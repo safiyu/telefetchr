@@ -18,23 +18,16 @@ import yaml
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Load the YAML file
-with open('config.yaml', 'r') as file:
-    config = yaml.safe_load(file)
-
-API_ID = config['api_id']
-API_HASH = config['api_hash']
-PHONE_NUMBER = f"+{config['phone']}"
-SAVE_PATH = config.get('save_path', 'downloads')
-CHANNEL_LIST = config.get('channel', [])
-MAX_CONCURRENT_DOWNLOADS = config.get('max_concurrent_downloads', 3)
-
+API_ID = os.getenv("API_ID")
+API_HASH = os.getenv("API_HASH")
+PHONE_NUMBER = f'+{os.getenv("PHONE_NUMBER")}'
+channels_raw = os.getenv("CHANNELS", "")
+CHANNEL_LIST = [c.strip() for c in channels_raw.split(",") if c.strip()]
+MAX_CONCURRENT_DOWNLOADS = os.getenv("MAX_CONCURRENT_DOWNLOADS", 3)
 
 # Session file - always use sessions directory
-
+SAVE_PATH = 'downloads'
 SESSION_DIR = 'sessions'
-# Ensure sessions directory exists
-os.makedirs(SESSION_DIR, exist_ok=True)
 SESSION_FILE = os.path.join(SESSION_DIR, 'telegram_session')
 
 # Global client instance

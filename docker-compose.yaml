@@ -8,14 +8,14 @@ services:
       - "8000:8000"
     volumes:
       - ./sessions:/app/sessions
-      - ./config.yaml:/app/config.yaml:ro
-      # Mount your network drive location here
-      # Replace /mnt/network-drive with your actual network drive path
-      - /mnt/network-drive:/app/downloads
-      # Or use a named volume for local storage
-      # - downloads:/app/downloads
+      - ./media:/app/downloads
     environment:
       - PYTHONUNBUFFERED=1
+      - CHANNELS=@cop_bot,@Cin_Bot
+      - API_ID=12345
+      - API_HASH=saasdasdf12324
+      - PHONE_NUMBER=12345 # without + sign
+      - MAX_CONCURRENT_DOWNLOADS=3
     restart: unless-stopped
     networks:
       - telefetchr-net
@@ -23,7 +23,3 @@ services:
 networks:
   telefetchr-net:
     driver: bridge
-
-# Uncomment if using named volume instead of network drive
-# volumes:
-#   downloads:

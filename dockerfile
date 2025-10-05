@@ -25,7 +25,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application files
 COPY launch.py .
-COPY config.yaml .
 COPY view.html .
 COPY script.js .
 
