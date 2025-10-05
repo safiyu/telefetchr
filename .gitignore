@@ -1,5 +1,2 @@
 # Ignore session files
 sessions/
-
-# Ignore sensitive config
-config.yaml

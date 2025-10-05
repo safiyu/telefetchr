@@ -8,13 +8,13 @@ services:
       - "8000:8000"
     volumes:
       - ./sessions:/app/sessions
-      - ./media:/app/downloads
+      - ./downloads:/app/downloads
     environment:
       - PYTHONUNBUFFERED=1
-      - CHANNELS=@cop_bot,@Cin_Bot
-      - API_ID=12345
-      - API_HASH=saasdasdf12324
-      - PHONE_NUMBER=12345 # without + sign
+      - CHANNELS=@c_bot,@Cin_Bot
+      - API_ID=1234567
+      - API_HASH=yourapihash
+      - PHONE_NUMBER=1234567890
       - MAX_CONCURRENT_DOWNLOADS=3
     restart: unless-stopped
     networks:
