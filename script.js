@@ -40,7 +40,7 @@ async function checkStatus() {
         const downloadSection = document.getElementById('downloadSection');
 
         if (data.status === 'connected') {
-            connectionStatus.className = 'inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-green-400 to-emerald-500 text-white shadow-md animate-pulse';
+            connectionStatus.className = 'inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-green-400 to-green-500 text-white shadow-md animate-pulse';
             connectionStatus.innerHTML = '<i class="fa-solid fa-circle mr-2 text-white animate-pulse"></i><span class="font-bold tracking-wide">Connected</span>';
             userInfo.innerHTML = `<p><strong>User:</strong> ${data.user.first_name} (@${data.user.username || 'N/A'})</p>`;
             loginSection.classList.add('hidden');
