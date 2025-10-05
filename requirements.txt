@@ -1,0 +1,7 @@
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+telethon==1.33.1
+pydantic
+PyYAML==6.0.1
+python-multipart==0.0.6
+aiofiles==23.2.1

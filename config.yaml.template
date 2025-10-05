@@ -1,0 +1,15 @@
+# Telegram API Configuration
+# Get your credentials from https://my.telegram.org/apps
+
+api_id: 12345678
+api_hash: "your_api_hash_here"
+phone: 33612345678  # Phone number without + sign (country code + number)
+
+# Download configuration
+save_path: "\\\\192.168.1.1\\complete"  # Network path or local path
+max_concurrent_downloads: 3 
+
+# List of channels to download from
+channel:
+  - "@chaneel1"
+  - "@channel2"
