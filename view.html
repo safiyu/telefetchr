@@ -4,20 +4,26 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Telefetchr</title>
+  <title>TeleFetchr</title>
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="/static/favicon.png" />
+  <!-- For Apple devices -->
+  <link rel="apple-touch-icon" href="/static/favicon.png" />
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-<body class="bg-gradient-to-br from-indigo-200 via-purple-100 to-blue-100 min-h-screen flex flex-col">
+<body class="bg-gradient-to-br from-indigo-200 via-purple-100 to-blue-100 min-h-screen flex flex-col font-mono">
   <!-- Toast Container for popup messages -->
   <div id="toastContainer" class="fixed top-6 right-6 z-50 space-y-2"></div>
   <header class="bg-white shadow p-4 flex justify-between items-center sticky top-0 z-10">
     <div class="flex items-center gap-2">
-      <i class="fa-brands fa-telegram text-indigo-500 text-2xl"></i>
-      <span class="font-bold text-xl text-indigo-700">Telefetchr</span>
+      <img src="/static/logo.png" alt="TeleFetchr Logo" class="h-20 w-auto" />
+      <span class="text-4xl font-bold font-mono bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500 bg-clip-text text-transparent animate-gradient-x">
+        TeleFetchr
+      </span>
     </div>
     <div id="statusBadge" class="flex items-center gap-2">
-      <span id="connectionStatus" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-green-400 to-emerald-500 text-white shadow-md animate-pulse">
+      <span id="connectionStatus" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-green-400 to-green-500 text-white shadow-md animate-pulse">
         <i class="fa-solid fa-circle mr-2 text-white animate-pulse"></i>
         <span class="font-bold tracking-wide">Connected</span>
       </span>
@@ -73,7 +79,7 @@
         </div>
         <div class="flex gap-2 mt-2">
           <button onclick="listFiles()" class="flex-1 py-2 px-4 rounded bg-indigo-500 text-white font-semibold shadow hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition"><i class="fa-solid fa-list mr-2"></i>List Files</button>
-          <button onclick="downloadAll()" class="flex-1 py-2 px-4 rounded bg-green-500 text-white font-semibold shadow hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-400 transition"><i class="fa-solid fa-cloud-arrow-down mr-2"></i>Download All</button>
+          <button onclick="downloadAll()" class="flex-1 py-2 px-4 rounded bg-green-500 text-white font-semibold shadow hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-400 transition"><i class="fa-solid fa-cloud-arrow-down mr-2"></i>Download All</button>
           <button onclick="cancelDownload()" id="cancelBtn" class="flex-1 py-2 px-4 rounded bg-red-500 text-white font-semibold shadow hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-400 transition hidden"><i class="fa-solid fa-ban mr-2"></i>Cancel All</button>
         </div>
         <!-- Progress Section -->

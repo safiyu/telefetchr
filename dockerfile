@@ -27,6 +27,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY launch.py .
 COPY view.html .
 COPY script.js .
+COPY logo.png .
+COPY favicon.png .
 
 # Copy sessions directory if exists (for build context)
 RUN mkdir -p sessions
