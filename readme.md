@@ -13,42 +13,28 @@
 
 ```
 telefetchr/
-├── Dockerfile
-├── docker-compose.yml
-├── .dockerignore
-├── requirements.txt
+├── Dockerfile         # Dockerfile for building the image
+├── docker-compose.yml # Docker Compose configuration
+├── .dockerignore # Ignore unnecessary files
+├── requirements.txt # Python dependencies
 ├── launch.py                # FastAPI app entry point
-├── config.yaml
-├── view.html                # Modern web UI (Tailwind, FontAwesome, popup toasts)
+├── view.html                # Modern web UI
 ├── script.js   # JavaScript for the web UI
-├── downloads/               # Created automatically
+├── downloads/               # Created automatically, stores downloaded files
 └── sessions/                # Created automatically, stores session files
-  ├── session.session
-  ├── telegram_session.session
-  └── telegram_session.session-journal
 ```
 
-
-> **Note:** All static files (HTML, JS) are served from the project root at `/static` by FastAPI. You do not need a physical `static/` folder.
-
-## Configuration File: `config.yaml`
-
-The `config.yaml` file in the project root contains your Telegram API credentials and app settings. **This file is required for the app to run.** Use the config template to create the config.yaml.
-
-**Template:**
+## Environment Variables (MANDATORY): 
 
 ```yaml
-api_id: YOUR_API_ID
-api_hash: YOUR_API_HASH
-phone: YOUR_PHONE_NUMBER  # Without + sign, e.g., 33612345678
-save_path: downloads # local path or network drive url
-channel: ["channel1", "channel2"]
-max_concurrent_downloads: 3
+environment:
+      - PYTHONUNBUFFERED=1
+      - CHANNELS=@cop_bot,@Cin_Bot # comma separated list of channels
+      - API_ID=12345 # your api_id from my.telegram.org
+      - API_HASH=saasdasdf12324 # your api_hash from my.telegram.org
+      - PHONE_NUMBER=12345 # without + sign
+      - MAX_CONCURRENT_DOWNLOADS=3 # optional, default is 3
 ```
-
-**Security:**
-- `config.yaml` is listed in `.gitignore` and will not be committed to git.
-- Never share this file or commit it to public repositories.
 
 ## Accessing the Application
 
@@ -57,18 +43,6 @@ Once the container is running, open your browser and navigate to:
 ```
 http://localhost:8000
 ```
-
-## Running Without Docker (Development)
-
-You can run the FastAPI app directly for development:
-
-
-```bash
-pip install -r requirements.txt
-python launch.py
-```
-
-Then open [http://localhost:8000](http://localhost:8000) in your browser.
 
 ## First Time Login
 
@@ -80,8 +54,8 @@ Then open [http://localhost:8000](http://localhost:8000) in your browser.
 
 ## Persistent Data
 
-- **Downloads**: All downloaded files are stored in save path in config
-- **Sessions**: Telegram session files are stored in `./sessions/`
+- **Downloads**: All downloaded files are stored in this path 
+- **Sessions**: Telegram session files are stored in this path
 - Both directories are mounted as volumes, so data persists even if you restart or rebuild the container
 
 ## Network Paths for Downloads
@@ -95,7 +69,7 @@ sudo mount -t cifs //server/share /mnt/network -o username=user,password=pass
 
 # Update docker-compose.yml to add volume:
 volumes:
-  - /mnt/network:/mnt/network
+  - /mnt/network:/app/downloads
 ```
 
 ### Windows:
@@ -105,130 +79,31 @@ net use Z: \\server\share /user:username password
 
 # Update docker-compose.yml:
 volumes:
-  - Z:/:/network
+  - Z:/:/app/downloads
 ```
-
-Then in the web interface, use `/mnt/network` (Linux/Mac) or `/network` (Windows) as the download path.
 
 ## Build and Run Instructions
 
-### 1. Create config.yaml
-
-Create a `config.yaml` file in the project root with your Telegram credentials:
-
-```yaml
-api_id: YOUR_API_ID
-api_hash: "YOUR_API_HASH"
-phone: YOUR_PHONE_NUMBER  # without + sign, e.g., 1234567890
-save_path: "downloads"  # See below for path options
-max_concurrent_downloads: 3
-channel:
-  - channel1
-  - channel2
-```
 ### Option 1: Using Docker Compose (Recommended)
 
-**Understanding save_path with Docker:**
 
-The `save_path` in your config.yaml determines where files are downloaded. You have three options:
-
-**Option 1: Relative Path (Recommended for simplicity)**
-```yaml
-save_path: "downloads"
-```
-Then mount it in docker-compose.yml:
-```yaml
-volumes:
-  - ./downloads:/app/downloads
-```
-
-**Option 2: Absolute Path (Network Drive)**
-```yaml
-save_path: "/mnt/nas/downloads"
-```
-Then mount the EXACT same path in docker-compose.yml:
-```yaml
-volumes:
-  - /mnt/nas/downloads:/mnt/nas/downloads
-```
-
-**Option 3: Absolute Path with Mapping**
-```yaml
-save_path: "/data/downloads"
-```
-Map your network drive to this path:
-```yaml
-volumes:
-  - /mnt/your-network-drive:/data/downloads
-```
-
-### 2. Configure Volume Mounts
-
-The volume mounts in `docker-compose.yml` MUST match the `save_path` in your config.yaml.
-
-**If you're using a network drive path like `/mnt/nas/downloads`:**
-
-1. First, ensure the network drive is mounted on your host system
-2. Set `save_path: "/mnt/nas/downloads"` in config.yaml
-3. Mount it in docker-compose.yml:
-```yaml
-volumes:
-  - /mnt/nas/downloads:/mnt/nas/downloads  # Same path on both sides
-```
-
-**If you're using a relative path like `downloads`:**
-
-1. Set `save_path: "downloads"` in config.yaml
-2. Mount it in docker-compose.yml:
-```yaml
-volumes:
-  - ./downloads:/app/downloads  # Local directory to container
-```
-
-
-**Example docker-compose.yml configurations:**
-
-For network drive (absolute path):
-```yaml
-volumes:
-  - ./sessions:/app/sessions
-  - ./config.yaml:/app/config.yaml:ro
-  - /mnt/nas/telegram:/mnt/nas/telegram  # Matches save_path in config
-```
-
-For local directory (relative path):
-```yaml
-volumes:
-  - ./sessions:/app/sessions
-  - ./config.yaml:/app/config.yaml:ro
-  - ./downloads:/app/downloads  # Matches save_path: "downloads" in config
-```
 
 **Examples for different systems:**
 
 **Linux/macOS (NFS/SMB mount):**
 ```yaml
-- /mnt/nas/downloads:/mnt/nas/downloads
+- /mnt/nas/downloads:/app/downloads
 ```
-Config.yaml: `save_path: "/mnt/nas/downloads"`
 
 **Windows (mapped network drive):**
 ```yaml
-- Z:/downloads:/app/Z/downloads
+- Z:/downloads:/app/downloads
 ```
-Config.yaml: `save_path: "/app/Z/downloads"`
 
 **Windows (UNC path):**
 ```yaml
-- //server/share/downloads://server/share/downloads
+- //server/share/downloads:/app/downloads
 ```
-Config.yaml: `save_path: "//server/share/downloads"`
-
-### 3. Ensure Required Files Exist
-
-Make sure you have:
-- `launch.py` - Your FastAPI application
-- `view.html` - The web interface
 
 ## Installation & Usage
 
@@ -263,7 +138,11 @@ docker run -d \
   -p 8000:8000 \
   -v $(pwd)/downloads:/app/downloads \
   -v $(pwd)/sessions:/app/sessions \
-  -v $(pwd)/config.yaml:/app/config.yaml:ro \
+  -e API_ID=123456 \
+  -e API_HASH=abcdef123456 \
+  -e CHANNELS=@news,@music,@movies \
+  -e PHONE_NUMBER=1234567890 \
+  -e MAX_CONCURRENT_DOWNLOADS=3 \
   telefetchr
 
 # Run the container (windows)
@@ -273,6 +152,11 @@ docker run -d `
   -v ${PWD}/downloads:/app/downloads `
   -v ${PWD}/sessions:/app/sessions `
   -v ${PWD}/config.yaml:/app/config.yaml:ro `
+  -e API_ID=123456 `
+  -e API_HASH=abcdef123456 `
+  -e CHANNELS=@news,@music,@movies `
+  -e PHONE_NUMBER=1234567890 `
+  -e MAX_CONCURRENT_DOWNLOADS=3 `
   telefetchr
 
 
@@ -343,36 +227,10 @@ The following directories are mounted as volumes and will persist data:
 
 - **Network Drive** (configured in docker-compose.yml) - All downloaded files go directly to your network storage
 - **sessions/** - Telegram session data (keeps you logged in)
-- **config.yaml** - Your configuration file (read-only)
 
 Files are downloaded directly to your network drive location, so they're immediately available to other systems on your network.
 
 ## Troubleshooting
-
-### Path Mismatch Issues
-
-**Problem:** Files aren't appearing in your expected location.
-
-**Solution:** Ensure your docker-compose.yml volume mount matches your config.yaml save_path:
-
-1. Check your config.yaml:
-```bash
-cat config.yaml | grep save_path
-```
-
-2. If `save_path: "/mnt/nas/downloads"`, your docker-compose.yml needs:
-```yaml
-volumes:
-  - /mnt/nas/downloads:/mnt/nas/downloads
-```
-
-3. If `save_path: "downloads"`, your docker-compose.yml needs:
-```yaml
-volumes:
-  - ./downloads:/app/downloads
-```
-
-The paths must match exactly!
 
 ### Container Won't Start
 
@@ -382,9 +240,10 @@ docker-compose logs
 ```
 
 **Common issues:**
-- Missing `config.yaml` file
 - Invalid API credentials
 - Port 8000 already in use
+- Permission issues with network drive
+- Path not set correctly
 
 ### Port Already in Use
 
@@ -508,69 +367,6 @@ volumes:
   - /Volumes/NetworkDrive/downloads:/app/downloads
 ```
 
-### Custom Download Path
-
-**Key Principle:** The path in your `config.yaml` must exist inside the Docker container.
-
-**Example Setup:**
-
-If your network drive is at `/mnt/synology/media` on your host:
-
-1. **config.yaml:**
-```yaml
-save_path: "/mnt/synology/media"
-```
-
-2. **docker-compose.yml:**
-```yaml
-volumes:
-  - /mnt/synology/media:/mnt/synology/media  # Mount with same path
-```
-
-**Alternative Setup (Path Mapping):**
-
-If you want to use a different path inside the container:
-
-1. **config.yaml:**
-```yaml
-save_path: "/storage"  # Path inside container
-```
-
-2. **docker-compose.yml:**
-```yaml
-volumes:
-  - /mnt/synology/media:/storage  # Map host path to container path
-```
-
-**Multiple Network Locations:**
-
-If you need to support multiple network drives:
-
-**config.yaml:**
-```yaml
-save_path: "/mnt/nas1"  # Choose which one to use
-```
-
-**docker-compose.yml:**
-```yaml
-volumes:
-  - /mnt/nas1:/mnt/nas1
-  - /mnt/nas2:/mnt/nas2
-  - /mnt/backup:/mnt/backup
-  - ./sessions:/app/sessions
-```
-
-Then change `save_path` in config.yaml to switch between locations.
-
-### Environment Variables
-
-You can set additional environment variables in `docker-compose.yml`:
-
-```yaml
-environment:
-  - PYTHONUNBUFFERED=1
-  - LOG_LEVEL=INFO
-```
 
 ### Resource Limits
 
@@ -601,18 +397,10 @@ services:
 
 ## Security Notes
 
-- Keep your `config.yaml` secure and never commit it to version control
 - The `sessions/` directory contains sensitive authentication data
 - Use environment variables for sensitive data in production
 - Consider using Docker secrets for production deployments
 
-## Support
-
-For issues and questions:
-- Check the logs: `docker-compose logs -f`
-- Ensure all prerequisites are installed
-- Verify your Telegram API credentials
-- Check that required files (`view.html`, `launch.py`) exist
 
 ## License
 
