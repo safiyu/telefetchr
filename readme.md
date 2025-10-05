@@ -1,5 +1,5 @@
 
-# Telegram File Downloader (Modern Web UI)
+# Telefetchr (Telegram file downloader)
 
 ## Prerequisites
 
@@ -12,7 +12,7 @@
 
 
 ```
-telegram-downloader/
+telefetchr/
 ├── Dockerfile
 ├── docker-compose.yml
 ├── .dockerignore
@@ -20,7 +20,7 @@ telegram-downloader/
 ├── launch.py                # FastAPI app entry point
 ├── config.yaml
 ├── view.html                # Modern web UI (Tailwind, FontAwesome, popup toasts)
-├── telegram_downloader.js   # JavaScript for the web UI
+├── script.js   # JavaScript for the web UI
 ├── downloads/               # Created automatically
 └── sessions/                # Created automatically, stores session files
   ├── session.session
@@ -31,35 +31,24 @@ telegram-downloader/
 
 > **Note:** All static files (HTML, JS) are served from the project root at `/static` by FastAPI. You do not need a physical `static/` folder.
 
----
+## Configuration File: `config.yaml`
 
-## Modern Web UI Features
+The `config.yaml` file in the project root contains your Telegram API credentials and app settings. **This file is required for the app to run.** Use the config template to create the config.yaml.
 
-- **Modern look:** Uses Tailwind CSS and FontAwesome for a clean, responsive interface.
-- **Popup toasts:** All status and error messages appear as animated popups in the top-right, keeping the UI clean.
-- **Multi-progress bars:** See progress for each concurrent download.
-- **Channel selection:** Channel dropdown is loaded only once on page load for a stable experience.
-- **No static folder needed:** All static files are served directly from the project root.
-
-To use the modern UI, open `view.html` in your browser or ensure your FastAPI app serves it as the main page.
-
----
-
-## Configuration
-
-1. **Create `config.yaml`** in the project root:
+**Template:**
 
 ```yaml
 api_id: YOUR_API_ID
 api_hash: YOUR_API_HASH
 phone: YOUR_PHONE_NUMBER  # Without + sign, e.g., 33612345678
+save_path: downloads # local path or network drive url
+channel: ["channel1", "channel2"]
+max_concurrent_downloads: 3
 ```
 
-2. **Create necessary directories**:
-
-```bash
-mkdir -p downloads sessions
-```
+**Security:**
+- `config.yaml` is listed in `.gitignore` and will not be committed to git.
+- Never share this file or commit it to public repositories.
 
 ## Building and Running
 
@@ -80,23 +69,23 @@ docker-compose down
 
 ```bash
 # Build the image
-docker build -t telegram-downloader .
+docker build -t telefetchr .
 
 # Run the container
 docker run -d \
-  --name telegram-downloader \
+  --name telefetchr \
   -p 8000:8000 \
   -v $(pwd)/downloads:/app/downloads \
   -v $(pwd)/sessions:/app/sessions \
   -v $(pwd)/config.yaml:/app/config.yaml:ro \
-  telegram-downloader
+  telefetchr
 
 # View logs
-docker logs -f telegram-downloader
+docker logs -f telefetchr
 
 # Stop the container
-docker stop telegram-downloader
-docker rm telegram-downloader
+docker stop telefetchr
+docker rm telefetchr
 ```
 
 
@@ -107,13 +96,6 @@ Once the container is running, open your browser and navigate to:
 ```
 http://localhost:8000
 ```
-
-
-## Web UI Structure
-
-- `view.html`: The modern HTML file for the web interface (Tailwind, FontAwesome, popup toasts)
-- `telegram_downloader.js`: All JavaScript logic for the UI (loaded via `<script src="/static/telegram_downloader.js"></script>` at the end of `view.html`)
-- All static files (JS, HTML, etc.) are served from the project root via FastAPI's static file mount at `/static`.
 
 ## Running Without Docker (Development)
 
@@ -127,12 +109,6 @@ python launch.py
 
 Then open [http://localhost:8000](http://localhost:8000) in your browser.
 
-If you make changes to `telegram_downloader.js` or `ui.html`, just reload the page.
-
-**Note:**
-- The FastAPI app serves static files (including JS) from the project directory at `/static`.
-- You do NOT need a physical `static/` folder; the files are served from the project root.
-
 ## First Time Login
 
 1. The application will prompt you to login
@@ -143,7 +119,7 @@ If you make changes to `telegram_downloader.js` or `ui.html`, just reload the pa
 
 ## Persistent Data
 
-- **Downloads**: All downloaded files are stored in `./downloads/`
+- **Downloads**: All downloaded files are stored in save path in config
 - **Sessions**: Telegram session files are stored in `./sessions/`
 - Both directories are mounted as volumes, so data persists even if you restart or rebuild the container
 
@@ -192,7 +168,7 @@ docker-compose down
 docker-compose down -v
 
 # Access container shell
-docker-compose exec telegram-downloader /bin/bash
+docker-compose exec telefetchr /bin/bash
 
 # Check container status
 docker-compose ps

@@ -26,8 +26,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application files
 COPY launch.py .
 COPY config.yaml .
-COPY ui.html .
-COPY telegram_downloader.js .
+COPY view.html .
+COPY script.js .
 
 # Copy sessions directory if exists (for build context)
 RUN mkdir -p sessions
