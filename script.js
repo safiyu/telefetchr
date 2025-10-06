@@ -4,6 +4,8 @@
 let statusCheckInterval;
 let channelList = [];
 let savePath = '';
+let selectedFiles = new Set();
+let progressMonitoringInterval = null;
 
 async function loadChannels() {
     try {
@@ -194,105 +196,218 @@ function displayFiles(files) {
         return;
     }
 
-        let html = `
-            <h3 class="text-lg font-semibold text-indigo-700 mb-4 flex items-center gap-2"><i class="fa-solid fa-folder-open"></i> Files Found</h3>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">`;
+    let html = `
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold text-indigo-700 flex items-center gap-2">
+                <i class="fa-solid fa-folder-open"></i> Files Found
+            </h3>
+            <div class="flex gap-2">
+                <button onclick="selectAllFiles()" class="py-1 px-3 rounded bg-indigo-500 text-white font-semibold shadow hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition flex items-center gap-1">
+                    <i class="fa-solid fa-check-double"></i> Select All
+                </button>
+                <button onclick="deselectAllFiles()" class="py-1 px-3 rounded bg-gray-500 text-white font-semibold shadow hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition flex items-center gap-1">
+                    <i class="fa-solid fa-xmark"></i> Deselect All
+                </button>
+                <button onclick="downloadSelected('${currentChannel}')" id="downloadSelectedBtn" class="py-1 px-3 rounded bg-green-500 text-white font-semibold shadow hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-400 transition flex items-center gap-1">
+                    <i class="fa-solid fa-download"></i> Download Selected (<span id="selectedCount">0</span>)
+                </button>
+            </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">`;
 
-        files.forEach(file => {
-                const size = file.file_size > 0 ? (file.file_size / 1024 / 1024).toFixed(2) + ' MB' : 'N/A';
-                let icon = 'fa-file-lines';
-                if (file.file_type === 'photo') icon = 'fa-file-image';
-                else if (file.file_type === 'video') icon = 'fa-file-video';
-                else if (file.file_type === 'audio') icon = 'fa-file-audio';
-                else if (file.file_type === 'document') icon = 'fa-file-lines';
-                html += `
-                    <div class="bg-white rounded-lg shadow flex items-center p-4 gap-4">
-                        <div>
-                            <i class="fa-solid ${icon} text-3xl text-indigo-400"></i>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <div class="font-semibold text-gray-800 truncate" title="${file.file_name}">${file.file_name}</div>
-                            <div class="text-xs text-gray-500 mt-1">${file.file_type.charAt(0).toUpperCase() + file.file_type.slice(1)} · ${size} · ${new Date(file.date).toLocaleDateString()}</div>
-                        </div>
-                        <button onclick="downloadSingle(${file.file_id}, '${currentChannel}')" class="py-1 px-3 rounded bg-indigo-500 text-white font-semibold shadow hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition flex items-center gap-1">
-                            <i class="fa-solid fa-download"></i> Download
-                        </button>
-                    </div>
-                `;
+    files.forEach(file => {
+        const size = file.file_size > 0 ? (file.file_size / 1024 / 1024).toFixed(2) + ' MB' : 'N/A';
+        let icon = 'fa-file-lines';
+        if (file.file_type === 'photo') icon = 'fa-file-image';
+        else if (file.file_type === 'video') icon = 'fa-file-video';
+        else if (file.file_type === 'audio') icon = 'fa-file-audio';
+        else if (file.file_type === 'document') icon = 'fa-file-lines';
+        
+        const isChecked = selectedFiles.has(file.file_id) ? 'checked' : '';
+        
+        html += `
+            <div class="bg-white rounded-lg shadow flex items-center p-4 gap-4 file-item" data-file-id="${file.file_id}">
+                <div class="flex items-center">
+                    <input type="checkbox" 
+                           id="file_${file.file_id}" 
+                           class="file-checkbox w-5 h-5 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer" 
+                           onchange="toggleFileSelection(${file.file_id})"
+                           ${isChecked}>
+                </div>
+                <div>
+                    <i class="fa-solid ${icon} text-3xl text-indigo-400"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="font-semibold text-gray-800 truncate" title="${file.file_name}">${file.file_name}</div>
+                    <div class="text-xs text-gray-500 mt-1">${file.file_type.charAt(0).toUpperCase() + file.file_type.slice(1)} · ${size} · ${new Date(file.date).toLocaleDateString()}</div>
+                </div>
+                <button onclick="downloadSingle(${file.file_id}, '${currentChannel}')" class="py-1 px-3 rounded bg-indigo-500 text-white font-semibold shadow hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition flex items-center gap-1">
+                    <i class="fa-solid fa-download"></i> Download
+                </button>
+            </div>
+        `;
+    });
+
+    html += '</div>';
+    filesList.innerHTML = html;
+    updateSelectedCount();
+}
+
+function toggleFileSelection(fileId) {
+    if (selectedFiles.has(fileId)) {
+        selectedFiles.delete(fileId);
+    } else {
+        selectedFiles.add(fileId);
+    }
+    updateSelectedCount();
+}
+
+function selectAllFiles() {
+    const checkboxes = document.querySelectorAll('.file-checkbox');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = true;
+        const fileId = parseInt(checkbox.id.replace('file_', ''));
+        selectedFiles.add(fileId);
+    });
+    updateSelectedCount();
+}
+
+function deselectAllFiles() {
+    const checkboxes = document.querySelectorAll('.file-checkbox');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    selectedFiles.clear();
+    updateSelectedCount();
+}
+
+function updateSelectedCount() {
+    const countElement = document.getElementById('selectedCount');
+    if (countElement) {
+        countElement.textContent = selectedFiles.size;
+    }
+}
+
+async function downloadSelected(channel) {
+    if (selectedFiles.size === 0) {
+        showAlert('downloadAlert', 'Please select at least one file to download', 'warning');
+        return;
+    }
+
+    try {
+        const response = await fetch('/files/download-selected', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                channel_username: channel,
+                message_ids: Array.from(selectedFiles)
+            })
         });
 
-        html += '</div>';
-        filesList.innerHTML = html;
+        const data = await response.json();
+
+        if (response.ok) {
+            showAlert('downloadAlert', data.message, 'success');
+            
+            // Clear any previous progress display
+            const progressBarsContainer = document.getElementById('progressBarsContainer');
+            if (progressBarsContainer) {
+                progressBarsContainer.innerHTML = '';
+            }
+            
+            document.getElementById('downloadProgress').classList.remove('hidden');
+            document.getElementById('cancelBtn').classList.remove('hidden');
+            document.getElementById('clearProgressBtn').classList.add('hidden');
+            startProgressMonitoring();
+        } else {
+            showAlert('downloadAlert', data.detail, 'error');
+        }
+    } catch (error) {
+        showAlert('downloadAlert', 'Error: ' + error.message, 'error');
+    }
 }
 
 async function downloadSingle(messageId, channel) {
+    let progressInterval;
+    
     try {
         showAlert('downloadAlert', 'Starting download...', 'info');
+        
+        // Clear previous progress
+        const progressBarsContainer = document.getElementById('progressBarsContainer');
+        if (progressBarsContainer) {
+            progressBarsContainer.innerHTML = '';
+        }
+        
         document.getElementById('downloadProgress').classList.remove('hidden');
         document.getElementById('cancelBtn').classList.remove('hidden');
-        // Always use the unified progress monitoring logic
-        let progressInterval = setInterval(async () => {
+        document.getElementById('clearProgressBtn').classList.add('hidden');
+        
+        progressInterval = setInterval(async () => {
             try {
                 const response = await fetch('/download-progress');
                 const data = await response.json();
                 let html = '';
-                // Show overall progress if available
+                
                 if (typeof data.progress === 'number' && typeof data.total === 'number' && data.total > 0) {
                     html += `<div style="margin-bottom: 10px; font-weight: 600;">Overall: ${data.progress} / ${data.total} files</div>`;
                 }
-                // If concurrent downloads are present, only show those
+                
                 if (data.concurrent_downloads && Object.keys(data.concurrent_downloads).length > 0) {
-                                        for (const [fileId, fileData] of Object.entries(data.concurrent_downloads)) {
-                                                const percentage = fileData.percentage || 0;
-                                                const formatBytes = (bytes) => {
-                                                        if (!bytes || bytes === 0) return '0 Bytes';
-                                                        const k = 1024;
-                                                        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-                                                        const i = Math.floor(Math.log(bytes) / Math.log(k));
-                                                        return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
-                                                };
-                                                                        html += `
-                                                                            <div class="file-progress-block bg-white rounded-lg shadow p-4 mb-4">
-                                                                                <div class="file-name font-semibold text-gray-800 mb-2">${fileData.name}</div>
-                                                                                <div class="w-full bg-gray-200 rounded-full h-4 mb-2">
-                                                                                    <div class="bg-indigo-500 h-4 rounded-full transition-all duration-300" style="width: ${percentage}%; max-width: 100%;"></div>
-                                                                                </div>
-                                                                                <div class="flex justify-between text-xs text-gray-500">
-                                                                                    <span>${formatBytes(fileData.progress)} / ${formatBytes(fileData.total)}</span>
-                                                                                    <span>${percentage}%</span>
-                                                                                </div>
-                                                                            </div>
-                                                                        `;
-                                        }
+                    for (const [fileId, fileData] of Object.entries(data.concurrent_downloads)) {
+                        const percentage = fileData.percentage || 0;
+                        const formatBytes = (bytes) => {
+                            if (!bytes || bytes === 0) return '0 Bytes';
+                            const k = 1024;
+                            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                            const i = Math.floor(Math.log(bytes) / Math.log(k));
+                            return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+                        };
+                        html += `
+                            <div class="file-progress-block bg-white rounded-lg shadow p-4 mb-4">
+                                <div class="file-name font-semibold text-gray-800 mb-2">${fileData.name}</div>
+                                <div class="w-full bg-gray-200 rounded-full h-4 mb-2">
+                                    <div class="bg-indigo-500 h-4 rounded-full transition-all duration-300" style="width: ${percentage}%; max-width: 100%;"></div>
+                                </div>
+                                <div class="flex justify-between text-xs text-gray-500">
+                                    <span>${formatBytes(fileData.progress)} / ${formatBytes(fileData.total)}</span>
+                                    <span>${percentage}%</span>
+                                </div>
+                            </div>
+                        `;
+                    }
                 } else if (data.current_file && data.current_file !== "") {
-                    // Only show single file progress if no concurrent downloads
-                                        let filePercentage = 0;
-                                        if (data.current_file_size > 0) {
-                                                filePercentage = Math.round((data.current_file_progress / data.current_file_size) * 100);
-                                        }
-                                        const formatBytes = (bytes) => {
-                                                if (!bytes || bytes === 0) return '0 Bytes';
-                                                const k = 1024;
-                                                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-                                                const i = Math.floor(Math.log(bytes) / Math.log(k));
-                                                return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
-                                        };
-                                                            html += `
-                                                                <div class="file-progress-block bg-white rounded-lg shadow p-4 mb-4">
-                                                                    <div class="file-name font-semibold text-gray-800 mb-2">${data.current_file}</div>
-                                                                    <div class="w-full bg-gray-200 rounded-full h-4 mb-2">
-                                                                        <div class="bg-indigo-500 h-4 rounded-full transition-all duration-300" style="width: ${filePercentage}%; max-width: 100%;"></div>
-                                                                    </div>
-                                                                    <div class="flex justify-between text-xs text-gray-500">
-                                                                        <span>${formatBytes(data.current_file_progress)} / ${formatBytes(data.current_file_size)}</span>
-                                                                        <span>${filePercentage}%</span>
-                                                                    </div>
-                                                                </div>
-                                                            `;
+                    let filePercentage = 0;
+                    if (data.current_file_size > 0) {
+                        filePercentage = Math.round((data.current_file_progress / data.current_file_size) * 100);
+                    }
+                    const formatBytes = (bytes) => {
+                        if (!bytes || bytes === 0) return '0 Bytes';
+                        const k = 1024;
+                        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                        const i = Math.floor(Math.log(bytes) / Math.log(k));
+                        return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+                    };
+                    html += `
+                        <div class="file-progress-block bg-white rounded-lg shadow p-4 mb-4">
+                            <div class="file-name font-semibold text-gray-800 mb-2">${data.current_file}</div>
+                            <div class="w-full bg-gray-200 rounded-full h-4 mb-2">
+                                <div class="bg-indigo-500 h-4 rounded-full transition-all duration-300" style="width: ${filePercentage}%; max-width: 100%;"></div>
+                            </div>
+                            <div class="flex justify-between text-xs text-gray-500">
+                                <span>${formatBytes(data.current_file_progress)} / ${formatBytes(data.current_file_size)}</span>
+                                <span>${filePercentage}%</span>
+                            </div>
+                        </div>
+                    `;
                 } else {
                     html += '<div style="color:#999; text-align:center; padding:12px;">Download is active, but no file progress to show yet.</div>';
                 }
-                document.getElementById('downloadProgress').innerHTML = html;
+                
+                const container = document.getElementById('progressBarsContainer');
+                if (container) {
+                    container.innerHTML = html;
+                }
             } catch (error) {
                 console.error('Progress update error:', error);
             }
@@ -302,22 +417,41 @@ async function downloadSingle(messageId, channel) {
             method: 'POST'
         });
 
-        clearInterval(progressInterval);
-
         const data = await response.json();
 
+        if (progressInterval) {
+            clearInterval(progressInterval);
+        }
+
         if (response.ok) {
-            showAlert('downloadAlert', 'File downloaded: ' + data.file_path, 'success');
-            document.getElementById('downloadProgress').classList.add('hidden');
+            const finalHtml = `
+                <div class="file-progress-block bg-white rounded-lg shadow p-4 mb-4">
+                    <div class="file-name font-semibold text-gray-800 mb-2">✓ Download Complete!</div>
+                    <div class="w-full bg-gray-200 rounded-full h-4 mb-2">
+                        <div class="bg-green-500 h-4 rounded-full transition-all duration-300" style="width: 100%;"></div>
+                    </div>
+                    <div class="flex justify-between text-xs text-gray-500">
+                        <span>Completed</span>
+                        <span>100%</span>
+                    </div>
+                </div>
+            `;
+            const container = document.getElementById('progressBarsContainer');
+            if (container) {
+                container.innerHTML = finalHtml;
+            }
             document.getElementById('cancelBtn').classList.add('hidden');
+            
+            showAlert('downloadAlert', 'File downloaded: ' + data.file_path, 'success');
         } else {
             showAlert('downloadAlert', data.detail, 'error');
-            document.getElementById('downloadProgress').classList.add('hidden');
             document.getElementById('cancelBtn').classList.add('hidden');
         }
     } catch (error) {
+        if (progressInterval) {
+            clearInterval(progressInterval);
+        }
         showAlert('downloadAlert', 'Error: ' + error.message, 'error');
-        document.getElementById('downloadProgress').classList.add('hidden');
         document.getElementById('cancelBtn').classList.add('hidden');
     }
 }
@@ -347,8 +481,16 @@ async function downloadAll() {
 
         if (response.ok) {
             showAlert('downloadAlert', data.message, 'success');
+            
+            // Clear previous progress
+            const progressBarsContainer = document.getElementById('progressBarsContainer');
+            if (progressBarsContainer) {
+                progressBarsContainer.innerHTML = '';
+            }
+            
             document.getElementById('downloadProgress').classList.remove('hidden');
             document.getElementById('cancelBtn').classList.remove('hidden');
+            document.getElementById('clearProgressBtn').classList.add('hidden');
             startProgressMonitoring();
         } else {
             showAlert('downloadAlert', data.detail, 'error');
@@ -368,7 +510,34 @@ async function cancelDownload() {
 
         if (response.ok) {
             showAlert('downloadAlert', data.message, 'info');
+            
+            // Stop any active progress monitoring
+            if (progressMonitoringInterval) {
+                clearInterval(progressMonitoringInterval);
+                progressMonitoringInterval = null;
+            }
+            
+            // Clear progress bars container
+            const progressBarsContainer = document.getElementById('progressBarsContainer');
+            if (progressBarsContainer) {
+                progressBarsContainer.innerHTML = '';
+            }
+            
+            // Reset overall text
+            const overallText = document.getElementById('overallText');
+            if (overallText) {
+                overallText.textContent = '';
+            }
+            
+            // Clear selected files and update UI
+            selectedFiles.clear();
+            updateSelectedCount();
+            deselectAllFiles();
+            
+            // Hide the progress section and buttons
+            document.getElementById('downloadProgress').classList.add('hidden');
             document.getElementById('cancelBtn').classList.add('hidden');
+            document.getElementById('clearProgressBtn').classList.add('hidden');
         } else {
             showAlert('downloadAlert', data.detail || data.message, 'error');
         }
@@ -378,21 +547,49 @@ async function cancelDownload() {
 }
 
 function startProgressMonitoring() {
-    const progressInterval = setInterval(async () => {
+    // Clear any existing interval first
+    if (progressMonitoringInterval) {
+        clearInterval(progressMonitoringInterval);
+    }
+    
+    let hasStarted = false;
+    
+    progressMonitoringInterval = setInterval(async () => {
         try {
             const response = await fetch('/download-progress');
             const data = await response.json();
 
-            if (!data.active) {
-                clearInterval(progressInterval);
-                document.getElementById('downloadProgress').classList.add('hidden');
+            // Mark as started once we see active status
+            if (data.active) {
+                hasStarted = true;
+            }
+
+            // Only show completion if download actually started and is now inactive
+            if (!data.active && hasStarted) {
+                clearInterval(progressMonitoringInterval);
+                progressMonitoringInterval = null;
                 document.getElementById('cancelBtn').classList.add('hidden');
+                document.getElementById('clearProgressBtn').classList.remove('hidden');
+                
+                const progressBarsContainer = document.getElementById('progressBarsContainer');
+                if (progressBarsContainer) {
+                    const currentHtml = progressBarsContainer.innerHTML;
+                    const completionMsg = '<div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mt-4 flex items-center gap-2"><i class="fa-solid fa-circle-check"></i><span>All downloads completed!</span></div>';
+                    if (!currentHtml.includes('All downloads completed')) {
+                        progressBarsContainer.innerHTML += completionMsg;
+                    }
+                }
                 return;
             }
 
-            document.getElementById('overallText').textContent = `${data.progress}/${data.total} files`;
+            const overallText = document.getElementById('overallText');
+            if (overallText) {
+                overallText.textContent = `${data.progress}/${data.total} files`;
+            }
 
             const progressBarsContainer = document.getElementById('progressBarsContainer');
+            if (!progressBarsContainer) return;
+            
             let barsHtml = '';
             if (data.active) {
                 if (data.concurrent_downloads && Object.keys(data.concurrent_downloads).length > 0) {
@@ -409,7 +606,7 @@ function startProgressMonitoring() {
                             <div class="file-progress-block" style="margin: 16px 0; padding: 12px; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
                                 <div class="file-name" style="font-size: 1em; margin-bottom: 8px;">${fileData.name}</div>
                                 <div class="progress-bar" style="height: 24px; margin: 8px 0;">
-                                    <div class="progress-fill" style="width: ${percentage}%">${percentage}%</div>
+                                    <div class="progress-fill" style="width: ${percentage}%; min-width: ${percentage > 0 ? '30px' : '0'};">${percentage}%</div>
                                 </div>
                                 <div style="font-size: 0.9em; color: #666;">${formatBytes(fileData.progress)} / ${formatBytes(fileData.total)}</div>
                             </div>
@@ -431,7 +628,7 @@ function startProgressMonitoring() {
                         <div class="file-progress-block" style="margin: 16px 0; padding: 12px; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
                             <div class="file-name" style="font-size: 1em; margin-bottom: 8px;">${data.current_file}</div>
                             <div class="progress-bar" style="height: 24px; margin: 8px 0;">
-                                <div class="progress-fill" style="width: ${filePercentage}%">${filePercentage}%</div>
+                                <div class="progress-fill" style="width: ${filePercentage}%; min-width: ${filePercentage > 0 ? '30px' : '0'};">${filePercentage}%</div>
                             </div>
                             <div style="font-size: 0.9em; color: #666;">${formatBytes(data.current_file_progress)} / ${formatBytes(data.current_file_size)}</div>
                         </div>
@@ -450,8 +647,32 @@ function startProgressMonitoring() {
     }, 500);
 }
 
+function clearProgress() {
+    // Stop monitoring if active
+    if (progressMonitoringInterval) {
+        clearInterval(progressMonitoringInterval);
+        progressMonitoringInterval = null;
+    }
+    
+    document.getElementById('downloadProgress').classList.add('hidden');
+    const progressBarsContainer = document.getElementById('progressBarsContainer');
+    if (progressBarsContainer) {
+        progressBarsContainer.innerHTML = '';
+    }
+    const overallText = document.getElementById('overallText');
+    if (overallText) {
+        overallText.textContent = '';
+    }
+    
+    // Clear selected files and update UI
+    selectedFiles.clear();
+    updateSelectedCount();
+    deselectAllFiles();
+    
+    document.getElementById('clearProgressBtn').classList.add('hidden');
+}
+
 function showAlert(_elementId, message, type) {
-    // type: 'success', 'error', 'info', 'warning'
     const toastContainer = document.getElementById('toastContainer');
     if (!toastContainer) return;
     let color = 'bg-indigo-500';
@@ -471,6 +692,7 @@ function showAlert(_elementId, message, type) {
         setTimeout(() => toast.remove(), 500);
     }, 4000);
 }
+
 // Toast fade-in animation
 const style = document.createElement('style');
 style.innerHTML = `@keyframes fade-in-up { from { opacity: 0; transform: translateY(20px);} to { opacity: 1; transform: translateY(0);} } .animate-fade-in-up { animation: fade-in-up 0.4s cubic-bezier(.39,.575,.565,1.000) both; }`;
@@ -479,7 +701,6 @@ document.head.appendChild(style);
 // On page load, check status and load channels if connected
 (async function() {
     await checkStatus();
-    // Only load channels once on page load if connected
     const connectionStatus = document.getElementById('connectionStatus');
     if (connectionStatus && connectionStatus.textContent.includes('Connected')) {
         await loadChannels();

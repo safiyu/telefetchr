@@ -11,10 +11,32 @@
   <link rel="apple-touch-icon" href="/static/favicon.png" />
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    /* Custom styles for progress bars */
+    .progress-bar {
+      background: #e5e7eb;
+      border-radius: 9999px;
+      overflow: hidden;
+      position: relative;
+    }
+    .progress-fill {
+      background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%);
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 0.75rem;
+      font-weight: 600;
+      transition: width 0.3s ease;
+      min-width: 30px;
+    }
+  </style>
 </head>
 <body class="bg-gradient-to-br from-indigo-200 via-purple-100 to-blue-100 min-h-screen flex flex-col font-mono">
   <!-- Toast Container for popup messages -->
   <div id="toastContainer" class="fixed top-6 right-6 z-50 space-y-2"></div>
+  
   <header class="bg-white shadow p-4 flex justify-between items-center sticky top-0 z-10">
     <div class="flex items-center gap-2">
       <img src="/static/logo.png" alt="TeleFetchr Logo" class="h-20 w-auto" />
@@ -35,7 +57,7 @@
     <div class="w-full max-w-3xl space-y-6">
       <!-- Login Card -->
       <div id="loginSection" class="bg-white rounded-xl shadow p-6 space-y-4 hidden">
-  <h2 class="text-lg font-semibold text-indigo-700 flex items-center gap-2"><i class="fa-solid fa-lock"></i> Login Required</h2>
+        <h2 class="text-lg font-semibold text-indigo-700 flex items-center gap-2"><i class="fa-solid fa-lock"></i> Login Required</h2>
         <div id="codeForm" class="space-y-2 hidden">
           <div class="flex items-center gap-2"><i class="fa-solid fa-sms text-indigo-400"></i>Enter the code sent to your phone:</div>
           <input type="text" id="verificationCode" class="input input-bordered w-full" placeholder="12345">
@@ -53,7 +75,7 @@
 
       <!-- Channel & Settings Card -->
       <div id="downloadSection" class="bg-white rounded-xl shadow p-6 space-y-4 hidden">
-  <h2 class="text-lg font-semibold text-indigo-700 flex items-center gap-2"><i class="fa-solid fa-download"></i> Download Files</h2>
+        <h2 class="text-lg font-semibold text-indigo-700 flex items-center gap-2"><i class="fa-solid fa-download"></i> Download Files</h2>
         <div class="bg-gray-50 p-3 rounded flex items-center gap-2">
           <i class="fa-solid fa-folder-open text-indigo-400"></i>
           <span class="font-medium">Save Path:</span>
@@ -80,13 +102,19 @@
         <div class="flex gap-2 mt-2">
           <button onclick="listFiles()" class="flex-1 py-2 px-4 rounded bg-indigo-500 text-white font-semibold shadow hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition"><i class="fa-solid fa-list mr-2"></i>List Files</button>
           <button onclick="downloadAll()" class="flex-1 py-2 px-4 rounded bg-green-500 text-white font-semibold shadow hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-400 transition"><i class="fa-solid fa-cloud-arrow-down mr-2"></i>Download All</button>
-          <button onclick="cancelDownload()" id="cancelBtn" class="flex-1 py-2 px-4 rounded bg-red-500 text-white font-semibold shadow hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-400 transition hidden"><i class="fa-solid fa-ban mr-2"></i>Cancel All</button>
+          <button onclick="cancelDownload()" id="cancelBtn" class="flex-1 py-2 px-4 rounded bg-red-500 text-white font-semibold shadow hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-400 transition hidden"><i class="fa-solid fa-ban mr-2"></i>Cancel</button>
+          <button onclick="clearProgress()" id="clearProgressBtn" class="flex-1 py-2 px-4 rounded bg-gray-500 text-white font-semibold shadow hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition hidden"><i class="fa-solid fa-eraser mr-2"></i>Clear Progress</button>
         </div>
+        
         <!-- Progress Section -->
         <div id="downloadProgress" class="hidden mt-4">
-          <h3 class="font-semibold text-indigo-600 mb-2 flex items-center gap-2"><i class="fa-solid fa-spinner animate-spin"></i>Download Progress</h3>
+          <h3 class="font-semibold text-indigo-600 mb-2 flex items-center gap-2">
+            <i class="fa-solid fa-spinner fa-spin"></i>Download Progress
+            <span id="overallText" class="text-sm text-gray-600"></span>
+          </h3>
           <div id="progressBarsContainer" class="space-y-4"></div>
         </div>
+        
         <div id="filesList" class="mt-4"></div>
       </div>
     </div>

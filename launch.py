@@ -23,7 +23,7 @@ API_HASH = os.getenv("API_HASH")
 PHONE_NUMBER = f'+{os.getenv("PHONE_NUMBER")}'
 channels_raw = os.getenv("CHANNELS", "")
 CHANNEL_LIST = [c.strip() for c in channels_raw.split(",") if c.strip()]
-MAX_CONCURRENT_DOWNLOADS = os.getenv("MAX_CONCURRENT_DOWNLOADS", 3)
+MAX_CONCURRENT_DOWNLOADS = int(os.getenv("MAX_CONCURRENT_DOWNLOADS", "3"))
 
 # Session file - always use sessions directory
 SAVE_PATH = 'downloads'
@@ -42,7 +42,7 @@ download_status = {
     "current_file_size": 0,
     "downloaded_bytes": 0,
     "concurrent_downloads": {},
-    "cancelled": False  # NEW: Track cancellation
+    "cancelled": False
 }
 
 
@@ -276,6 +276,150 @@ async def list_files(request: DownloadRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 
+class DownloadSelectedRequest(BaseModel):
+    channel_username: str
+    message_ids: List[int]
+
+
+@app.post("/files/download-selected")
+async def download_selected_files(request: DownloadSelectedRequest, background_tasks: BackgroundTasks):
+    """Download selected files from a channel with parallel downloads"""
+    global client, download_status
+    
+    if not client or not client.is_connected():
+        raise HTTPException(status_code=400, detail="Not connected. Login first.")
+    
+    logger.info(f"Starting download of {len(request.message_ids)} selected files")
+    
+    # Initialize status immediately
+    download_status = {
+        "active": True, 
+        "progress": 0, 
+        "total": len(request.message_ids), 
+        "current_file": "",
+        "current_file_progress": 0,
+        "current_file_size": 0,
+        "downloaded_bytes": 0,
+        "concurrent_downloads": {},
+        "cancelled": False
+    }
+    
+    async def download_single_file(message, target_dir, file_id):
+        """Download a single file with progress tracking"""
+        try:
+            file_name = "unknown"
+            if isinstance(message.media, MessageMediaDocument):
+                doc = message.media.document
+                file_name = next((attr.file_name for attr in doc.attributes 
+                                if hasattr(attr, 'file_name')), f"document_{message.id}")
+            elif isinstance(message.media, MessageMediaPhoto):
+                file_name = f"photo_{message.id}.jpg"
+            
+            logger.info(f"Starting download: {file_name}")
+            
+            download_status["concurrent_downloads"][file_id] = {
+                "name": file_name,
+                "progress": 0,
+                "total": 0,
+                "percentage": 0
+            }
+            
+            def progress_callback(current, total):
+                if download_status["cancelled"]:
+                    raise Exception("Download cancelled by user")
+                download_status["concurrent_downloads"][file_id]["progress"] = current
+                download_status["concurrent_downloads"][file_id]["total"] = total
+                download_status["concurrent_downloads"][file_id]["percentage"] = int((current / total * 100)) if total > 0 else 0
+            
+            file_path = await client.download_media(
+                message, 
+                file=target_dir,
+                progress_callback=progress_callback
+            )
+            
+            if file_id in download_status["concurrent_downloads"]:
+                del download_status["concurrent_downloads"][file_id]
+            
+            logger.info(f"Completed download: {file_name}")
+            return file_path
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"Error downloading {file_name}: {error_msg}")
+            if file_id in download_status["concurrent_downloads"]:
+                del download_status["concurrent_downloads"][file_id]
+            if "cancelled" in error_msg.lower():
+                return None
+            return None
+    
+    async def download_task():
+        try:
+            target_dir = DOWNLOAD_DIR
+            
+            try:
+                os.makedirs(target_dir, exist_ok=True)
+            except Exception as e:
+                logger.warning(f"Could not create directory {target_dir}: {str(e)}")
+            
+            logger.info(f"Fetching {len(request.message_ids)} messages from {request.channel_username}")
+            
+            # Get only the selected messages
+            messages_to_download = []
+            for message_id in request.message_ids:
+                message = await client.get_messages(request.channel_username, ids=message_id)
+                if message and message.media:
+                    messages_to_download.append(message)
+                else:
+                    logger.warning(f"Message {message_id} not found or has no media")
+            
+            total_files = len(messages_to_download)
+            download_status["total"] = total_files
+            logger.info(f"Found {total_files} files to download. MAX_CONCURRENT_DOWNLOADS={MAX_CONCURRENT_DOWNLOADS}")
+            
+            if total_files == 0:
+                logger.warning("No files to download!")
+                download_status["active"] = False
+                return
+            
+            downloaded = []
+            
+            for i in range(0, len(messages_to_download), MAX_CONCURRENT_DOWNLOADS):
+                if download_status["cancelled"]:
+                    logger.info("Download cancelled by user")
+                    break
+                    
+                batch = messages_to_download[i:i + MAX_CONCURRENT_DOWNLOADS]
+                logger.info(f"Processing batch {i // MAX_CONCURRENT_DOWNLOADS + 1}, {len(batch)} files")
+                
+                tasks = []
+                for idx, message in enumerate(batch):
+                    file_id = f"file_{i + idx}"
+                    tasks.append(download_single_file(message, target_dir, file_id))
+                
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+                
+                for result in results:
+                    if result and not isinstance(result, Exception):
+                        downloaded.append(result)
+                        download_status["progress"] = len(downloaded)
+                        logger.info(f"Downloaded ({len(downloaded)}/{total_files}): {result}")
+            
+            download_status["active"] = False
+            download_status["concurrent_downloads"] = {}
+            logger.info(f"Download completed. Total files: {len(downloaded)}")
+        
+        except Exception as e:
+            download_status["active"] = False
+            download_status["concurrent_downloads"] = {}
+            logger.error(f"Background download error: {str(e)}", exc_info=True)
+    
+    background_tasks.add_task(download_task)
+    
+    return {
+        "status": "started",
+        "message": f"Downloading {len(request.message_ids)} selected files with {MAX_CONCURRENT_DOWNLOADS} parallel downloads."
+    }
+
+
 @app.post("/files/download/{message_id}")
 async def download_file(message_id: int, channel_username: str):
     """Download a specific file by message ID"""
@@ -377,6 +521,21 @@ async def download_all_files(request: DownloadRequest, background_tasks: Backgro
     if not client or not client.is_connected():
         raise HTTPException(status_code=400, detail="Not connected. Login first.")
     
+    logger.info(f"Starting download-all from {request.channel_username}, limit={request.limit}")
+    
+    # Initialize status immediately
+    download_status = {
+        "active": True, 
+        "progress": 0, 
+        "total": 0,
+        "current_file": "",
+        "current_file_progress": 0,
+        "current_file_size": 0,
+        "downloaded_bytes": 0,
+        "concurrent_downloads": {},
+        "cancelled": False
+    }
+    
     async def download_single_file(message, target_dir, file_id):
         """Download a single file with progress tracking"""
         try:
@@ -387,6 +546,8 @@ async def download_all_files(request: DownloadRequest, background_tasks: Backgro
                                 if hasattr(attr, 'file_name')), f"document_{message.id}")
             elif isinstance(message.media, MessageMediaPhoto):
                 file_name = f"photo_{message.id}.jpg"
+            
+            logger.info(f"Starting download: {file_name}")
             
             download_status["concurrent_downloads"][file_id] = {
                 "name": file_name,
@@ -411,6 +572,7 @@ async def download_all_files(request: DownloadRequest, background_tasks: Backgro
             if file_id in download_status["concurrent_downloads"]:
                 del download_status["concurrent_downloads"][file_id]
             
+            logger.info(f"Completed download: {file_name}")
             return file_path
         except Exception as e:
             error_msg = str(e)
@@ -422,7 +584,6 @@ async def download_all_files(request: DownloadRequest, background_tasks: Backgro
             return None
     
     async def download_task():
-        global download_status
         try:
             target_dir = DOWNLOAD_DIR
             
@@ -431,6 +592,7 @@ async def download_all_files(request: DownloadRequest, background_tasks: Backgro
             except Exception as e:
                 logger.warning(f"Could not create directory {target_dir}: {str(e)}")
             
+            logger.info("Fetching messages from channel...")
             messages_to_download = []
             async for message in client.iter_messages(request.channel_username, limit=request.limit):
                 if message.media:
@@ -447,28 +609,23 @@ async def download_all_files(request: DownloadRequest, background_tasks: Backgro
                         messages_to_download.append(message)
             
             total_files = len(messages_to_download)
+            download_status["total"] = total_files
+            logger.info(f"Found {total_files} files to download. MAX_CONCURRENT_DOWNLOADS={MAX_CONCURRENT_DOWNLOADS}")
             
-            download_status = {
-                "active": True, 
-                "progress": 0, 
-                "total": total_files, 
-                "current_file": "",
-                "current_file_progress": 0,
-                "current_file_size": 0,
-                "downloaded_bytes": 0,
-                "concurrent_downloads": {},
-                "cancelled": False
-            }
+            if total_files == 0:
+                logger.warning("No files to download!")
+                download_status["active"] = False
+                return
             
             downloaded = []
             
             for i in range(0, len(messages_to_download), MAX_CONCURRENT_DOWNLOADS):
-                # Check if cancelled before starting new batch
                 if download_status["cancelled"]:
                     logger.info("Download cancelled by user")
                     break
                     
                 batch = messages_to_download[i:i + MAX_CONCURRENT_DOWNLOADS]
+                logger.info(f"Processing batch {i // MAX_CONCURRENT_DOWNLOADS + 1}, {len(batch)} files")
                 
                 tasks = []
                 for idx, message in enumerate(batch):
@@ -490,7 +647,7 @@ async def download_all_files(request: DownloadRequest, background_tasks: Backgro
         except Exception as e:
             download_status["active"] = False
             download_status["concurrent_downloads"] = {}
-            logger.error(f"Background download error: {str(e)}")
+            logger.error(f"Background download error: {str(e)}", exc_info=True)
     
     background_tasks.add_task(download_task)
     
