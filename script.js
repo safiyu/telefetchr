@@ -364,14 +364,13 @@ async function downloadSingle(messageId, channel) {
                             return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
                         };
                         html += `
-                            <div class="file-progress-block bg-white rounded-lg shadow p-4 mb-4">
-                                <div class="file-name font-semibold text-gray-800 mb-2">${fileData.name}</div>
-                                <div class="w-full bg-gray-200 rounded-full h-4 mb-2">
-                                    <div class="bg-indigo-500 h-4 rounded-full transition-all duration-300" style="width: ${percentage}%; max-width: 100%;"></div>
+                            <div class="file-progress-block" style="margin: 16px 0; padding: 12px; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
+                                <div class="file-name" style="font-size: 1em; margin-bottom: 8px;">${fileData.name}</div>
+                                <div class="progress-bar" style="height: 24px; margin: 8px 0;">
+                                    <div class="progress-fill" style="width: ${percentage}%; min-width: ${percentage > 0 ? '10px' : '0'};">${percentage}%</div>
                                 </div>
                                 <div class="flex justify-between text-xs text-gray-500">
                                     <span>${formatBytes(fileData.progress)} / ${formatBytes(fileData.total)}</span>
-                                    <span>${percentage}%</span>
                                 </div>
                             </div>
                         `;
@@ -389,14 +388,13 @@ async function downloadSingle(messageId, channel) {
                         return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
                     };
                     html += `
-                        <div class="file-progress-block bg-white rounded-lg shadow p-4 mb-4">
-                            <div class="file-name font-semibold text-gray-800 mb-2">${data.current_file}</div>
-                            <div class="w-full bg-gray-200 rounded-full h-4 mb-2">
-                                <div class="bg-indigo-500 h-4 rounded-full transition-all duration-300" style="width: ${filePercentage}%; max-width: 100%;"></div>
+                        <div class="file-progress-block" style="margin: 16px 0; padding: 12px; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
+                            <div class="file-name" style="font-size: 1em; margin-bottom: 8px;">${data.current_file}</div>
+                            <div class="progress-bar" style="height: 24px; margin: 8px 0;">
+                                    <div class="progress-fill" style="width: ${filePercentage}%; min-width: ${filePercentage > 0 ? '10px' : '0'};">${filePercentage}%</div>
                             </div>
                             <div class="flex justify-between text-xs text-gray-500">
                                 <span>${formatBytes(data.current_file_progress)} / ${formatBytes(data.current_file_size)}</span>
-                                <span>${filePercentage}%</span>
                             </div>
                         </div>
                     `;
@@ -441,7 +439,7 @@ async function downloadSingle(messageId, channel) {
                 container.innerHTML = finalHtml;
             }
             document.getElementById('cancelBtn').classList.add('hidden');
-            
+                        
             showAlert('downloadAlert', 'File downloaded: ' + data.file_path, 'success');
         } else {
             showAlert('downloadAlert', data.detail, 'error');
@@ -606,7 +604,7 @@ function startProgressMonitoring() {
                             <div class="file-progress-block" style="margin: 16px 0; padding: 12px; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
                                 <div class="file-name" style="font-size: 1em; margin-bottom: 8px;">${fileData.name}</div>
                                 <div class="progress-bar" style="height: 24px; margin: 8px 0;">
-                                    <div class="progress-fill" style="width: ${percentage}%; min-width: ${percentage > 0 ? '30px' : '0'};">${percentage}%</div>
+                                    <div class="progress-fill" style="width: ${percentage}%; min-width: ${percentage > 0 ? '10px' : '0'};">${percentage}%</div>
                                 </div>
                                 <div style="font-size: 0.9em; color: #666;">${formatBytes(fileData.progress)} / ${formatBytes(fileData.total)}</div>
                             </div>

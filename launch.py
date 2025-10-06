@@ -670,7 +670,18 @@ async def cancel_download():
     global download_status
     
     if download_status["active"] or download_status["current_file_progress"] > 0:
-        download_status["cancelled"] = True
+        # Initialize status immediately
+        download_status = {
+            "active": False, 
+            "progress": 0, 
+            "total": 0,
+            "current_file": "",
+            "current_file_progress": 0,
+            "current_file_size": 0,
+            "downloaded_bytes": 0,
+            "concurrent_downloads": {},
+            "cancelled": True
+        }
         logger.info("Download cancellation requested")
         return {
             "status": "success",
