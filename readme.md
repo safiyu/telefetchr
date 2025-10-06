@@ -1,6 +1,9 @@
 
 # Telefetchr (Telegram file downloader)
 
+## Screenshot
+<img width="1909" height="934" alt="screenshot" src="https://github.com/user-attachments/assets/e91f774a-3aa8-46f6-ad46-53aad2dd7245" />
+
 ## Prerequisites
 
 - Docker installed on your system
