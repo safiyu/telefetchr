@@ -12,8 +12,6 @@
 
 ## Directory Structure
 
-
-
 ```
 telefetchr/
 ├── Dockerfile         # Dockerfile for building the image
@@ -87,10 +85,24 @@ volumes:
 ## Build and Run Instructions
 
 ### Option 1: Using Docker Compose (Recommended)
-
-
-
-**Examples for different systems:**
+```yaml
+services:
+  telefetchr:
+    image: safiyu/telefetchr:latest
+    container_name: telefetchr
+    ports:
+      - "8000:8000"
+    volumes:
+      - /path/to/sessions:/app/sessions
+      - /path/to/downloads:/app/downloads
+    environment:
+      - PYTHONUNBUFFERED=1
+      - API_ID=123456 # your api_id from my.telegram.org
+      - API_HASH=abcddfabc123456 # your api_hash from my.telegram.org
+      - PHONE_NUMBER=33334567890 # without + sign
+      - MAX_CONCURRENT_DOWNLOADS=3
+    restart: always
+```
 
 **Linux/macOS (NFS/SMB mount):**
 ```yaml
