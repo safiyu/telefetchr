@@ -407,6 +407,80 @@ services:
    docker-compose up -d --build
    ```
 
+**Debug Section Fields Explained**:
+
+- **memory_state**: Current state in application memory
+  - `active`: Whether a download is currently in progress
+  - `progress`: Number of files completed
+  - `total`: Total files in the session
+  - `session_id`: Unique identifier for the download session
+  - `channel`: Telegram channel being downloaded from
+  - `completed_count`: Number of files successfully downloaded
+  - `concurrent_count`: Number of files currently downloading
+  - `cancelled`: Whether the download was cancelled
+
+- **file_state**: Information about the persisted state file
+  - `exists`: Whether the state file exists on disk
+  - `size_bytes`: Size of the state file
+  - `path`: Location of the state file
+  - `content`: First 500 characters of the file content
+
+- **completed_downloads**: Dictionary of all completed downloads
+  - Key format: `file_INDEX_MESSAGEID` or `single_MESSAGEID`
+  - Contains filename, size, and completion timestamp
+
+- **active_tasks**: List of currently running background tasks
+
+**Indicators of health**:
+- ✅ `active: false` when no download running
+- ✅ `progress` equals `total` (all files downloaded)
+- ✅ `completed_count` equals `total`
+- ✅ `concurrent_count: 0` when not downloading
+- ✅ `channel` is set to a valid channel name
+- ✅ `session_id` exists
+
+**Indicators of problems**:
+- ❌ `channel: null` but `session_id` exists
+- ❌ `concurrent_count > 0` but `active: false`
+- ❌ `total: 0` but `session_id` exists
+- ❌ `started_at: null` but files were downloaded
+
+**Solution**: Run cleanup state
+
+### Cleanup state`
+
+**Purpose**: Clean up corrupted or incomplete state data
+
+**What it does**:
+1. Creates a backup of the current state file
+2. Removes orphaned `concurrent_downloads` (when not active)
+3. Resets progress fields when no active download
+4. Fully resets if no valid session data exists
+
+**Use Case**: Fix state corruption after interrupted downloads or crashes
+
+### Reset state
+
+**Purpose**: Completely reset all download state (⚠️ USE WITH CAUTION)
+
+**What it does**:
+1. Creates a backup of the current state file
+2. Clears all state data
+3. Resets to initial empty state
+
+**Use Case**: Start fresh when state is severely corrupted
+
+**Response**:
+```json
+{
+  "status": "success",
+  "message": "State completely reset. Backup saved."
+}
+```
+
+**⚠️ Warning**: This will delete all download history and progress. Cannot be undone except by restoring from backup.
+
+
 ## Security Notes
 
 - The `sessions/` directory contains sensitive authentication data
