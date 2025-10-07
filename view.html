@@ -1,131 +1,163 @@
 <!-- Modern Telegram Downloader UI using Tailwind CSS and FontAwesome -->
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TeleFetchr</title>
-  <!-- Favicon -->
-  <link rel="icon" type="image/png" href="/static/favicon.png" />
-  <!-- For Apple devices -->
-  <link rel="apple-touch-icon" href="/static/favicon.png" />
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <style>
-    /* Custom styles for progress bars */
-    .progress-bar {
-      background: #e5e7eb;
-      border-radius: 9999px;
-      overflow: hidden;
-      position: relative;
-    }
-    .progress-fill {
-      background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%);
-      height: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      font-size: 0.75rem;
-      font-weight: 600;
-      transition: width 0.3s ease;
-      min-width: 30px;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TeleFetchr</title>
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/static/favicon.png" />
+    <!-- For Apple devices -->
+    <link rel="apple-touch-icon" href="/static/favicon.png" />
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Custom styles for progress bars */
+        
+        .progress-bar {
+            background: #e5e7eb;
+            border-radius: 9999px;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .progress-fill {
+            background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%);
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.75rem;
+            font-weight: 600;
+            transition: width 0.3s ease;
+            min-width: 30px;
+        }
+    </style>
 </head>
+
 <body class="bg-gradient-to-br from-indigo-200 via-purple-100 to-blue-100 min-h-screen flex flex-col font-mono">
-  <!-- Toast Container for popup messages -->
-  <div id="toastContainer" class="fixed top-6 right-6 z-50 space-y-2"></div>
-  
-  <header class="bg-white shadow p-4 flex justify-between items-center sticky top-0 z-10">
-    <div class="flex items-center gap-2">
-      <img src="/static/logo.png" alt="TeleFetchr Logo" class="h-20 w-auto" />
-      <span class="text-4xl font-bold font-mono bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500 bg-clip-text text-transparent animate-gradient-x">
+    <!-- Toast Container for popup messages -->
+    <div id="toastContainer" class="fixed top-6 right-6 z-50 space-y-2"></div>
+
+    <header class="bg-white shadow p-4 flex justify-between items-center sticky top-0 z-10">
+        <div class="flex items-center gap-2">
+            <img src="/static/logo.png" alt="TeleFetchr Logo" class="h-20 w-auto" />
+            <span class="text-4xl font-bold font-mono bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500 bg-clip-text text-transparent animate-gradient-x">
         TeleFetchr
       </span>
-    </div>
-    <div id="statusBadge" class="flex items-center gap-2">
-      <span id="connectionStatus" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-green-400 to-green-500 text-white shadow-md animate-pulse">
+        </div>
+        <div id="statusBadge" class="flex items-center gap-2">
+            <span id="connectionStatus" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-green-400 to-green-500 text-white shadow-md animate-pulse">
         <i class="fa-solid fa-circle mr-2 text-white animate-pulse"></i>
         <span class="font-bold tracking-wide">Connected</span>
-      </span>
-      <span id="userInfo" class="text-gray-600 ml-2"></span>
-    </div>
-  </header>
+            </span>
+            <span id="userInfo" class="text-gray-600 ml-2"></span>
+        </div>
+    </header>
 
-  <main class="flex-1 flex flex-col items-center py-8">
-    <div class="w-full max-w-3xl space-y-6">
-      <!-- Login Card -->
-      <div id="loginSection" class="bg-white rounded-xl shadow p-6 space-y-4 hidden">
-        <h2 class="text-lg font-semibold text-indigo-700 flex items-center gap-2"><i class="fa-solid fa-lock"></i> Login Required</h2>
-        <div id="codeForm" class="space-y-2 hidden">
-          <div class="flex items-center gap-2"><i class="fa-solid fa-sms text-indigo-400"></i>Enter the code sent to your phone:</div>
-          <input type="text" id="verificationCode" class="input input-bordered w-full" placeholder="12345">
-          <button onclick="verifyCode()" class="w-full py-2 px-4 rounded bg-indigo-500 text-white font-semibold shadow hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition">Verify</button>
-        </div>
-        <div id="passwordForm" class="space-y-2 hidden">
-          <div class="flex items-center gap-2"><i class="fa-solid fa-key text-indigo-400"></i>Enter your 2FA password:</div>
-          <input type="password" id="password2fa" class="input input-bordered w-full" placeholder="Your 2FA password">
-          <button onclick="verify2FA()" class="w-full py-2 px-4 rounded bg-indigo-500 text-white font-semibold shadow hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition">Submit</button>
-        </div>
-        <div id="requestCodeBtn">
-          <button onclick="requestCode()" class="w-full py-2 px-4 rounded bg-green-500 text-white font-semibold shadow hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-400 transition"><i class="fa-solid fa-paper-plane mr-2"></i>Send Verification Code</button>
-        </div>
-      </div>
+    <main class="flex-1 flex flex-col items-center py-8">
+        <div class="w-full max-w-3xl space-y-6">
+            <!-- Login Card -->
+            <div id="loginSection" class="bg-white rounded-xl shadow p-6 space-y-4 hidden">
+                <h2 class="text-lg font-semibold text-indigo-700 flex items-center gap-2"><i class="fa-solid fa-lock"></i> Login Required</h2>
+                <div id="codeForm" class="space-y-2 hidden">
+                    <div class="flex items-center gap-2"><i class="fa-solid fa-sms text-indigo-400"></i>Enter the code sent to your phone:</div>
+                    <input type="text" id="verificationCode" class="input input-bordered w-full" placeholder="12345">
+                    <button onclick="verifyCode()" class="w-full py-2 px-4 rounded bg-indigo-500 text-white font-semibold shadow hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition">Verify</button>
+                </div>
+                <div id="passwordForm" class="space-y-2 hidden">
+                    <div class="flex items-center gap-2"><i class="fa-solid fa-key text-indigo-400"></i>Enter your 2FA password:</div>
+                    <input type="password" id="password2fa" class="input input-bordered w-full" placeholder="Your 2FA password">
+                    <button onclick="verify2FA()" class="w-full py-2 px-4 rounded bg-indigo-500 text-white font-semibold shadow hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition">Submit</button>
+                </div>
+                <div id="requestCodeBtn">
+                    <button onclick="requestCode()" class="w-full py-2 px-4 rounded bg-green-500 text-white font-semibold shadow hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-400 transition"><i class="fa-solid fa-paper-plane mr-2"></i>Send Verification Code</button>
+                </div>
+            </div>
 
-      <!-- Channel & Settings Card -->
-      <div id="downloadSection" class="bg-white rounded-xl shadow p-6 space-y-4 hidden">
-        <h2 class="text-lg font-semibold text-indigo-700 flex items-center gap-2"><i class="fa-solid fa-download"></i> Download Files</h2>
-        <div class="bg-gray-50 p-3 rounded flex items-center gap-2">
-          <i class="fa-solid fa-folder-open text-indigo-400"></i>
-          <span class="font-medium">Save Path:</span>
-          <span id="savePathText" class="text-gray-700">Loading...</span>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label class="block font-medium mb-1">Channel</label>
-            <select id="channelUsername" class="input input-bordered w-full"></select>
-          </div>
-          <div>
-            <label class="block font-medium mb-1">Number of Files</label>
-            <input type="number" id="fileLimit" value="10" min="1" max="1000" class="input input-bordered w-full">
-          </div>
-          <div>
-            <label class="block font-medium mb-1">File Type</label>
-            <select id="fileType" class="input input-bordered w-full">
+            <!-- Channel & Settings Card -->
+            <div id="downloadSection" class="bg-white rounded-xl shadow p-6 space-y-4 hidden">
+                <h2 class="text-lg font-semibold text-indigo-700 flex items-center gap-2"><i class="fa-solid fa-download"></i> Download Files</h2>
+                <div class="bg-gray-50 p-3 rounded flex items-center gap-2">
+                    <i class="fa-solid fa-folder-open text-indigo-400"></i>
+                    <span class="font-medium">Save Path:</span>
+                    <span id="savePathText" class="text-gray-700">Loading...</span>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block font-medium mb-1">Channel</label>
+                        <select id="channelUsername" class="input input-bordered w-full"></select>
+                    </div>
+                    <div>
+                        <label class="block font-medium mb-1">Number of Files</label>
+                        <input type="number" id="fileLimit" value="10" min="1" max="1000" class="input input-bordered w-full">
+                    </div>
+                    <div>
+                        <label class="block font-medium mb-1">File Type</label>
+                        <select id="fileType" class="input input-bordered w-full">
               <option value="">All Files</option>
               <option value="document">Documents Only</option>
               <option value="photo">Photos Only</option>
             </select>
-          </div>
-        </div>
-        <div class="flex gap-2 mt-2">
-          <button onclick="listFiles()" class="flex-1 py-2 px-4 rounded bg-indigo-500 text-white font-semibold shadow hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition"><i class="fa-solid fa-list mr-2"></i>List Files</button>
-          <button onclick="downloadAll()" class="flex-1 py-2 px-4 rounded bg-green-500 text-white font-semibold shadow hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-400 transition"><i class="fa-solid fa-cloud-arrow-down mr-2"></i>Download All</button>
-          <button onclick="cancelDownload()" id="cancelBtn" class="flex-1 py-2 px-4 rounded bg-red-500 text-white font-semibold shadow hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-400 transition hidden"><i class="fa-solid fa-ban mr-2"></i>Cancel</button>
-          <button onclick="clearProgress()" id="clearProgressBtn" class="flex-1 py-2 px-4 rounded bg-gray-500 text-white font-semibold shadow hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition hidden"><i class="fa-solid fa-eraser mr-2"></i>Clear Progress</button>
-        </div>
-        
-        <!-- Progress Section -->
-        <div id="downloadProgress" class="hidden mt-4">
-          <h3 class="font-semibold text-indigo-600 mb-2 flex items-center gap-2">
-            Downloads
-            <span id="overallText" class="text-sm text-gray-600"></span>
-          </h3>
-          <div id="progressBarsContainer" class="space-y-4"></div>
-        </div>
-        
-        <div id="filesList" class="mt-4"></div>
-      </div>
-    </div>
-  </main>
+                    </div>
+                </div>
+                <div class="flex gap-2 mt-2">
+                    <button onclick="listFiles()" class="flex-1 py-2 px-4 rounded bg-indigo-500 text-white font-semibold shadow hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition"><i class="fa-solid fa-list mr-2"></i>List Files</button>
+                    <button onclick="downloadAll()" class="flex-1 py-2 px-4 rounded bg-green-500 text-white font-semibold shadow hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-400 transition"><i class="fa-solid fa-cloud-arrow-down mr-2"></i>Download All</button>
+                    <button onclick="cancelDownload()" id="cancelBtn" class="flex-1 py-2 px-4 rounded bg-red-500 text-white font-semibold shadow hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-400 transition hidden"><i class="fa-solid fa-ban mr-2"></i>Cancel</button>
+                    <button onclick="clearProgress()" id="clearProgressBtn" class="flex-1 py-2 px-4 rounded bg-gray-500 text-white font-semibold shadow hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition hidden">
+                        <i class="fa-solid fa-eraser mr-2"></i>Clear Progress
+                    </button>
+                </div>
 
-  <footer class="bg-white shadow-inner p-4 text-center text-gray-500 text-sm mt-8">
-    <span>© 2025 safiyu</span> ·
-    <a href="https://github.com/safiyu/telefetchr" class="text-indigo-500 hover:underline" target="_blank"><i class="fa-brands fa-github"></i> GitHub</a> ·
-    <span>Version 1.0</span>
-  </footer>
+                <!-- Progress Section -->
+                <div id="downloadProgress" class="hidden mt-4">
+                    <h3 class="font-semibold text-indigo-600 mb-2 flex items-center gap-2">
+                        Downloads
+                        <span id="overallText" class="text-sm text-gray-600"></span>
+                    </h3>
+                    <div id="progressBarsContainer" class="space-y-4"></div>
+                </div>
 
-  <script src="/static/script.js"></script>
+                <div id="filesList" class="mt-4"></div>
+
+                <div id="debugPanel" class="mt-4 p-4 bg-gray-100 rounded-lg hidden">
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="font-semibold text-gray-700">Debug Information
+                            <div class="flex justify-between text-xs text-gray-500">(Caution: Hope you know what you're doing!)</div>
+                        </h3>
+                        <div class="flex gap-2">
+                            <button onclick="cleanupState()" class="py-1 px-2 rounded bg-yellow-500 text-white text-xs hover:bg-yellow-600">
+                              <i class="fa-solid fa-broom"></i> Cleanup
+                            </button>
+                            <button onclick="resetState()" class="py-1 px-2 rounded bg-red-500 text-white text-xs hover:bg-red-600">
+                                <i class="fa-solid fa-trash"></i> Reset
+                            </button>
+                            <button onclick="refreshDebugInfo()" class="py-1 px-2 rounded bg-gray-500 text-white text-xs hover:bg-gray-600">
+                                <i class="fa-solid fa-refresh"></i> Refresh
+                            </button>
+                        </div>
+                    </div>
+                    <pre id="debugInfo" class="text-xs bg-white p-2 rounded overflow-auto max-h-96"></pre>
+                </div>
+
+                <!-- Add toggle button in the header -->
+                <button onclick="toggleDebugPanel()" class="py-1 px-3 rounded bg-gray-600 text-white text-sm">
+                    <i class="fa-solid fa-bug"></i> Debug
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <footer class="bg-white shadow-inner p-4 text-center text-gray-500 text-sm mt-8">
+        <span>© 2025 safiyu</span> ·
+        <a href="https://github.com/safiyu/telefetchr" class="text-indigo-500 hover:underline" target="_blank"><i class="fa-brands fa-github"></i> GitHub</a> ·
+        <span>Version 1.0</span>
+    </footer>
+
+    <script src="/static/script.js"></script>
 </body>
+
 </html>
