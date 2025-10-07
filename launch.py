@@ -4,15 +4,12 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from telethon import TelegramClient
-from telethon.tl.types import MessageMediaDocument, MessageMediaPhoto
+from telethon.tl.types import MessageMediaDocument, MessageMediaPhoto, Channel, User
 from contextlib import asynccontextmanager
 import os
 import asyncio
 from typing import Optional, List
 import logging
-from pathlib import Path
-import json
-import yaml
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -21,8 +18,6 @@ logger = logging.getLogger(__name__)
 API_ID = os.getenv("API_ID")
 API_HASH = os.getenv("API_HASH")
 PHONE_NUMBER = f'+{os.getenv("PHONE_NUMBER")}'
-channels_raw = os.getenv("CHANNELS", "")
-CHANNEL_LIST = [c.strip() for c in channels_raw.split(",") if c.strip()]
 MAX_CONCURRENT_DOWNLOADS = int(os.getenv("MAX_CONCURRENT_DOWNLOADS", "3"))
 
 # Session file - always use sessions directory
@@ -218,15 +213,35 @@ async def check_status():
     except:
         return {"status": "not_authenticated"}
 
-
 @app.get("/config/channels")
 async def get_channels():
-    """Get the list of channels from config"""
-    return {
-        "channels": CHANNEL_LIST,
-        "save_path": SAVE_PATH
-    }
+    """Get the list of Telegram channels with @usernames"""
+    bots = []
 
+    async for dialog in client.iter_dialogs():
+        entity = dialog.entity
+        if isinstance(entity, User) and entity.bot:
+            bots.append({
+                "name": entity.first_name,
+                "id": entity.id,
+                "username": f"@{entity.username}" if entity.username else None
+            })
+    channels = []
+
+    async for dialog in client.iter_dialogs():
+        entity = dialog.entity
+        # Include only public channels with usernames
+        if isinstance(entity, Channel) and entity.username:
+            channels.append({
+                "name": dialog.name,
+                "id": entity.id,
+                "username": f"@{entity.username}"
+            })
+
+    return {
+        "channels": bots + channels,
+        "save_path": SAVE_PATH  # if still needed
+    }
 
 @app.post("/files/list")
 async def list_files(request: DownloadRequest):
