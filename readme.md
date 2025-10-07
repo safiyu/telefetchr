@@ -32,7 +32,6 @@ telefetchr/
 ```yaml
 environment:
       - PYTHONUNBUFFERED=1
-      - CHANNELS=@cop_bot,@Cin_Bot # comma separated list of channels
       - API_ID=12345 # your api_id from my.telegram.org
       - API_HASH=saasdasdf12324 # your api_hash from my.telegram.org
       - PHONE_NUMBER=12345 # without + sign
@@ -143,7 +142,6 @@ docker run -d \
   -v $(pwd)/sessions:/app/sessions \
   -e API_ID=123456 \
   -e API_HASH=abcdef123456 \
-  -e CHANNELS=@news,@music,@movies \
   -e PHONE_NUMBER=1234567890 \
   -e MAX_CONCURRENT_DOWNLOADS=3 \
   telefetchr
@@ -157,7 +155,6 @@ docker run -d `
   -v ${PWD}/config.yaml:/app/config.yaml:ro `
   -e API_ID=123456 `
   -e API_HASH=abcdef123456 `
-  -e CHANNELS=@news,@music,@movies `
   -e PHONE_NUMBER=1234567890 `
   -e MAX_CONCURRENT_DOWNLOADS=3 `
   telefetchr
