@@ -407,7 +407,7 @@ services:
    docker-compose up -d --build
    ```
 
-**Debug Section Fields Explained**:
+## Debug Section Fields Explained**:
 
 - **memory_state**: Current state in application memory
   - `active`: Whether a download is currently in progress
