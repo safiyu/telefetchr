@@ -8,9 +8,55 @@ let selectedFiles = new Set();
 let progressMonitoringInterval = null;
 let completedDownloads = new Map(); // Track completed downloads
 
+// Authentication helpers
+function getAuthToken() {
+    return localStorage.getItem('access_token');
+}
+
+function getAuthHeaders() {
+    const token = getAuthToken();
+    return token ? { 'Authorization': `Bearer ${token}` } : {};
+}
+
+function logout() {
+    localStorage.removeItem('access_token');
+    window.location.href = '/';
+}
+
+// Authenticated fetch wrapper
+async function authFetch(url, options = {}) {
+    const headers = {
+        ...getAuthHeaders(),
+        ...(options.headers || {})
+    };
+
+    const response = await fetch(url, {
+        ...options,
+        headers
+    });
+
+    // If unauthorized, redirect to login
+    if (response.status === 401) {
+        logout();
+        return null;
+    }
+
+    return response;
+}
+
+// Check authentication on page load
+window.addEventListener('DOMContentLoaded', () => {
+    const token = getAuthToken();
+    if (!token) {
+        window.location.href = '/';
+        return;
+    }
+});
+
 async function loadChannels() {
     try {
-        const response = await fetch("/config/channels");
+        const response = await authFetch("/config/channels");
+        if (!response) return;
         const data = await response.json();
 
         const channelList = data.channels;
@@ -41,7 +87,7 @@ async function loadChannels() {
 async function checkSavedState() {
     try {
         console.log('Checking for saved state...');
-        const response = await fetch("/download/state");
+        const response = await authFetch("/download/state");
         const data = await response.json();
 
         console.log('Saved state response:', data);
@@ -63,7 +109,7 @@ async function checkSavedState() {
                                 <p class="text-sm font-semibold text-yellow-800">Previous download session found</p>
                                 <p class="text-xs text-yellow-700 mt-1">
                                     <strong>Channel:</strong> ${data.channel || 'Unknown'}<br>
-                                    <strong>Progress:</strong> ${completedCount}/${totalCount} files completed 
+                                    <strong>Progress:</strong> ${completedCount}/${totalCount} files completed
                                     ${remainingCount > 0 ? `(${remainingCount} remaining)` : '(All done!)'}
                                 </p>
                                 <p class="text-xs text-gray-500 mt-1">Session ID: ${data.session_id || 'N/A'}</p>
@@ -105,7 +151,7 @@ async function checkSavedState() {
 
             // Restore completed downloads to the map
             if (data.completed_count > 0) {
-                const progressResponse = await fetch("/download-progress");
+                const progressResponse = await authFetch("/download-progress");
                 const progressData = await progressResponse.json();
 
                 if (progressData.completed_downloads) {
@@ -113,10 +159,10 @@ async function checkSavedState() {
                     if (progressBarsContainer) {
                         for (const [fileId, fileData] of Object.entries(progressData.completed_downloads)) {
                             completedDownloads.set(fileId, fileData.path);
-                            
+
                             // Add completed progress bar if not exists
                             if (!document.getElementById(`progress-${fileId}`)) {
-                                progressBarsContainer.insertAdjacentHTML('beforeend', 
+                                progressBarsContainer.insertAdjacentHTML('beforeend',
                                     createProgressBar(fileId, fileData.name, true, 100, fileData.size, fileData.size)
                                 );
                             }
@@ -144,17 +190,17 @@ function toggleDebugPanel() {
 
 async function refreshDebugInfo() {
     try {
-        const response = await fetch('/debug/state');
+        const response = await authFetch('/debug/state');
         const data = await response.json();
-        
+
         const debugInfo = document.getElementById('debugInfo');
         if (debugInfo) {
             debugInfo.textContent = JSON.stringify(data, null, 2);
         }
-        
+
         // Also log to console
         console.log('Debug State:', data);
-        
+
     } catch (error) {
         console.error('Error fetching debug info:', error);
         const debugInfo = document.getElementById('debugInfo');
@@ -166,27 +212,27 @@ async function refreshDebugInfo() {
 
 async function viewCompletedDownloads() {
     try {
-        const progressResponse = await fetch("/download-progress");
+        const progressResponse = await authFetch("/download-progress");
         const progressData = await progressResponse.json();
-        
+
         // Show progress section
         document.getElementById("downloadProgress").classList.remove("hidden");
         document.getElementById("clearProgressBtn")?.classList.remove("hidden");
-        
+
         if (progressData.completed_downloads) {
             const progressBarsContainer = document.getElementById("progressBarsContainer");
             if (progressBarsContainer) {
                 // Clear and rebuild
                 progressBarsContainer.innerHTML = '';
-                
+
                 // Add all completed downloads
                 for (const [fileId, fileData] of Object.entries(progressData.completed_downloads)) {
                     completedDownloads.set(fileId, fileData.path);
-                    progressBarsContainer.insertAdjacentHTML('beforeend', 
+                    progressBarsContainer.insertAdjacentHTML('beforeend',
                         createProgressBar(fileId, fileData.name, true, 100, fileData.size, fileData.size)
                     );
                 }
-                
+
                 const count = Object.keys(progressData.completed_downloads).length;
                 showAlert("downloadAlert", `Showing ${count} completed download${count !== 1 ? 's' : ''}`, "success");
             }
@@ -212,17 +258,17 @@ function toggleDebugPanel() {
 
 async function refreshDebugInfo() {
     try {
-        const response = await fetch('/debug/state');
+        const response = await authFetch('/debug/state');
         const data = await response.json();
-        
+
         const debugInfo = document.getElementById('debugInfo');
         if (debugInfo) {
             debugInfo.textContent = JSON.stringify(data, null, 2);
         }
-        
+
         // Also log to console
         console.log('Debug State:', data);
-        
+
     } catch (error) {
         console.error('Error fetching debug info:', error);
         const debugInfo = document.getElementById('debugInfo');
@@ -234,7 +280,7 @@ async function refreshDebugInfo() {
 
 async function clearSavedState() {
     try {
-        const response = await fetch("/download/clear-completed", {
+        const response = await authFetch("/download/clear-completed", {
             method: "POST",
         });
 
@@ -291,7 +337,7 @@ function clearProgress() {
 async function resumeDownload() {
     try {
         // First, load the existing completed downloads into UI
-        const progressResponse = await fetch("/download-progress");
+        const progressResponse = await authFetch("/download-progress");
         const progressData = await progressResponse.json();
 
         // Show progress section
@@ -320,7 +366,7 @@ async function resumeDownload() {
         }
 
         // Now resume the download
-        const response = await fetch("/download/resume", {
+        const response = await authFetch("/download/resume", {
             method: "POST",
         });
 
@@ -348,7 +394,7 @@ async function resumeDownload() {
 
 async function checkStatus() {
     try {
-        const response = await fetch("/status");
+        const response = await authFetch("/status");
         const data = await response.json();
 
         const connectionStatus = document.getElementById("connectionStatus");
@@ -390,7 +436,7 @@ async function checkStatus() {
 
 async function requestCode() {
     try {
-        const response = await fetch("/login/request-code", {
+        const response = await authFetch("/login/request-code", {
             method: "POST",
         });
 
@@ -417,7 +463,7 @@ async function verifyCode() {
     }
 
     try {
-        const response = await fetch("/login/verify", {
+        const response = await authFetch("/login/verify", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ code: code }),
@@ -457,7 +503,7 @@ async function verify2FA() {
     }
 
     try {
-        const response = await fetch("/login/password", {
+        const response = await authFetch("/login/password", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ password: password }),
@@ -490,7 +536,7 @@ async function listFiles() {
     }
 
     try {
-        const response = await fetch("/files/list", {
+        const response = await authFetch("/files/list", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -559,9 +605,9 @@ function displayFiles(files) {
               file.file_id
             }">
                 <div class="flex items-center">
-                    <input type="checkbox" 
-                           id="file_${file.file_id}" 
-                           class="file-checkbox w-5 h-5 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer" 
+                    <input type="checkbox"
+                           id="file_${file.file_id}"
+                           class="file-checkbox w-5 h-5 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer"
                            onchange="toggleFileSelection(${file.file_id})"
                            ${isChecked}>
                 </div>
@@ -708,7 +754,7 @@ async function downloadSelected(channel) {
   }
 
   try {
-    const response = await fetch("/files/download-selected", {
+    const response = await authFetch("/files/download-selected", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -743,7 +789,7 @@ async function downloadSingle(messageId, channel) {
     document.getElementById("cancelBtn").classList.remove("hidden");
     progressInterval = setInterval(async () => {
       try {
-        const response = await fetch("/download-progress");
+        const response = await authFetch("/download-progress");
         const data = await response.json();
         const progressBarsContainer = document.getElementById(
           "progressBarsContainer"
@@ -784,7 +830,7 @@ async function downloadSingle(messageId, channel) {
       }
     }, 500);
 
-    const response = await fetch(
+    const response = await authFetch(
       `/files/download/${messageId}?channel_username=${channel}`,
       {
         method: "POST",
@@ -802,7 +848,7 @@ async function downloadSingle(messageId, channel) {
       completedDownloads.set(fileId, data.file_path);
 
       // Get the last progress data to show final size
-      const progressResponse = await fetch("/download-progress");
+      const progressResponse = await authFetch("/download-progress");
       const progressData = await progressResponse.json();
       let finalSize = 0;
 
@@ -854,7 +900,7 @@ async function downloadAll() {
   }
 
   try {
-    const response = await fetch("/files/download-all", {
+    const response = await authFetch("/files/download-all", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -883,7 +929,7 @@ async function downloadAll() {
 
 async function cleanupState() {
     try {
-    const response = await fetch("/debug/cleanup-state", {
+    const response = await authFetch("/debug/cleanup-state", {
       method: "POST",
     });
 
@@ -899,7 +945,7 @@ async function cleanupState() {
 
 async function resetState() {
     try {
-    const response = await fetch("/debug/reset-state", {
+    const response = await authFetch("/debug/reset-state", {
       method: "POST",
     });
 
@@ -915,7 +961,7 @@ async function resetState() {
 
 async function cancelDownload() {
   try {
-    const response = await fetch("/download/cancel", {
+    const response = await authFetch("/download/cancel", {
       method: "POST",
     });
 
@@ -967,74 +1013,74 @@ function startProgressMonitoring() {
     if (progressMonitoringInterval) {
         clearInterval(progressMonitoringInterval);
     }
-    
+
     let hasStarted = false;
-    
+
     progressMonitoringInterval = setInterval(async () => {
         try {
-            const response = await fetch('/download-progress');
+            const response = await authFetch('/download-progress');
             const data = await response.json();
-            
+
             if (data.active) {
                 hasStarted = true;
             }
-            
+
             // Handle completed downloads from state (only add once)
             if (data.completed_downloads) {
                 for (const [fileId, fileData] of Object.entries(data.completed_downloads)) {
                     if (!completedDownloads.has(fileId)) {
                         completedDownloads.set(fileId, fileData.path);
-                        
+
                         // Add completed progress bar if not exists
                         const existingProgress = document.getElementById(`progress-${fileId}`);
                         if (!existingProgress) {
                             const progressBarsContainer = document.getElementById('progressBarsContainer');
                             if (progressBarsContainer) {
-                                progressBarsContainer.insertAdjacentHTML('beforeend', 
+                                progressBarsContainer.insertAdjacentHTML('beforeend',
                                     createProgressBar(fileId, fileData.name, true, 100, fileData.size, fileData.size)
                                 );
                             }
                         }
                     }
                 }
-                
+
                 // Show clear button if we have completed downloads
                 if (Object.keys(data.completed_downloads).length > 0) {
                     document.getElementById('clearProgressBtn')?.classList.remove('hidden');
                 }
             }
-            
+
             // Check if download is complete
             if (!data.active && hasStarted) {
                 clearInterval(progressMonitoringInterval);
                 progressMonitoringInterval = null;
                 document.getElementById('cancelBtn').classList.add('hidden');
-                
+
                 const completedCount = Object.keys(data.completed_downloads || {}).length;
                 if (completedCount > 0) {
                     showAlert("downloadAlert", `Download session complete! ${completedCount} files downloaded.`, "success");
                 }
                 return;
             }
-            
+
             // Update overall progress text
             const overallText = document.getElementById('overallText');
             if (overallText && data.total > 0) {
                 overallText.textContent = `${data.progress || 0}/${data.total} files`;
             }
-            
+
             // Handle active downloads
             const progressBarsContainer = document.getElementById('progressBarsContainer');
             if (!progressBarsContainer) return;
-            
+
             if (data.active && data.concurrent_downloads) {
                 for (const [fileId, fileData] of Object.entries(data.concurrent_downloads)) {
                     // Skip if already completed
                     if (completedDownloads.has(fileId)) continue;
-                    
+
                     const percentage = fileData.percentage || 0;
                     const existingProgress = document.getElementById(`progress-${fileId}`);
-                    
+
                     if (existingProgress) {
                         // Update existing progress bar
                         existingProgress.outerHTML = createProgressBar(
@@ -1097,12 +1143,12 @@ function showAlert(_elementId, message, type) {
 // Toast fade-in animation
 const style = document.createElement("style");
 style.innerHTML = `
-    @keyframes fade-in-up { 
-        from { opacity: 0; transform: translateY(20px);} 
-        to { opacity: 1; transform: translateY(0);} 
-    } 
-    .animate-fade-in-up { 
-        animation: fade-in-up 0.4s cubic-bezier(.39,.575,.565,1.000) both; 
+    @keyframes fade-in-up {
+        from { opacity: 0; transform: translateY(20px);}
+        to { opacity: 1; transform: translateY(0);}
+    }
+    .animate-fade-in-up {
+        animation: fade-in-up 0.4s cubic-bezier(.39,.575,.565,1.000) both;
     }
     .progress-fill.bg-green-500 {
         background: linear-gradient(90deg, #10b981 0%, #059669 100%) !important;
@@ -1115,7 +1161,7 @@ document.head.appendChild(style);
     console.log('TeleFetchr initializing...');
     console.log('Checking connection status...');
     await checkStatus();
-    
+
     const connectionStatus = document.getElementById('connectionStatus');
     if (connectionStatus && connectionStatus.textContent.includes('Connected')) {
         console.log('Connected to Telegram, loading channels...');
@@ -1125,6 +1171,6 @@ document.head.appendChild(style);
     } else {
         console.log('Not connected to Telegram');
     }
-    
+
     console.log('TeleFetchr initialization complete');
 })();

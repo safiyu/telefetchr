@@ -34,6 +34,11 @@ environment:
       - API_HASH=saasdasdf12324 # your api_hash from my.telegram.org
       - PHONE_NUMBER=12345 # without + sign
       - MAX_CONCURRENT_DOWNLOADS=3 # optional, default is 3
+      # Generate secret: python -c "import secrets; print(secrets.token_urlsafe(32))"
+      - SECRET_KEY=your_generated_secret_key_here
+      - ADMIN_USERNAME=yourusername
+      - ADMIN_PASSWORD=yourpassword
+      - ACCESS_TOKEN_EXPIRE_MINUTES=1440  # 24 hours
 ```
 
 ## Accessing the Application

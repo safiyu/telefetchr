@@ -24,11 +24,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 
 # Copy application files
-COPY launch.py .
-COPY view.html .
-COPY script.js .
-COPY logo.png .
-COPY favicon.png .
+COPY main.py .
+COPY app/ ./app/
 
 # Copy sessions directory if exists (for build context)
 RUN mkdir -p sessions
@@ -43,4 +40,4 @@ VOLUME ["/app/downloads", "/app/sessions"]
 EXPOSE 8000
 
 # Run the application
-CMD ["uvicorn", "launch:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
