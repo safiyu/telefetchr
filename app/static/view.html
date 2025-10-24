@@ -19,12 +19,12 @@
         * {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         }
-
+        
         body {
             background: #fafafa;
         }
-
         /* Card styles */
+        
         .card {
             background: white;
             border-radius: 12px;
@@ -32,19 +32,19 @@
             padding: 1.5rem;
             transition: box-shadow 0.2s ease;
         }
-
+        
         .card:hover {
             box-shadow: 0 8px 12px rgba(0, 0, 0, 0.1);
         }
-
         /* Header styles */
+        
         header {
             background: white;
             border-bottom: 1px solid #e4e4e7;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
         }
-
         /* Button styles */
+        
         .btn-primary {
             background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
             color: white;
@@ -56,12 +56,12 @@
             cursor: pointer;
             box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
         }
-
+        
         .btn-primary:hover {
             transform: translateY(-2px);
             box-shadow: 0 8px 16px rgba(99, 102, 241, 0.35);
         }
-
+        
         .btn-secondary {
             background: white;
             color: #18181b;
@@ -72,12 +72,12 @@
             transition: all 0.2s ease;
             cursor: pointer;
         }
-
+        
         .btn-secondary:hover {
             background: #fafafa;
             border-color: #d4d4d8;
         }
-
+        
         .btn-success {
             background: #10b981;
             color: white;
@@ -88,12 +88,12 @@
             border: none;
             cursor: pointer;
         }
-
+        
         .btn-success:hover {
             background: #059669;
             transform: translateY(-2px);
         }
-
+        
         .btn-danger {
             background: #ef4444;
             color: white;
@@ -104,12 +104,12 @@
             border: none;
             cursor: pointer;
         }
-
+        
         .btn-danger:hover {
             background: #dc2626;
         }
-
         /* Input styles */
+        
         input[type="text"],
         input[type="number"],
         select {
@@ -120,22 +120,22 @@
             transition: all 0.2s ease;
             outline: none;
         }
-
+        
         input:focus,
         select:focus {
             border-color: #6366f1;
             background: white;
             box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
         }
-
         /* Progress bar */
+        
         .progress-bar {
             background: #e4e4e7;
             border-radius: 8px;
             overflow: hidden;
             position: relative;
         }
-
+        
         .progress-fill {
             background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%);
             height: 100%;
@@ -148,12 +148,12 @@
             transition: width 0.3s ease;
             min-width: 30px;
         }
-
+        
         .progress-fill.bg-green-500 {
             background: #10b981 !important;
         }
-
         /* Badge */
+        
         .badge {
             display: inline-flex;
             align-items: center;
@@ -163,23 +163,23 @@
             font-size: 13px;
             font-weight: 500;
         }
-
+        
         .badge-success {
             background: #d1fae5;
             color: #065f46;
         }
-
+        
         .badge-warning {
             background: #fef3c7;
             color: #92400e;
         }
-
+        
         .badge-info {
             background: #dbeafe;
             color: #1e40af;
         }
-
         /* Logo */
+        
         .logo-text {
             font-size: 1.75rem;
             font-weight: 700;
@@ -259,6 +259,45 @@
                         </select>
                     </div>
                 </div>
+
+                <!-- Search & Filter Section -->
+                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="font-semibold text-gray-900 flex items-center gap-2">
+                            <i class="fa-solid fa-filter text-indigo-500"></i> Filters
+                        </h3>
+                        <button onclick="toggleFilters()" id="toggleFiltersBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-semibold cursor-pointer">
+                            <i class="fa-solid fa-chevron-down"></i> Show
+                        </button>
+                    </div>
+                    <div id="filtersPanel" class="hidden space-y-3">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block font-medium mb-1 text-gray-700 text-xs">Search Filename</label>
+                                <input type="text" id="searchQuery" placeholder="e.g., report, invoice..." class="w-full text-sm">
+                            </div>
+                            <div>
+                                <label class="block font-medium mb-1 text-gray-700 text-xs">File Extension</label>
+                                <input type="text" id="fileExtension" placeholder="e.g., pdf, mp4, jpg" class="w-full text-sm">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block font-medium mb-1 text-gray-700 text-xs">Min Size (MB)</label>
+                                <input type="number" id="minSize" placeholder="0" min="0" step="0.1" class="w-full text-sm">
+                            </div>
+                            <div>
+                                <label class="block font-medium mb-1 text-gray-700 text-xs">Max Size (MB)</label>
+                                <input type="number" id="maxSize" placeholder="Unlimited" min="0" step="0.1" class="w-full text-sm">
+                            </div>
+                        </div>
+                        <div class="flex justify-end gap-2">
+                            <button onclick="clearFilters()" class="btn-secondary text-sm py-2 px-3">
+                                <i class="fa-solid fa-eraser"></i> Clear Filters
+                            </button>
+                        </div>
+                    </div>
+                </div>
                 <div class="flex flex-wrap gap-2 mt-2">
                     <button onclick="listFiles()" class="flex-1 btn-primary"><i class="fa-solid fa-list mr-2"></i>List Files</button>
                     <button onclick="downloadAll()" class="flex-1 btn-success"><i class="fa-solid fa-cloud-arrow-down mr-2"></i>Download All</button>
@@ -313,7 +352,7 @@
         <span>Version 1.0</span>
     </footer>
 
-    <script src="/static/js/script.js"></script>
+    <script src="/static/js/script.js?v=2"></script>
 </body>
 
 </html>

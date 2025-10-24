@@ -28,6 +28,12 @@ class DownloadRequest(BaseModel):
     channel_username: str
     limit: Optional[int] = 10
     filter_type: Optional[str] = None
+    search_query: Optional[str] = None
+    min_size: Optional[int] = None
+    max_size: Optional[int] = None
+    date_from: Optional[str] = None
+    date_to: Optional[str] = None
+    file_extension: Optional[str] = None
 
 
 class DownloadSelectedRequest(BaseModel):

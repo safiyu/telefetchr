@@ -525,10 +525,34 @@ async function verify2FA() {
     }
 }
 
+function toggleFilters() {
+    const filtersPanel = document.getElementById("filtersPanel");
+    const toggleBtn = document.getElementById("toggleFiltersBtn");
+
+    if (filtersPanel.classList.contains("hidden")) {
+        filtersPanel.classList.remove("hidden");
+        toggleBtn.innerHTML = '<i class="fa-solid fa-chevron-up"></i> Hide';
+    } else {
+        filtersPanel.classList.add("hidden");
+        toggleBtn.innerHTML = '<i class="fa-solid fa-chevron-down"></i> Show';
+    }
+}
+
+function clearFilters() {
+    document.getElementById("searchQuery").value = "";
+    document.getElementById("fileExtension").value = "";
+    document.getElementById("minSize").value = "";
+    document.getElementById("maxSize").value = "";
+}
+
 async function listFiles() {
     const channel = document.getElementById("channelUsername").value;
     const limit = document.getElementById("fileLimit").value;
     const fileType = document.getElementById("fileType").value;
+    const searchQuery = document.getElementById("searchQuery").value;
+    const fileExtension = document.getElementById("fileExtension").value;
+    const minSize = document.getElementById("minSize").value;
+    const maxSize = document.getElementById("maxSize").value;
 
     if (!channel) {
         showAlert("downloadAlert", "Please select a channel", "error");
@@ -536,21 +560,31 @@ async function listFiles() {
     }
 
     try {
+        const requestBody = {
+            channel_username: channel,
+            limit: parseInt(limit),
+            filter_type: fileType || null,
+        };
+
+        if (searchQuery) requestBody.search_query = searchQuery;
+        if (fileExtension) requestBody.file_extension = fileExtension;
+        if (minSize) requestBody.min_size = parseFloat(minSize) * 1024 * 1024;
+        if (maxSize) requestBody.max_size = parseFloat(maxSize) * 1024 * 1024;
+
         const response = await authFetch("/files/list", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                channel_username: channel,
-                limit: parseInt(limit),
-                filter_type: fileType || null,
-            }),
+            body: JSON.stringify(requestBody),
         });
 
         const data = await response.json();
 
         if (response.ok) {
             displayFiles(data.files);
-            showAlert("downloadAlert", `Found ${data.count} files`, "success");
+            const filterMsg = (searchQuery || fileExtension || minSize || maxSize)
+                ? " (with filters applied)"
+                : "";
+            showAlert("downloadAlert", `Found ${data.count} files${filterMsg}`, "success");
         } else {
             showAlert("downloadAlert", data.detail, "error");
         }

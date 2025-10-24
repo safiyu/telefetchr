@@ -154,7 +154,7 @@ async def get_channels(current_user: str = Depends(get_current_user)):
 
 @router.post("/files/list")
 async def list_files(request: DownloadRequest, current_user: str = Depends(get_current_user)):
-    """List files from a channel"""
+    """List files from a channel with search and filter options"""
     if not await telegram_service.is_connected():
         raise HTTPException(status_code=400, detail="Not connected. Login first.")
 
@@ -162,7 +162,13 @@ async def list_files(request: DownloadRequest, current_user: str = Depends(get_c
         files = await telegram_service.list_files(
             request.channel_username,
             request.limit,
-            request.filter_type
+            request.filter_type,
+            request.search_query,
+            request.min_size,
+            request.max_size,
+            request.date_from,
+            request.date_to,
+            request.file_extension
         )
         return {"status": "success", "files": files, "count": len(files)}
     except Exception as e:

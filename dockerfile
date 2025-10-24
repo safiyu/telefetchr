@@ -1,37 +1,45 @@
-# Use Python 3.11 slim image as base
-FROM python:3.11-slim
+# Multi-stage build for smaller final image
+FROM python:3.11-slim AS builder
 
 # Set working directory
 WORKDIR /app
 
-# Set environment variables
+# Set build-time environment variables
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     g++ \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements file
+# Copy and install Python dependencies
 COPY requirements.txt .
+RUN pip install --no-cache-dir --user -r requirements.txt
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Final stage - smaller runtime image
+FROM python:3.11-slim
 
+# Set working directory
+WORKDIR /app
+
+# Set runtime environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PATH=/root/.local/bin:$PATH
+
+# Copy only the installed packages from builder
+COPY --from=builder /root/.local /root/.local
 
 # Copy application files
 COPY main.py .
 COPY app/ ./app/
 
-# Copy sessions directory if exists (for build context)
-RUN mkdir -p sessions
-
-# Create downloads directory
-RUN mkdir -p downloads
+# Create necessary directories
+RUN mkdir -p sessions downloads
 
 # Create volume mount points
 VOLUME ["/app/downloads", "/app/sessions"]

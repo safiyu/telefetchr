@@ -1,5 +1,6 @@
 import logging
 from typing import Optional, List
+from datetime import datetime
 from telethon import TelegramClient
 from telethon.tl.types import MessageMediaDocument, MessageMediaPhoto, Channel, User
 
@@ -115,11 +116,36 @@ class TelegramService:
 
         return bots + channels
 
-    async def list_files(self, channel_username: str, limit: int = 10, filter_type: Optional[str] = None) -> List[FileInfo]:
-        """List files from a channel"""
+    async def list_files(
+        self,
+        channel_username: str,
+        limit: int = 10,
+        filter_type: Optional[str] = None,
+        search_query: Optional[str] = None,
+        min_size: Optional[int] = None,
+        max_size: Optional[int] = None,
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None,
+        file_extension: Optional[str] = None
+    ) -> List[FileInfo]:
+        """List files from a channel with search and filter options"""
         files = []
 
-        async for message in self.client.iter_messages(channel_username, limit=limit):
+        date_from_dt = None
+        date_to_dt = None
+        if date_from:
+            try:
+                date_from_dt = datetime.fromisoformat(date_from.replace('Z', '+00:00'))
+            except:
+                logger.warning(f"Invalid date_from format: {date_from}")
+
+        if date_to:
+            try:
+                date_to_dt = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
+            except:
+                logger.warning(f"Invalid date_to format: {date_to}")
+
+        async for message in self.client.iter_messages(channel_username, limit=limit * 2):
             if message.media:
                 file_info = None
 
@@ -148,7 +174,30 @@ class TelegramService:
                         )
 
                 if file_info:
+                    if search_query and search_query.lower() not in file_info.file_name.lower():
+                        continue
+
+                    if min_size is not None and file_info.file_size < min_size:
+                        continue
+
+                    if max_size is not None and file_info.file_size > max_size:
+                        continue
+
+                    if date_from_dt and message.date.replace(tzinfo=None) < date_from_dt.replace(tzinfo=None):
+                        continue
+
+                    if date_to_dt and message.date.replace(tzinfo=None) > date_to_dt.replace(tzinfo=None):
+                        continue
+
+                    if file_extension:
+                        ext = file_info.file_name.split('.')[-1].lower() if '.' in file_info.file_name else ''
+                        if ext != file_extension.lower().lstrip('.'):
+                            continue
+
                     files.append(file_info)
+
+                    if len(files) >= limit:
+                        break
 
         return files
 
