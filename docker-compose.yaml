@@ -11,7 +11,6 @@ services:
       - ./downloads:/app/downloads
     environment:
       - PYTHONUNBUFFERED=1
-      - CHANNELS=@c_bot,@Cin_Bot
       - API_ID=1234567
       - API_HASH=yourapihash
       - PHONE_NUMBER=1234567890
