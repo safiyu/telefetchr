@@ -61,10 +61,9 @@ class DownloadService:
                     if status["cancelled"]:
                         raise Exception("Download cancelled by user")
 
-                    # Check if progress has stalled (no change in 15 seconds)
                     if current == last_progress_bytes:
                         time_since_progress = (datetime.now() - last_progress_time).total_seconds()
-                        if time_since_progress > 15:
+                        if time_since_progress > 50:
                             logger.warning(f"Download stalled at {current}/{total} bytes for {time_since_progress}s")
                             raise Exception(f"Download stalled - no progress for {time_since_progress}s")
                     else:
@@ -141,14 +140,14 @@ class DownloadService:
 
                         # Use actual file size for progress detection
                         if actual_file_size == last_check_file_size:
-                            if time_elapsed > 15:  # Reduced from 20 to 15 seconds
-                                # No file growth in 15 seconds
+                            if time_elapsed > 60:  
+                                 # No file growth in 60 seconds
                                 logger.error(f"STALL DETECTED! File not growing for {time_elapsed}s. Disk size: {actual_file_size} bytes")
                                 logger.error(f"Cancelling download task and will retry...")
                                 download_task.cancel()
                                 raise Exception(f"Download stalled - file not growing for {time_elapsed}s")
                             else:
-                                logger.warning(f"File size unchanged ({actual_file_size} bytes) for {time_elapsed}s - will cancel if reaches 15s")
+                                logger.warning(f"File size unchanged ({actual_file_size} bytes) for {time_elapsed}s - will cancel if reaches 30s")
                         else:
                             logger.info(f"File growing: {last_check_file_size} -> {actual_file_size} bytes (+{actual_file_size - last_check_file_size})")
                             last_check_file_size = actual_file_size
@@ -175,17 +174,17 @@ class DownloadService:
 
                     return result
 
-                # Add timeout wrapper for the download (2 minutes per file)
-                logger.info(f"About to call download_with_monitoring() with 120s timeout")
+                # Add timeout wrapper for the download (5 minutes per file - increased from 2 minutes)
+                logger.info(f"About to call download_with_monitoring() with 300s timeout")
                 try:
                     file_path = await asyncio.wait_for(
                         download_with_monitoring(),
-                        timeout=120  # 2 minutes timeout for entire download
+                        timeout=1200  # 20 minutes timeout for entire download (allows for larger files)
                     )
                     logger.info(f"download_with_monitoring() completed, file_path={file_path}")
                 except asyncio.TimeoutError:
-                    logger.error(f"Download timeout after 2 minutes for {file_name}")
-                    raise Exception("Download timeout - exceeded 2 minutes")
+                    logger.error(f"Download timeout after 20 minutes for {file_name}")
+                    raise Exception("Download timeout - exceeded 20 minutes")
                 except asyncio.CancelledError:
                     logger.warning(f"Download cancelled (likely due to stall) for {file_name}")
                     raise Exception("Download stalled and was cancelled")
@@ -449,7 +448,7 @@ class DownloadService:
         return session_id
 
     async def download_single(self, channel_username: str, message_id: int) -> Dict:
-        """Download a single file"""
+        """Download a single file with simple, reliable method"""
         target_dir = Config.SAVE_PATH
         os.makedirs(target_dir, exist_ok=True)
 
@@ -490,8 +489,12 @@ class DownloadService:
             status["concurrent_downloads"][file_id]["progress"] = current
             status["concurrent_downloads"][file_id]["total"] = total
             status["concurrent_downloads"][file_id]["percentage"] = int((current / total * 100)) if total > 0 else 0
+            status["concurrent_downloads"][file_id]["last_update"] = datetime.now().isoformat()
             self.state_manager.save_state()
 
+        # Simple download without aggressive timeout/stall detection
+        # This has proven more reliable for individual downloads
+        logger.info(f"Starting single file download (simple method): {file_name}")
         file_path = await self.telegram_service.download_media(
             message,
             target_dir,

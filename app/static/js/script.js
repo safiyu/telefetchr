@@ -60,7 +60,7 @@ function showConfirmModal(options) {
 
         // Set icon
         modalIcon.className = 'modal-icon ' + (options.iconType || 'danger');
-        modalIcon.innerHTML = `<i class="fa-solid ${options.icon || 'fa-trash-can'}"></i>`;
+        modalIcon.innerHTML = `<i class="fa-solid ${escapeHtml(options.icon || 'fa-trash-can')}"></i>`;
 
         // Set details if provided
         if (options.details) {
@@ -71,8 +71,8 @@ function showConfirmModal(options) {
         }
 
         // Set button text
-        confirmBtn.innerHTML = `<i class="fa-solid fa-check mr-2"></i>${options.confirmText || 'Confirm'}`;
-        cancelBtn.innerHTML = `<i class="fa-solid fa-xmark mr-2"></i>${options.cancelText || 'Cancel'}`;
+        confirmBtn.innerHTML = `<i class="fa-solid fa-check mr-2"></i>${escapeHtml(options.confirmText || 'Confirm')}`;
+        cancelBtn.innerHTML = `<i class="fa-solid fa-xmark mr-2"></i>${escapeHtml(options.cancelText || 'Cancel')}`;
 
         // Set button style
         confirmBtn.className = options.confirmClass || 'btn-danger';
@@ -345,11 +345,11 @@ async function checkSavedState() {
                             <div>
                                 <p class="text-sm font-semibold text-yellow-800">Previous download session found</p>
                                 <p class="text-xs text-yellow-700 mt-1">
-                                    <strong>Channel:</strong> ${data.channel || 'Unknown'}<br>
+                                    <strong>Channel:</strong> ${escapeHtml(data.channel || 'Unknown')}<br>
                                     <strong>Progress:</strong> ${completedCount}/${totalCount} files completed
                                     ${remainingCount > 0 ? `(${remainingCount} remaining)` : '(All done!)'}
                                 </p>
-                                <p class="text-xs text-gray-500 mt-1">Session ID: ${data.session_id || 'N/A'}</p>
+                                <p class="text-xs text-gray-500 mt-1">Session ID: ${escapeHtml(data.session_id || 'N/A')}</p>
                             </div>
                         </div>
                         <div class="flex gap-2">
@@ -390,6 +390,10 @@ async function checkSavedState() {
         // Restore completed downloads to UI if they exist (whether active or not)
         if (data.completed_count > 0) {
             const progressResponse = await authFetch("/download-progress");
+            if (!progressResponse) {
+                console.error("Failed to fetch progress data for restoring completed downloads");
+                return;
+            }
             const progressData = await progressResponse.json();
 
             if (progressData.completed_downloads) {
@@ -417,43 +421,13 @@ async function checkSavedState() {
     }
 }
 
-function toggleDebugPanel() {
-    const panel = document.getElementById('debugPanel');
-    if (panel) {
-        if (panel.classList.contains('hidden')) {
-            panel.classList.remove('hidden');
-            refreshDebugInfo();
-        } else {
-            panel.classList.add('hidden');
-        }
-    }
-}
-
-async function refreshDebugInfo() {
-    try {
-        const response = await authFetch('/debug/state');
-        const data = await response.json();
-
-        const debugInfo = document.getElementById('debugInfo');
-        if (debugInfo) {
-            debugInfo.textContent = JSON.stringify(data, null, 2);
-        }
-
-        // Also log to console
-        console.log('Debug State:', data);
-
-    } catch (error) {
-        console.error('Error fetching debug info:', error);
-        const debugInfo = document.getElementById('debugInfo');
-        if (debugInfo) {
-            debugInfo.textContent = 'Error: ' + error.message;
-        }
-    }
-}
-
 async function viewCompletedDownloads() {
     try {
         const progressResponse = await authFetch("/download-progress");
+        if (!progressResponse) {
+            showAlert("downloadAlert", "Failed to load completed downloads", "error");
+            return;
+        }
         const progressData = await progressResponse.json();
 
         // Show progress section
@@ -501,6 +475,13 @@ function toggleDebugPanel() {
 async function refreshDebugInfo() {
     try {
         const response = await authFetch('/debug/state');
+        if (!response) {
+            const debugInfo = document.getElementById('debugInfo');
+            if (debugInfo) {
+                debugInfo.textContent = 'Failed to fetch debug state';
+            }
+            return;
+        }
         const data = await response.json();
 
         const debugInfo = document.getElementById('debugInfo');
@@ -525,6 +506,11 @@ async function clearSavedState() {
         const response = await authFetch("/download/clear-completed", {
             method: "POST",
         });
+
+        if (!response) {
+            showAlert("downloadAlert", "Failed to clear saved state", "error");
+            return;
+        }
 
         const data = await response.json();
 
@@ -558,6 +544,11 @@ async function clearProgress() {
             method: "POST",
         });
 
+        if (!response) {
+            showAlert("downloadAlert", "Failed to clear progress", "error");
+            return;
+        }
+
         const data = await response.json();
 
         if (response.ok) {
@@ -585,6 +576,10 @@ async function resumeDownload() {
     try {
         // First, load the existing completed downloads into UI
         const progressResponse = await authFetch("/download-progress");
+        if (!progressResponse) {
+            showAlert("downloadAlert", "Failed to resume download", "error");
+            return;
+        }
         const progressData = await progressResponse.json();
 
         // Show progress section
@@ -657,8 +652,8 @@ async function checkStatus() {
             connectionStatus.innerHTML =
                 '<i class="fa-solid fa-circle mr-2 text-white animate-pulse"></i><span class="font-bold tracking-wide">Connected</span>';
             userInfo.innerHTML = `<p><strong>User:</strong> ${
-        data.user.first_name
-      } (@${data.user.username || "N/A"})</p>`;
+        escapeHtml(data.user.first_name)
+      } (@${escapeHtml(data.user.username || "N/A")})</p>`;
             loginSection.classList.add("hidden");
             downloadSection.classList.remove("hidden");
         } else if (data.status === "not_authenticated" || data.status === "disconnected") {
@@ -863,7 +858,7 @@ function displayFiles(files) {
                 <button onclick="deselectAllFiles()" class="py-1 px-3 rounded bg-gray-500 text-white font-semibold shadow hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition flex items-center gap-1">
                     <i class="fa-solid fa-xmark"></i> Deselect All
                 </button>
-                <button onclick="downloadSelected('${currentChannel}')" id="downloadSelectedBtn" class="py-1 px-3 rounded bg-gray-500 text-white font-semibold shadow hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-400 transition flex items-center gap-1">
+                <button onclick="downloadSelected('${escapeHtml(currentChannel).replace(/'/g, "\\'")}')" id="downloadSelectedBtn" class="py-1 px-3 rounded bg-gray-500 text-white font-semibold shadow hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-400 transition flex items-center gap-1">
                     <i class="fa-solid fa-download"></i> Download Selected (<span id="selectedCount">0</span>)
                 </button>
             </div>
@@ -898,9 +893,9 @@ function displayFiles(files) {
                     <i class="fa-solid ${icon} text-3xl text-indigo-400"></i>
                 </div>
                 <div class="flex-1 min-w-0">
-                    <div class="font-semibold text-gray-800 truncate" title="${
+                    <div class="font-semibold text-gray-800 truncate" title="${escapeHtml(
                       file.file_name
-                    }">${file.file_name}</div>
+                    )}">${escapeHtml(file.file_name)}</div>
                     <div class="text-xs text-gray-500 mt-1">${
                       file.file_type.charAt(0).toUpperCase() +
                       file.file_type.slice(1)
@@ -910,7 +905,7 @@ function displayFiles(files) {
                 </div>
                 <button onclick="downloadSingle(${
                   file.file_id
-                }, '${currentChannel}')" class="py-1 px-3 rounded bg-indigo-500 text-white font-semibold shadow hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition flex items-center gap-1">
+                }, '${escapeHtml(currentChannel).replace(/'/g, "\\'")}')" class="py-1 px-3 rounded bg-indigo-500 text-white font-semibold shadow hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition flex items-center gap-1">
                     <i class="fa-solid fa-download"></i> Download
                 </button>
             </div>
@@ -957,24 +952,59 @@ function updateSelectedCount() {
     }
 }
 
-function clearIndividualProgress(fileId) {
-    completedDownloads.delete(fileId);
-    const element = document.getElementById(`progress-${fileId}`);
-    if (element) {
-        element.remove();
-    }
+async function clearIndividualProgress(fileId) {
+    try {
+        // Call backend to remove from server state
+        const response = await authFetch(`/download/clear-individual/${fileId}`, {
+            method: "DELETE",
+        });
 
-    // If no more progress items, hide the entire progress section
-    const progressBarsContainer = document.getElementById(
-        "progressBarsContainer"
-    );
-    if (progressBarsContainer && progressBarsContainer.children.length === 0) {
-        document.getElementById("downloadProgress").classList.add("hidden");
+        if (!response) {
+            showAlert("downloadAlert", "Failed to clear download", "error");
+            return;
+        }
+
+        const data = await response.json();
+
+        if (response.ok || data.status === "success") {
+            // Remove from client-side tracking
+            completedDownloads.delete(fileId);
+
+            // Remove from UI
+            const element = document.getElementById(`progress-${fileId}`);
+            if (element) {
+                element.remove();
+            }
+
+            // If no more progress items, hide the entire progress section
+            const progressBarsContainer = document.getElementById(
+                "progressBarsContainer"
+            );
+            if (progressBarsContainer && progressBarsContainer.children.length === 0) {
+                document.getElementById("downloadProgress").classList.add("hidden");
+            }
+        } else {
+            showAlert("downloadAlert", data.message || "Failed to clear download", "error");
+        }
+    } catch (error) {
+        console.error("Error clearing individual progress:", error);
+        showAlert("downloadAlert", "Error: " + error.message, "error");
     }
 }
 
 // Make function globally accessible for inline onclick handlers
 window.clearIndividualProgress = clearIndividualProgress;
+
+// HTML escape function to prevent XSS
+function escapeHtml(unsafe) {
+    if (!unsafe) return '';
+    return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
 
 function formatBytes(bytes) {
     if (!bytes || bytes === 0) return "0 Bytes";
@@ -1021,7 +1051,7 @@ function createProgressBar(
         <div id="${progressId}" class="file-progress-block" style="margin: 16px 0; padding: 12px; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
             <div class="flex justify-between items-center mb-2">
                 <div class="file-name flex items-center" style="font-size: 1em; font-weight: 600;">
-                    ${fileName}
+                    ${escapeHtml(fileName)}
                     ${retryBadge}
                     ${stallWarning}
                 </div>
@@ -1104,7 +1134,7 @@ async function downloadSingle(messageId, channel) {
     document.getElementById("cancelBtn").classList.remove("hidden");
 
     const response = await authFetch(
-      `/files/download/${messageId}?channel_username=${channel}`,
+      `/files/download/${messageId}?channel_username=${encodeURIComponent(channel)}`,
       {
         method: "POST",
       }
@@ -1286,18 +1316,22 @@ function startProgressMonitoring() {
         if (timeSinceUpdate > 10000) { // 10 seconds without update
             console.warn(`Progress monitoring appears stalled (${timeSinceUpdate}ms since last update)`);
 
-            // Check if download is still active
-            authFetch('/download-progress').then(response => {
-                if (!response) return;
-                return response.json();
-            }).then(data => {
-                if (data && data.active && !progressMonitoringInterval) {
-                    console.log('Watchdog: Restarting stalled progress monitoring');
-                    startProgressMonitoring();
-                }
-            }).catch(err => {
-                console.error('Watchdog check failed:', err);
-            });
+            // Only restart if interval is actually stopped (not just stalled)
+            if (!progressMonitoringInterval) {
+                // Check if download is still active
+                authFetch('/download-progress').then(response => {
+                    if (!response) return;
+                    return response.json();
+                }).then(data => {
+                    // Double-check interval is still null before restarting
+                    if (data && data.active && !progressMonitoringInterval) {
+                        console.log('Watchdog: Restarting stalled progress monitoring');
+                        startProgressMonitoring();
+                    }
+                }).catch(err => {
+                    console.error('Watchdog check failed:', err);
+                });
+            }
         }
     }, 5000);
 
@@ -1503,7 +1537,7 @@ function showAlert(_elementId, message, type) {
   const toast = document.createElement("div");
   toast.className = `flex items-center gap-4 px-6 py-4 rounded-xl shadow-2xl text-white font-medium ${color} animate-fade-in-up pointer-events-auto`;
   toast.style.width = "100%";
-  toast.innerHTML = `<i class="fa-solid ${icon} text-2xl"></i><span class="text-base">${message}</span>`;
+  toast.innerHTML = `<i class="fa-solid ${icon} text-2xl"></i><span class="text-base">${escapeHtml(message)}</span>`;
   toastContainer.appendChild(toast);
   setTimeout(() => {
     toast.classList.add("opacity-0");

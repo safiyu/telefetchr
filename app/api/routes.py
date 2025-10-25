@@ -313,6 +313,31 @@ async def clear_completed_downloads(current_user: str = Depends(get_current_user
     }
 
 
+@router.delete("/download/clear-individual/{file_id}")
+async def clear_individual_download(file_id: str, current_user: str = Depends(get_current_user)):
+    """Clear a single completed download from state"""
+    status = state_manager.get_status()
+    completed_downloads = status.get("completed_downloads", {})
+
+    if file_id in completed_downloads:
+        del completed_downloads[file_id]
+        status["completed_downloads"] = completed_downloads
+
+        # Update progress count
+        status["progress"] = len(completed_downloads)
+
+        state_manager.save_state()
+        return {
+            "status": "success",
+            "message": f"Download {file_id} cleared"
+        }
+    else:
+        return {
+            "status": "not_found",
+            "message": f"Download {file_id} not found"
+        }
+
+
 @router.get("/files/downloaded")
 async def list_downloaded_files(current_user: str = Depends(get_current_user)):
     """List all downloaded files"""
