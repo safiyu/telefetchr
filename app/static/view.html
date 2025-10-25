@@ -189,6 +189,47 @@
             -webkit-text-fill-color: transparent;
             background-clip: text;
         }
+        
+        .logout-btn {
+            background: transparent;
+            color: #ef4444;
+            border: none;
+            padding: 0.5rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            transition: color 0.2s ease;
+        }
+        
+        .logout-btn:hover {
+            color: #dc2626;
+        }
+        
+        .logout-btn:focus {
+            outline: 2px solid #ef4444;
+            outline-offset: 2px;
+            border-radius: 4px;
+        }
+        
+        .logout-btn i {
+            font-size: 1.25rem;
+        }
+        
+        .logout-text {
+            opacity: 0;
+            max-width: 0;
+            overflow: hidden;
+            white-space: nowrap;
+            transition: opacity 0.3s ease, max-width 0.3s ease;
+        }
+        
+        .logout-btn:hover .logout-text {
+            opacity: 1;
+            max-width: 100px;
+            /* Adjust based on text length */
+        }
     </style>
 </head>
 
@@ -207,8 +248,9 @@
                 <span>Connected</span>
             </span>
             <span id="userInfo" class="text-gray-600 text-sm font-medium"></span>
-            <button onclick="logout()" class="btn-danger flex items-center gap-2">
-                <i class="fa-solid fa-sign-out-alt"></i> Logout
+            <button onclick="logout()" aria-label="Logout" class="logout-btn">
+                <i class="fa-solid fa-sign-out-alt"></i>
+                <span class="logout-text">Logout</span>
             </button>
         </div>
     </header>
@@ -352,7 +394,7 @@
         <span>Version 1.0</span>
     </footer>
 
-    <script src="/static/js/script.js?v=2"></script>
+    <script src="/static/js/script.js"></script>
 </body>
 
 </html>

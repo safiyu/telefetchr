@@ -11,10 +11,10 @@ class Config:
 
     # Download Configuration
     MAX_CONCURRENT_DOWNLOADS = int(os.getenv("MAX_CONCURRENT_DOWNLOADS", "3"))
-    SAVE_PATH = 'downloads'
+    SAVE_PATH = os.path.abspath('downloads')
 
     # Session Configuration
-    SESSION_DIR = 'sessions'
+    SESSION_DIR = os.path.abspath('sessions')
     SESSION_FILE = os.path.join(SESSION_DIR, 'telegram_session')
     STATE_FILE = os.path.join(SESSION_DIR, 'download_state.json')
 

@@ -148,24 +148,27 @@ async function checkSavedState() {
             document.getElementById("downloadProgress").classList.remove("hidden");
             document.getElementById("cancelBtn").classList.remove("hidden");
             startProgressMonitoring();
+		}
 
-            // Restore completed downloads to the map
-            if (data.completed_count > 0) {
-                const progressResponse = await authFetch("/download-progress");
-                const progressData = await progressResponse.json();
+		// Restore completed downloads to UI if they exist (whether active or not)
+        if (data.completed_count > 0) {
+            const progressResponse = await authFetch("/download-progress");
+            const progressData = await progressResponse.json();
 
-                if (progressData.completed_downloads) {
-                    const progressBarsContainer = document.getElementById("progressBarsContainer");
-                    if (progressBarsContainer) {
-                        for (const [fileId, fileData] of Object.entries(progressData.completed_downloads)) {
-                            completedDownloads.set(fileId, fileData.path);
+            if (progressData.completed_downloads) {
+                const progressBarsContainer = document.getElementById("progressBarsContainer");
+                if (progressBarsContainer) {
+                    document.getElementById("downloadProgress").classList.remove("hidden");
+                    document.getElementById("clearProgressBtn")?.classList.remove("hidden");
 
-                            // Add completed progress bar if not exists
-                            if (!document.getElementById(`progress-${fileId}`)) {
-                                progressBarsContainer.insertAdjacentHTML('beforeend',
-                                    createProgressBar(fileId, fileData.name, true, 100, fileData.size, fileData.size)
-                                );
-                            }
+                    for (const [fileId, fileData] of Object.entries(progressData.completed_downloads)) {
+                        completedDownloads.set(fileId, fileData.path);
+
+                        // Add completed progress bar if not exists
+                        if (!document.getElementById(`progress-${fileId}`)) {
+                            progressBarsContainer.insertAdjacentHTML('beforeend',
+                                createProgressBar(fileId, fileData.name, true, 100, fileData.size, fileData.size)
+                            );
                         }
                     }
                 }
@@ -310,27 +313,32 @@ async function clearSavedState() {
     }
 }
 
-function clearProgress() {
-    // Clear all completed downloads from UI but keep in state
-    const progressBarsContainer = document.getElementById(
-        "progressBarsContainer"
-    );
-    if (progressBarsContainer) {
-        const completedBlocks = progressBarsContainer.querySelectorAll(
-            ".file-progress-block"
-        );
-        completedBlocks.forEach((block) => {
-            const progressFill = block.querySelector(".progress-fill");
-            if (progressFill && progressFill.classList.contains("bg-green-500")) {
-                block.remove();
-            }
+async function clearProgress() {
+    try {
+        const response = await authFetch("/download/clear-completed", {
+            method: "POST",
         });
-    }
 
-    // Hide progress section if empty
-    if (progressBarsContainer && progressBarsContainer.children.length === 0) {
-        document.getElementById("downloadProgress").classList.add("hidden");
-        document.getElementById("clearProgressBtn").classList.add("hidden");
+        const data = await response.json();
+
+        if (response.ok) {
+            completedDownloads.clear();
+
+            const notification = document.getElementById("resumeNotification");
+            if (notification) notification.remove();
+
+            const progressBarsContainer = document.getElementById("progressBarsContainer");
+            if (progressBarsContainer) {
+                progressBarsContainer.innerHTML = "";
+            }
+
+            document.getElementById("downloadProgress").classList.add("hidden");
+            document.getElementById("clearProgressBtn").classList.add("hidden");
+
+            showAlert("downloadAlert", "Progress cleared", "info");
+        }
+    } catch (error) {
+        showAlert("downloadAlert", "Error: " + error.message, "error");
     }
 }
 
@@ -1093,6 +1101,8 @@ function startProgressMonitoring() {
                 const completedCount = Object.keys(data.completed_downloads || {}).length;
                 if (completedCount > 0) {
                     showAlert("downloadAlert", `Download session complete! ${completedCount} files downloaded.`, "success");
+					document.getElementById('downloadProgress').classList.remove('hidden');
+                    document.getElementById('clearProgressBtn')?.classList.remove('hidden');
                 }
                 return;
             }

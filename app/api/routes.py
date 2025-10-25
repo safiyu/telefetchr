@@ -287,6 +287,13 @@ async def clear_completed_downloads(current_user: str = Depends(get_current_user
     """Clear completed downloads from state"""
     status = state_manager.get_status()
     status["completed_downloads"] = {}
+    if not status.get("active"):
+        status["session_id"] = None
+        status["channel"] = None
+        status["started_at"] = None
+        status["total"] = 0
+        status["progress"] = 0
+        status["cancelled"] = False
     state_manager.save_state()
     return {
         "status": "success",
