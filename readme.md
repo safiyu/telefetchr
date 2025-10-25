@@ -2,7 +2,8 @@
 # Telefetchr (Telegram file downloader)
 
 ## Screenshot
-<img width="1909" height="934" alt="screenshot" src="https://github.com/user-attachments/assets/e91f774a-3aa8-46f6-ad46-53aad2dd7245" />
+<img width="1910" height="918" alt="image" src="https://github.com/user-attachments/assets/deb5c8e9-e68c-40ff-87df-245dfa127d49" />
+
 
 ## Prerequisites
 
