@@ -170,16 +170,6 @@ class DownloadService:
                     if result and os.path.exists(result):
                         final_size = os.path.getsize(result)
                         logger.info(f"Download completed successfully: {file_name}, size: {final_size} bytes")
-
-                        # Update state one final time with actual file size
-                        status = self.state_manager.get_status()
-                        if file_id in status.get("concurrent_downloads", {}):
-                            status["concurrent_downloads"][file_id]["progress"] = final_size
-                            status["concurrent_downloads"][file_id]["total"] = final_size
-                            status["concurrent_downloads"][file_id]["percentage"] = 100
-                            status["concurrent_downloads"][file_id]["last_update"] = datetime.now().isoformat()
-                            self.state_manager.save_state()
-                            logger.info(f"Final state updated to 100% for {file_name}")
                     else:
                         logger.warning(f"Download task returned but file not found: {result}")
 
@@ -204,8 +194,15 @@ class DownloadService:
                     raise
 
                 if file_path:
+                    # Get fresh status to ensure we're working with latest state
+                    status = self.state_manager.get_status()
+
                     # Get the final file size from disk
-                    final_size = os.path.getsize(file_path) if os.path.exists(file_path) else status["concurrent_downloads"][file_id]["total"]
+                    final_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
+
+                    # If we don't have the size from disk, try to get from concurrent state
+                    if final_size == 0 and file_id in status.get("concurrent_downloads", {}):
+                        final_size = status["concurrent_downloads"][file_id].get("total", 0)
 
                     # Move to completed downloads with 100% progress
                     status["completed_downloads"][file_id] = {
@@ -216,12 +213,18 @@ class DownloadService:
                         "completed_at": datetime.now().isoformat()
                     }
 
-                if file_id in status["concurrent_downloads"]:
-                    del status["concurrent_downloads"][file_id]
-                self.state_manager.save_state()
+                    # Remove from concurrent downloads
+                    if file_id in status.get("concurrent_downloads", {}):
+                        del status["concurrent_downloads"][file_id]
 
-                logger.info(f"Completed download: {file_name}")
-                return file_path
+                    # Save the updated state
+                    self.state_manager.save_state()
+
+                    logger.info(f"Completed download: {file_name}, size: {final_size} bytes, marked as 100%")
+                    return file_path
+                else:
+                    logger.warning(f"Download completed but no file path returned for {file_name}")
+                    return None
 
             except Exception as e:
                 error_msg = str(e)

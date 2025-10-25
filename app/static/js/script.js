@@ -1343,14 +1343,6 @@ function startProgressMonitoring() {
             errorCount = 0; // Reset error count on success
             lastProgressUpdate = Date.now(); // Update last progress timestamp
 
-            console.log('Progress update:', {
-                active: data.active,
-                progress: data.progress,
-                total: data.total,
-                concurrent: Object.keys(data.concurrent_downloads || {}).length,
-                completed: Object.keys(data.completed_downloads || {}).length
-            });
-
             if (data.active) {
                 hasStarted = true;
             }
@@ -1361,24 +1353,32 @@ function startProgressMonitoring() {
                 progressSection.classList.remove('hidden');
             }
 
-            // Handle completed downloads from state (only add once)
+            // Handle completed downloads from state
             if (data.completed_downloads) {
                 for (const [fileId, fileData] of Object.entries(data.completed_downloads)) {
-                    if (!completedDownloads.has(fileId)) {
-                        completedDownloads.set(fileId, fileData.path);
+                    const existingProgress = document.getElementById(`progress-${fileId}`);
 
-                        // Add completed progress bar if not exists
-                        const existingProgress = document.getElementById(`progress-${fileId}`);
-                        if (!existingProgress) {
-                            const progressBarsContainer = document.getElementById('progressBarsContainer');
-                            if (progressBarsContainer) {
-                                console.log(`Adding completed progress bar for file: ${fileData.name}`);
-                                // Use percentage from completed data (guaranteed to be 100) or default to 100
-                                const percentage = fileData.percentage || 100;
-                                progressBarsContainer.insertAdjacentHTML('beforeend',
-                                    createProgressBar(fileId, fileData.name, true, percentage, fileData.size, fileData.size)
-                                );
-                            }
+                    if (!completedDownloads.has(fileId)) {
+                        // This file just completed - update the tracking map
+                        completedDownloads.set(fileId, fileData.path);
+                        console.log(`File marked as completed: ${fileData.name}`);
+                    }
+
+                    // Always update/replace the progress bar to ensure it shows 100%
+                    const progressBarsContainer = document.getElementById('progressBarsContainer');
+                    if (progressBarsContainer) {
+                        const percentage = fileData.percentage || 100;
+
+                        if (existingProgress) {
+                            // Replace existing progress bar with completed version
+                            console.log(`Updating progress bar to complete (100%) for: ${fileData.name}`);
+                            existingProgress.outerHTML = createProgressBar(fileId, fileData.name, true, percentage, fileData.size, fileData.size);
+                        } else {
+                            // Add new completed progress bar
+                            console.log(`Adding completed progress bar for file: ${fileData.name}`);
+                            progressBarsContainer.insertAdjacentHTML('beforeend',
+                                createProgressBar(fileId, fileData.name, true, percentage, fileData.size, fileData.size)
+                            );
                         }
                     }
                 }
