@@ -13,6 +13,10 @@ class Config:
     MAX_CONCURRENT_DOWNLOADS = int(os.getenv("MAX_CONCURRENT_DOWNLOADS", "3"))
     SAVE_PATH = os.path.abspath('downloads')
 
+    # Telethon Download Configuration
+    DOWNLOAD_CHUNK_SIZE = int(os.getenv("DOWNLOAD_CHUNK_SIZE", "524288"))  # 512KB chunks (smaller = more stable)
+    DOWNLOAD_REQUEST_DELAY = float(os.getenv("DOWNLOAD_REQUEST_DELAY", "0.1"))  # 100ms delay between chunk requests
+
     # Session Configuration
     SESSION_DIR = os.path.abspath('sessions')
     SESSION_FILE = os.path.join(SESSION_DIR, 'telegram_session')

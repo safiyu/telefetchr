@@ -31,61 +31,235 @@ class DownloadService:
             return f"photo_{message.id}.jpg"
         return "unknown"
 
-    async def download_single_file(self, message, target_dir: str, file_id: str) -> Optional[str]:
-        """Download a single file with progress tracking"""
-        try:
-            file_name = self._get_file_name(message)
-            logger.info(f"Starting download: {file_name}")
+    async def download_single_file(self, message, target_dir: str, file_id: str, max_retries: int = 3) -> Optional[str]:
+        """Download a single file with progress tracking and retry logic"""
+        file_name = self._get_file_name(message)
+        logger.info(f"=== DOWNLOAD SINGLE FILE CALLED === file_id={file_id}, file_name={file_name}, target_dir={target_dir}")
 
-            status = self.state_manager.get_status()
-            status["concurrent_downloads"][file_id] = {
-                "name": file_name,
-                "progress": 0,
-                "total": 0,
-                "percentage": 0
-            }
-            self.state_manager.save_state()
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"Starting download (attempt {attempt + 1}/{max_retries}): {file_name}")
+                logger.info(f"Message details: id={message.id}, has_media={message.media is not None}")
 
-            def progress_callback(current, total):
-                if status["cancelled"]:
-                    raise Exception("Download cancelled by user")
-                status["concurrent_downloads"][file_id]["progress"] = current
-                status["concurrent_downloads"][file_id]["total"] = total
-                status["concurrent_downloads"][file_id]["percentage"] = int((current / total * 100)) if total > 0 else 0
+                status = self.state_manager.get_status()
+                status["concurrent_downloads"][file_id] = {
+                    "name": file_name,
+                    "progress": 0,
+                    "total": 0,
+                    "percentage": 0,
+                    "retry_attempt": attempt + 1 if attempt > 0 else None
+                }
                 self.state_manager.save_state()
 
-            file_path = await self.telegram_service.download_media(
-                message,
-                target_dir,
-                progress_callback
-            )
+                last_progress_time = datetime.now()
+                last_progress_bytes = 0
+                download_start_time = datetime.now()
 
-            if file_path:
-                # Move to completed downloads
-                status["completed_downloads"][file_id] = {
-                    "name": file_name,
-                    "path": file_path,
-                    "size": status["concurrent_downloads"][file_id]["total"],
-                    "completed_at": datetime.now().isoformat()
-                }
+                def progress_callback(current, total):
+                    nonlocal last_progress_time, last_progress_bytes
 
-            if file_id in status["concurrent_downloads"]:
-                del status["concurrent_downloads"][file_id]
-            self.state_manager.save_state()
+                    if status["cancelled"]:
+                        raise Exception("Download cancelled by user")
 
-            logger.info(f"Completed download: {file_name}")
-            return file_path
+                    # Check if progress has stalled (no change in 15 seconds)
+                    if current == last_progress_bytes:
+                        time_since_progress = (datetime.now() - last_progress_time).total_seconds()
+                        if time_since_progress > 15:
+                            logger.warning(f"Download stalled at {current}/{total} bytes for {time_since_progress}s")
+                            raise Exception(f"Download stalled - no progress for {time_since_progress}s")
+                    else:
+                        last_progress_time = datetime.now()
+                        last_progress_bytes = current
 
-        except Exception as e:
-            error_msg = str(e)
-            logger.error(f"Error downloading {file_name}: {error_msg}")
-            status = self.state_manager.get_status()
-            if file_id in status["concurrent_downloads"]:
-                del status["concurrent_downloads"][file_id]
-            self.state_manager.save_state()
-            if "cancelled" in error_msg.lower():
-                return None
-            return None
+                    status["concurrent_downloads"][file_id]["progress"] = current
+                    status["concurrent_downloads"][file_id]["total"] = total
+                    status["concurrent_downloads"][file_id]["percentage"] = int((current / total * 100)) if total > 0 else 0
+                    status["concurrent_downloads"][file_id]["last_update"] = datetime.now().isoformat()
+                    self.state_manager.save_state()
+
+                # Create a task to monitor overall progress even when callback isn't called
+                async def download_with_monitoring():
+                    logger.info(f"")
+                    logger.info(f"{'='*80}")
+                    logger.info(f"=== DOWNLOAD_WITH_MONITORING FUNCTION STARTED ===")
+                    logger.info(f"=== file_name={file_name}, file_id={file_id}")
+                    logger.info(f"{'='*80}")
+
+                    # Determine the expected file path
+                    expected_file_path = os.path.join(target_dir, file_name)
+                    logger.info(f"Expected file path: {expected_file_path}")
+                    logger.info(f"Target directory exists: {os.path.exists(target_dir)}")
+
+                    logger.info(f"Creating download task via telegram_service.download_media...")
+                    try:
+                        download_task = asyncio.create_task(
+                            self.telegram_service.download_media(
+                                message,
+                                target_dir,
+                                progress_callback
+                            )
+                        )
+                        logger.info(f"✓ Download task created successfully: {download_task}")
+                    except Exception as e:
+                        logger.error(f"✗ Failed to create download task: {e}")
+                        raise
+
+                    last_check_file_size = 0
+                    last_check_time = datetime.now()
+                    check_count = 0
+
+                    while not download_task.done():
+                        try:
+                            await asyncio.sleep(5)  # Check every 5 seconds
+                        except asyncio.CancelledError:
+                            logger.warning(f"Monitor sleep cancelled for {file_name}")
+                            download_task.cancel()
+                            raise
+
+                        check_count += 1
+
+                        if download_task.done():
+                            logger.info(f"Download task completed for {file_name}")
+                            break
+
+                        logger.debug(f"Monitor loop iteration {check_count} for {file_name}")
+
+                        # Check actual file size on disk
+                        actual_file_size = 0
+                        if os.path.exists(expected_file_path):
+                            actual_file_size = os.path.getsize(expected_file_path)
+
+                        # Also check state for reported progress
+                        status = self.state_manager.get_status()
+                        current_status = status.get("concurrent_downloads", {}).get(file_id, {})
+                        state_bytes = current_status.get("progress", 0)
+                        total_bytes = current_status.get("total", 0)
+                        percentage = current_status.get("percentage", 0)
+                        time_elapsed = (datetime.now() - last_check_time).total_seconds()
+
+                        logger.info(f"Monitor check #{check_count} for {file_name}: state={state_bytes}/{total_bytes} ({percentage}%), disk={actual_file_size}, elapsed={time_elapsed}s")
+
+                        # Use actual file size for progress detection
+                        if actual_file_size == last_check_file_size:
+                            if time_elapsed > 15:  # Reduced from 20 to 15 seconds
+                                # No file growth in 15 seconds
+                                logger.error(f"STALL DETECTED! File not growing for {time_elapsed}s. Disk size: {actual_file_size} bytes")
+                                logger.error(f"Cancelling download task and will retry...")
+                                download_task.cancel()
+                                raise Exception(f"Download stalled - file not growing for {time_elapsed}s")
+                            else:
+                                logger.warning(f"File size unchanged ({actual_file_size} bytes) for {time_elapsed}s - will cancel if reaches 15s")
+                        else:
+                            logger.info(f"File growing: {last_check_file_size} -> {actual_file_size} bytes (+{actual_file_size - last_check_file_size})")
+                            last_check_file_size = actual_file_size
+                            last_check_time = datetime.now()
+
+                            # Update state with actual file size if callback hasn't been called
+                            if state_bytes == 0 and actual_file_size > 0:
+                                logger.info(f"Updating state with actual file size: {actual_file_size}")
+                                status["concurrent_downloads"][file_id]["progress"] = actual_file_size
+                                if total_bytes > 0:
+                                    status["concurrent_downloads"][file_id]["percentage"] = int((actual_file_size / total_bytes * 100))
+                                status["concurrent_downloads"][file_id]["last_update"] = datetime.now().isoformat()
+                                self.state_manager.save_state()
+
+                    result = await download_task
+                    logger.info(f"Download task finished for {file_name}")
+
+                    # Verify the file was actually downloaded
+                    if result and os.path.exists(result):
+                        final_size = os.path.getsize(result)
+                        logger.info(f"Download completed successfully: {file_name}, size: {final_size} bytes")
+
+                        # Update state one final time with actual file size
+                        status = self.state_manager.get_status()
+                        if file_id in status.get("concurrent_downloads", {}):
+                            status["concurrent_downloads"][file_id]["progress"] = final_size
+                            status["concurrent_downloads"][file_id]["total"] = final_size
+                            status["concurrent_downloads"][file_id]["percentage"] = 100
+                            status["concurrent_downloads"][file_id]["last_update"] = datetime.now().isoformat()
+                            self.state_manager.save_state()
+                            logger.info(f"Final state updated to 100% for {file_name}")
+                    else:
+                        logger.warning(f"Download task returned but file not found: {result}")
+
+                    return result
+
+                # Add timeout wrapper for the download (2 minutes per file)
+                logger.info(f"About to call download_with_monitoring() with 120s timeout")
+                try:
+                    file_path = await asyncio.wait_for(
+                        download_with_monitoring(),
+                        timeout=120  # 2 minutes timeout for entire download
+                    )
+                    logger.info(f"download_with_monitoring() completed, file_path={file_path}")
+                except asyncio.TimeoutError:
+                    logger.error(f"Download timeout after 2 minutes for {file_name}")
+                    raise Exception("Download timeout - exceeded 2 minutes")
+                except asyncio.CancelledError:
+                    logger.warning(f"Download cancelled (likely due to stall) for {file_name}")
+                    raise Exception("Download stalled and was cancelled")
+                except Exception as e:
+                    logger.error(f"Exception in download_with_monitoring: {type(e).__name__}: {str(e)}")
+                    raise
+
+                if file_path:
+                    # Get the final file size from disk
+                    final_size = os.path.getsize(file_path) if os.path.exists(file_path) else status["concurrent_downloads"][file_id]["total"]
+
+                    # Move to completed downloads with 100% progress
+                    status["completed_downloads"][file_id] = {
+                        "name": file_name,
+                        "path": file_path,
+                        "size": final_size,
+                        "percentage": 100,
+                        "completed_at": datetime.now().isoformat()
+                    }
+
+                if file_id in status["concurrent_downloads"]:
+                    del status["concurrent_downloads"][file_id]
+                self.state_manager.save_state()
+
+                logger.info(f"Completed download: {file_name}")
+                return file_path
+
+            except Exception as e:
+                error_msg = str(e)
+
+                # Check if user cancelled
+                if "cancelled" in error_msg.lower():
+                    logger.info(f"Download cancelled by user: {file_name}")
+                    status = self.state_manager.get_status()
+                    if file_id in status["concurrent_downloads"]:
+                        del status["concurrent_downloads"][file_id]
+                    self.state_manager.save_state()
+                    return None
+
+                # Check if it's a timeout/stall error from Telegram
+                is_timeout = (
+                    "timeout" in error_msg.lower() or
+                    "timeouterror" in error_msg.lower() or
+                    "stalled" in error_msg.lower() or
+                    "stuck" in error_msg.lower()
+                )
+
+                if is_timeout and attempt < max_retries - 1:
+                    # Calculate exponential backoff: 2^attempt seconds (2s, 4s, 8s)
+                    wait_time = 2 ** attempt
+                    logger.warning(f"Telegram timeout for {file_name}. Retrying in {wait_time}s... (attempt {attempt + 1}/{max_retries})")
+                    await asyncio.sleep(wait_time)
+                    continue
+                else:
+                    # Final attempt failed or non-timeout error
+                    logger.error(f"Error downloading {file_name} after {attempt + 1} attempts: {error_msg}")
+                    status = self.state_manager.get_status()
+                    if file_id in status["concurrent_downloads"]:
+                        del status["concurrent_downloads"][file_id]
+                    self.state_manager.save_state()
+                    return None
+
+        # Should not reach here, but just in case
+        return None
 
     async def download_selected_files(self, channel_username: str, message_ids: List[int]) -> str:
         """Download selected files with parallel processing"""
@@ -322,10 +496,14 @@ class DownloadService:
         )
 
         if file_path:
+            # Get the final file size from disk
+            final_size = os.path.getsize(file_path) if os.path.exists(file_path) else status["concurrent_downloads"][file_id]["total"]
+
             status["completed_downloads"][file_id] = {
                 "name": file_name,
                 "path": file_path,
-                "size": status["concurrent_downloads"][file_id]["total"],
+                "size": final_size,
+                "percentage": 100,
                 "completed_at": datetime.now().isoformat()
             }
             status["progress"] = len(status["completed_downloads"])

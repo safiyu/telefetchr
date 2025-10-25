@@ -3,6 +3,7 @@ from typing import Optional, List
 from datetime import datetime
 from telethon import TelegramClient
 from telethon.tl.types import MessageMediaDocument, MessageMediaPhoto, Channel, User
+from telethon.network import ConnectionTcpMTProxyRandomizedIntermediate
 
 from app.config import Config
 from app.models.schemas import FileInfo
@@ -17,12 +18,19 @@ class TelegramService:
         self.client: Optional[TelegramClient] = None
 
     async def connect(self):
-        """Connect to Telegram"""
+        """Connect to Telegram with optimized settings"""
         try:
             self.client = TelegramClient(
                 Config.SESSION_FILE,
                 Config.API_ID,
-                Config.API_HASH
+                Config.API_HASH,
+                # Optimizations for better reliability
+                timeout=60,  # Increased timeout for requests (was 30s)
+                request_retries=10,  # More retries for failed requests (was 5)
+                connection_retries=10,  # More connection retries (was 5)
+                retry_delay=3,  # Delay between retries (was 2s)
+                auto_reconnect=True,  # Auto-reconnect on disconnect
+                sequential_updates=True  # Process updates sequentially
             )
             await self.client.connect()
 
@@ -47,7 +55,13 @@ class TelegramService:
             self.client = TelegramClient(
                 Config.SESSION_FILE,
                 Config.API_ID,
-                Config.API_HASH
+                Config.API_HASH,
+                timeout=60,
+                request_retries=10,
+                connection_retries=10,
+                retry_delay=3,
+                auto_reconnect=True,
+                sequential_updates=True
             )
             await self.client.connect()
 
@@ -223,9 +237,24 @@ class TelegramService:
         return self.client.iter_messages(channel_username, limit=limit)
 
     async def download_media(self, message, file_path: str, progress_callback=None):
-        """Download media from message"""
+        """Download media from message with optimized settings"""
+        import asyncio
+
+        # Wrap progress callback to add small delay between updates
+        last_callback_time = [datetime.now()]
+
+        def throttled_progress_callback(current, total):
+            if progress_callback:
+                # Only call callback if enough time has passed (prevents flooding)
+                now = datetime.now()
+                elapsed = (now - last_callback_time[0]).total_seconds()
+                if elapsed >= Config.DOWNLOAD_REQUEST_DELAY or current == total:
+                    progress_callback(current, total)
+                    last_callback_time[0] = now
+
+        # Download with progress callback only (chunk size is handled by Telethon internally)
         return await self.client.download_media(
             message,
             file=file_path,
-            progress_callback=progress_callback
+            progress_callback=throttled_progress_callback if progress_callback else None
         )

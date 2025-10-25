@@ -7,6 +7,8 @@ let savePath = "";
 let selectedFiles = new Set();
 let progressMonitoringInterval = null;
 let completedDownloads = new Map(); // Track completed downloads
+let lastProgressUpdate = null; // Track last progress update time
+let progressWatchdog = null; // Watchdog to detect stalled progress monitoring
 
 // Authentication helpers
 function getAuthToken() {
@@ -18,9 +20,172 @@ function getAuthHeaders() {
     return token ? { 'Authorization': `Bearer ${token}` } : {};
 }
 
-function logout() {
+async function logout() {
+    // Show confirmation modal
+    const confirmed = await showConfirmModal({
+        title: 'Logout from TeleFetchr?',
+        message: 'You will be logged out of the web interface. Your Telegram session will remain active.',
+        details: 'You can log back in anytime with your credentials without re-authenticating with Telegram.',
+        icon: 'fa-sign-out-alt',
+        iconType: 'warning',
+        confirmText: 'Logout',
+        cancelText: 'Stay Logged In',
+        confirmClass: 'btn-primary'
+    });
+
+    if (!confirmed) {
+        return;
+    }
+
     localStorage.removeItem('access_token');
     window.location.href = '/';
+}
+
+// Show confirmation modal
+function showConfirmModal(options) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('confirmModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalMessage = document.getElementById('modalMessage');
+        const modalIcon = document.getElementById('modalIcon');
+        const modalDetails = document.getElementById('modalDetails');
+        const modalDetailsText = document.getElementById('modalDetailsText');
+        const confirmBtn = document.getElementById('modalConfirmBtn');
+        const cancelBtn = document.getElementById('modalCancelBtn');
+
+        // Set content
+        modalTitle.textContent = options.title || 'Confirm Action';
+        modalMessage.textContent = options.message || 'Are you sure?';
+
+        // Set icon
+        modalIcon.className = 'modal-icon ' + (options.iconType || 'danger');
+        modalIcon.innerHTML = `<i class="fa-solid ${options.icon || 'fa-trash-can'}"></i>`;
+
+        // Set details if provided
+        if (options.details) {
+            modalDetailsText.textContent = options.details;
+            modalDetails.classList.remove('hidden');
+        } else {
+            modalDetails.classList.add('hidden');
+        }
+
+        // Set button text
+        confirmBtn.innerHTML = `<i class="fa-solid fa-check mr-2"></i>${options.confirmText || 'Confirm'}`;
+        cancelBtn.innerHTML = `<i class="fa-solid fa-xmark mr-2"></i>${options.cancelText || 'Cancel'}`;
+
+        // Set button style
+        confirmBtn.className = options.confirmClass || 'btn-danger';
+
+        // Show modal
+        modal.classList.remove('hidden');
+
+        // Handle confirmation
+        const handleConfirm = () => {
+            cleanup();
+            resolve(true);
+        };
+
+        // Handle cancel
+        const handleCancel = () => {
+            cleanup();
+            resolve(false);
+        };
+
+        // Handle click outside modal
+        const handleOutsideClick = (e) => {
+            if (e.target === modal) {
+                handleCancel();
+            }
+        };
+
+        // Handle escape key
+        const handleEscape = (e) => {
+            if (e.key === 'Escape') {
+                handleCancel();
+            }
+        };
+
+        // Cleanup function
+        const cleanup = () => {
+            modal.classList.add('hidden');
+            confirmBtn.removeEventListener('click', handleConfirm);
+            cancelBtn.removeEventListener('click', handleCancel);
+            modal.removeEventListener('click', handleOutsideClick);
+            document.removeEventListener('keydown', handleEscape);
+        };
+
+        // Add event listeners
+        confirmBtn.addEventListener('click', handleConfirm);
+        cancelBtn.addEventListener('click', handleCancel);
+        modal.addEventListener('click', handleOutsideClick);
+        document.addEventListener('keydown', handleEscape);
+    });
+}
+
+async function logoutSession() {
+    // Show confirmation modal
+    const confirmed = await showConfirmModal({
+        title: 'Delete Telegram Session?',
+        message: 'This will permanently delete your Telegram session. You will need to re-authenticate with a verification code the next time you use this app.',
+        details: 'This action cannot be undone. Your session file and all download progress will be cleared.',
+        icon: 'fa-trash-can',
+        iconType: 'danger',
+        confirmText: 'Delete Session',
+        cancelText: 'Cancel'
+    });
+
+    if (!confirmed) {
+        return;
+    }
+
+    try {
+        const response = await authFetch('/logout-session', {
+            method: 'POST'
+        });
+
+        if (!response) return;
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showAlert('downloadAlert', 'Telegram session deleted successfully. Redirecting...', 'success');
+
+            // Wait a moment for the user to see the message
+            setTimeout(() => {
+                // Clear local storage and redirect to login
+                localStorage.removeItem('access_token');
+                window.location.href = '/';
+            }, 1500);
+        } else {
+            showAlert('downloadAlert', data.detail || 'Failed to delete session', 'error');
+        }
+    } catch (error) {
+        console.error('Error deleting session:', error);
+        showAlert('downloadAlert', 'Error: ' + error.message, 'error');
+    }
+}
+
+// Safe JSON parser
+async function safeJsonParse(response, context = 'request') {
+    try {
+        const text = await response.text();
+
+        // Check if response is likely HTML (error page)
+        if (text.trim().startsWith('<')) {
+            console.error(`${context}: Server returned HTML instead of JSON. Likely a server error.`);
+            console.error('Response preview:', text.substring(0, 200));
+            throw new Error('Server error - received HTML instead of JSON');
+        }
+
+        // Try to parse as JSON
+        return JSON.parse(text);
+    } catch (error) {
+        if (error.message.includes('Server error')) {
+            throw error; // Re-throw our custom error
+        }
+        console.error(`${context}: Failed to parse response as JSON:`, error);
+        throw new Error('Invalid response from server');
+    }
 }
 
 // Authenticated fetch wrapper
@@ -30,19 +195,89 @@ async function authFetch(url, options = {}) {
         ...(options.headers || {})
     };
 
-    const response = await fetch(url, {
-        ...options,
-        headers
-    });
+    try {
+        const response = await fetch(url, {
+            ...options,
+            headers
+        });
 
-    // If unauthorized, redirect to login
-    if (response.status === 401) {
-        logout();
+        // If unauthorized, handle silently for background requests
+        if (response.status === 401) {
+            console.warn('Authentication token expired or invalid');
+
+            // Only show alert and redirect if this is NOT a background progress check
+            if (!url.includes('/download-progress')) {
+                showAlert('downloadAlert', 'Session expired. Please log in again.', 'warning');
+
+                // Redirect to login after a short delay
+                setTimeout(() => {
+                    localStorage.removeItem('access_token');
+                    window.location.href = '/';
+                }, 2000);
+            } else {
+                // For progress checks, just log and return null silently
+                console.log('Progress check failed due to expired token - monitoring will stop');
+            }
+
+            return null;
+        }
+
+        // Check for other error status codes
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`HTTP ${response.status} error from ${url}:`, errorText);
+
+            // Don't show alert for background progress checks
+            if (!url.includes('/download-progress')) {
+                // Special message for timeout errors
+                if (response.status === 504 || response.status === 408) {
+                    showAlert('downloadAlert', 'Download timeout. Large files may take longer. The download continues in the background.', 'warning');
+                } else if (response.status === 503) {
+                    showAlert('downloadAlert', 'Server is busy. Please wait and try again.', 'warning');
+                } else {
+                    showAlert('downloadAlert', `Server error (${response.status}). Please try again.`, 'error');
+                }
+            }
+
+            return null;
+        }
+
+        return response;
+    } catch (error) {
+        console.error(`Network error for ${url}:`, error);
+
+        // Don't show alert for background progress checks
+        if (!url.includes('/download-progress')) {
+            showAlert('downloadAlert', 'Network error. Please check your connection.', 'error');
+        }
+
         return null;
     }
-
-    return response;
 }
+
+// Global error handler for unhandled promise rejections
+window.addEventListener('unhandledrejection', function(event) {
+    console.error('Unhandled promise rejection:', event.reason);
+
+    // Prevent the default browser behavior (which might show console errors)
+    event.preventDefault();
+
+    // Check if it's a JSON parsing error
+    if (event.reason && event.reason.message) {
+        const message = event.reason.message;
+
+        // Don't show toast for these expected errors (already logged)
+        if (message.includes('Server error') ||
+            message.includes('Invalid response') ||
+            message.includes('Unexpected token')) {
+            console.log('Suppressing error toast for:', message);
+            return;
+        }
+    }
+
+    // For other errors, you might want to log them but not necessarily show a toast
+    console.log('Non-JSON error caught:', event.reason);
+});
 
 // Check authentication on page load
 window.addEventListener('DOMContentLoaded', () => {
@@ -57,7 +292,7 @@ async function loadChannels() {
     try {
         const response = await authFetch("/config/channels");
         if (!response) return;
-        const data = await response.json();
+        const data = await safeJsonParse(response, 'Load channels');
 
         const channelList = data.channels;
         const savePath = data.save_path;
@@ -88,7 +323,8 @@ async function checkSavedState() {
     try {
         console.log('Checking for saved state...');
         const response = await authFetch("/download/state");
-        const data = await response.json();
+        if (!response) return;
+        const data = await safeJsonParse(response, 'Check saved state');
 
         console.log('Saved state response:', data);
 
@@ -148,9 +384,9 @@ async function checkSavedState() {
             document.getElementById("downloadProgress").classList.remove("hidden");
             document.getElementById("cancelBtn").classList.remove("hidden");
             startProgressMonitoring();
-		}
+        }
 
-		// Restore completed downloads to UI if they exist (whether active or not)
+        // Restore completed downloads to UI if they exist (whether active or not)
         if (data.completed_count > 0) {
             const progressResponse = await authFetch("/download-progress");
             const progressData = await progressResponse.json();
@@ -166,8 +402,9 @@ async function checkSavedState() {
 
                         // Add completed progress bar if not exists
                         if (!document.getElementById(`progress-${fileId}`)) {
+                            const percentage = fileData.percentage || 100;
                             progressBarsContainer.insertAdjacentHTML('beforeend',
-                                createProgressBar(fileId, fileData.name, true, 100, fileData.size, fileData.size)
+                                createProgressBar(fileId, fileData.name, true, percentage, fileData.size, fileData.size)
                             );
                         }
                     }
@@ -231,8 +468,9 @@ async function viewCompletedDownloads() {
                 // Add all completed downloads
                 for (const [fileId, fileData] of Object.entries(progressData.completed_downloads)) {
                     completedDownloads.set(fileId, fileData.path);
+                    const percentage = fileData.percentage || 100;
                     progressBarsContainer.insertAdjacentHTML('beforeend',
-                        createProgressBar(fileId, fileData.name, true, 100, fileData.size, fileData.size)
+                        createProgressBar(fileId, fileData.name, true, percentage, fileData.size, fileData.size)
                     );
                 }
 
@@ -361,8 +599,9 @@ async function resumeDownload() {
                 // Add all completed downloads
                 for (const [fileId, fileData] of Object.entries(progressData.completed_downloads)) {
                     completedDownloads.set(fileId, fileData.path);
+                    const percentage = fileData.percentage || 100;
                     progressBarsContainer.insertAdjacentHTML('beforeend',
-                        createProgressBar(fileId, fileData.name, true, 100, fileData.size, fileData.size)
+                        createProgressBar(fileId, fileData.name, true, percentage, fileData.size, fileData.size)
                     );
                 }
 
@@ -403,7 +642,8 @@ async function resumeDownload() {
 async function checkStatus() {
     try {
         const response = await authFetch("/status");
-        const data = await response.json();
+        if (!response) return;
+        const data = await safeJsonParse(response, 'Check status');
 
         const connectionStatus = document.getElementById("connectionStatus");
         const userInfo = document.getElementById("userInfo");
@@ -420,7 +660,7 @@ async function checkStatus() {
       } (@${data.user.username || "N/A"})</p>`;
             loginSection.classList.add("hidden");
             downloadSection.classList.remove("hidden");
-        } else if (data.status === "not_authenticated") {
+        } else if (data.status === "not_authenticated" || data.status === "disconnected") {
             connectionStatus.className =
                 "inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-yellow-400 to-orange-400 text-white shadow-md";
             connectionStatus.innerHTML =
@@ -432,7 +672,7 @@ async function checkStatus() {
             connectionStatus.className =
                 "inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-red-400 to-pink-500 text-white shadow-md";
             connectionStatus.innerHTML =
-                '<i class="fa-solid fa-circle-xmark mr-2 text-white animate-pulse"></i><span class="font-bold tracking-wide">Not Connected</span>';
+                '<i class="fa-solid fa-circle-xmark mr-2 text-white animate-pulse"></i><span class="font-bold tracking-wide">Error</span>';
             userInfo.innerHTML = "";
             loginSection.classList.add("hidden");
             downloadSection.classList.add("hidden");
@@ -746,13 +986,41 @@ function createProgressBar(
     isComplete = false,
     percentage = 0,
     current = 0,
-    total = 0
+    total = 0,
+    retryAttempt = null,
+    lastUpdate = null
 ) {
     const progressId = `progress-${fileId}`;
+    let retryBadge = '';
+    let stallWarning = '';
+
+    if (retryAttempt && retryAttempt > 1) {
+        retryBadge = `<span class="text-xs px-2 py-1 rounded bg-yellow-100 text-yellow-800 ml-2">Retry ${retryAttempt}/3</span>`;
+    }
+
+    // Check if download appears stalled
+    if (lastUpdate && !isComplete) {
+        try {
+            const lastUpdateTime = new Date(lastUpdate);
+            const timeSinceUpdate = (Date.now() - lastUpdateTime) / 1000; // seconds
+            console.log(`Checking stall for ${fileName}: last update ${lastUpdate}, time since: ${timeSinceUpdate}s`);
+            if (timeSinceUpdate > 10) {
+                stallWarning = `<span class="text-xs px-2 py-1 rounded bg-orange-100 text-orange-800 ml-2"><i class="fa-solid fa-exclamation-triangle"></i> Stalled ${Math.floor(timeSinceUpdate)}s</span>`;
+                console.log(`Showing stall warning for ${fileName}`);
+            }
+        } catch (e) {
+            console.error('Error checking stall status:', e);
+        }
+    }
+
     let html = `
         <div id="${progressId}" class="file-progress-block" style="margin: 16px 0; padding: 12px; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
             <div class="flex justify-between items-center mb-2">
-                <div class="file-name" style="font-size: 1em; font-weight: 600;">${fileName}</div>
+                <div class="file-name flex items-center" style="font-size: 1em; font-weight: 600;">
+                    ${fileName}
+                    ${retryBadge}
+                    ${stallWarning}
+                </div>
                 ${
                   isComplete
                     ? `
@@ -777,6 +1045,8 @@ function createProgressBar(
                 ${
                   isComplete
                     ? '<span class="text-green-600 font-semibold">Download Complete</span>'
+                    : retryAttempt && retryAttempt > 1
+                    ? '<span class="text-yellow-600 font-semibold">Retrying after Telegram timeout...</span>'
                     : ""
                 }
             </div>
@@ -822,55 +1092,12 @@ async function downloadSelected(channel) {
 }
 
 async function downloadSingle(messageId, channel) {
-  let progressInterval;
   const fileId = `single_${messageId}`;
 
   try {
-    showAlert("downloadAlert", "Starting download...", "info");
+    showAlert("downloadAlert", "Starting download in background...", "info");
     document.getElementById("downloadProgress").classList.remove("hidden");
     document.getElementById("cancelBtn").classList.remove("hidden");
-    progressInterval = setInterval(async () => {
-      try {
-        const response = await authFetch("/download-progress");
-        const data = await response.json();
-        const progressBarsContainer = document.getElementById(
-          "progressBarsContainer"
-        );
-        if (!progressBarsContainer) return;
-        if (data.concurrent_downloads && data.concurrent_downloads[fileId]) {
-          const fileData = data.concurrent_downloads[fileId];
-          const percentage = fileData.percentage || 0;
-          const existingProgress = document.getElementById(
-            `progress-${fileId}`
-          );
-
-          if (existingProgress) {
-            existingProgress.outerHTML = createProgressBar(
-              fileId,
-              fileData.name,
-              false,
-              percentage,
-              fileData.progress,
-              fileData.total
-            );
-          } else {
-            progressBarsContainer.insertAdjacentHTML(
-              "beforeend",
-              createProgressBar(
-                fileId,
-                fileData.name,
-                false,
-                percentage,
-                fileData.progress,
-                fileData.total
-              )
-            );
-          }
-        }
-      } catch (error) {
-        console.error("Progress update error:", error);
-      }
-    }, 500);
 
     const response = await authFetch(
       `/files/download/${messageId}?channel_username=${channel}`,
@@ -879,55 +1106,30 @@ async function downloadSingle(messageId, channel) {
       }
     );
 
-    const data = await response.json();
-
-    if (progressInterval) {
-      clearInterval(progressInterval);
+    if (!response) {
+      document.getElementById("cancelBtn").classList.add("hidden");
+      return;
     }
+
+    const data = await safeJsonParse(response, 'Download single file');
 
     if (response.ok) {
-      // Mark as complete
-      completedDownloads.set(fileId, data.file_path);
+      showAlert("downloadAlert", data.message, "success");
 
-      // Get the last progress data to show final size
-      const progressResponse = await authFetch("/download-progress");
-      const progressData = await progressResponse.json();
-      let finalSize = 0;
-
-      if (
-        progressData.concurrent_downloads &&
-        progressData.concurrent_downloads[fileId]
-      ) {
-        finalSize = progressData.concurrent_downloads[fileId].total;
+      // Start progress monitoring if not already running
+      if (!progressMonitoringInterval) {
+        startProgressMonitoring();
       }
 
-      const existingProgress = document.getElementById(`progress-${fileId}`);
-      if (existingProgress) {
-        existingProgress.outerHTML = createProgressBar(
-          fileId,
-          data.file_path.split("/").pop(),
-          true,
-          100,
-          finalSize,
-          finalSize
-        );
-      }
-
-      document.getElementById("cancelBtn").classList.add("hidden");
-
-      showAlert("downloadAlert", "File downloaded successfully!", "success");
+      // The progress will be shown automatically by the progress monitoring interval
     } else {
-      showAlert("downloadAlert", data.detail, "error");
+      showAlert("downloadAlert", data.detail || "Download failed", "error");
       document.getElementById("cancelBtn").classList.add("hidden");
-      clearIndividualProgress(fileId);
     }
   } catch (error) {
-    if (progressInterval) {
-      clearInterval(progressInterval);
-    }
+    console.error("Download single error:", error);
     showAlert("downloadAlert", "Error: " + error.message, "error");
     document.getElementById("cancelBtn").classList.add("hidden");
-    clearIndividualProgress(fileId);
   }
 }
 
@@ -1053,18 +1255,110 @@ async function cancelDownload() {
 
 function startProgressMonitoring() {
     if (progressMonitoringInterval) {
+        console.log('Clearing existing progress monitoring interval');
         clearInterval(progressMonitoringInterval);
+        progressMonitoringInterval = null;
+    }
+
+    // Clear existing watchdog
+    if (progressWatchdog) {
+        clearInterval(progressWatchdog);
+        progressWatchdog = null;
     }
 
     let hasStarted = false;
+    let errorCount = 0;
+    const maxErrors = 5;
+
+    console.log('Starting progress monitoring with 500ms interval');
+    lastProgressUpdate = Date.now();
+
+    // Start watchdog to detect stalled monitoring (check every 5 seconds)
+    progressWatchdog = setInterval(() => {
+        const timeSinceUpdate = Date.now() - lastProgressUpdate;
+        if (timeSinceUpdate > 10000) { // 10 seconds without update
+            console.warn(`Progress monitoring appears stalled (${timeSinceUpdate}ms since last update)`);
+
+            // Check if download is still active
+            authFetch('/download-progress').then(response => {
+                if (!response) return;
+                return response.json();
+            }).then(data => {
+                if (data && data.active && !progressMonitoringInterval) {
+                    console.log('Watchdog: Restarting stalled progress monitoring');
+                    startProgressMonitoring();
+                }
+            }).catch(err => {
+                console.error('Watchdog check failed:', err);
+            });
+        }
+    }, 5000);
 
     progressMonitoringInterval = setInterval(async () => {
         try {
             const response = await authFetch('/download-progress');
-            const data = await response.json();
+
+            if (!response) {
+                console.error('No response from download-progress endpoint');
+                errorCount++;
+                if (errorCount >= maxErrors) {
+                    console.error(`Too many errors (${errorCount}), stopping progress monitoring`);
+                    clearInterval(progressMonitoringInterval);
+                    progressMonitoringInterval = null;
+
+                    // Clear watchdog
+                    if (progressWatchdog) {
+                        clearInterval(progressWatchdog);
+                        progressWatchdog = null;
+                    }
+
+                    // Don't show error if it's likely a token issue (user will see session expired message)
+                    // Only show if it seems like a genuine connection issue
+                    const token = getAuthToken();
+                    if (token) {
+                        showAlert("downloadAlert", "Lost connection to server. Please refresh the page.", "error");
+                    }
+                }
+                return;
+            }
+
+            let data;
+            try {
+                data = await safeJsonParse(response, 'Progress monitoring');
+            } catch (jsonError) {
+                console.error('Failed to parse progress response:', jsonError.message);
+                errorCount++;
+                if (errorCount >= maxErrors) {
+                    console.error(`Too many JSON parsing errors (${errorCount}), stopping progress monitoring`);
+                    clearInterval(progressMonitoringInterval);
+                    progressMonitoringInterval = null;
+                    if (progressWatchdog) {
+                        clearInterval(progressWatchdog);
+                        progressWatchdog = null;
+                    }
+                }
+                return;
+            }
+
+            errorCount = 0; // Reset error count on success
+            lastProgressUpdate = Date.now(); // Update last progress timestamp
+
+            console.log('Progress update:', {
+                active: data.active,
+                progress: data.progress,
+                total: data.total,
+                concurrent: Object.keys(data.concurrent_downloads || {}).length,
+                completed: Object.keys(data.completed_downloads || {}).length
+            });
 
             if (data.active) {
                 hasStarted = true;
+            }
+
+            // Ensure progress section is visible if we have data
+            const progressSection = document.getElementById('downloadProgress');
+            if (progressSection && (data.active || Object.keys(data.completed_downloads || {}).length > 0)) {
+                progressSection.classList.remove('hidden');
             }
 
             // Handle completed downloads from state (only add once)
@@ -1078,8 +1372,11 @@ function startProgressMonitoring() {
                         if (!existingProgress) {
                             const progressBarsContainer = document.getElementById('progressBarsContainer');
                             if (progressBarsContainer) {
+                                console.log(`Adding completed progress bar for file: ${fileData.name}`);
+                                // Use percentage from completed data (guaranteed to be 100) or default to 100
+                                const percentage = fileData.percentage || 100;
                                 progressBarsContainer.insertAdjacentHTML('beforeend',
-                                    createProgressBar(fileId, fileData.name, true, 100, fileData.size, fileData.size)
+                                    createProgressBar(fileId, fileData.name, true, percentage, fileData.size, fileData.size)
                                 );
                             }
                         }
@@ -1094,14 +1391,22 @@ function startProgressMonitoring() {
 
             // Check if download is complete
             if (!data.active && hasStarted) {
+                console.log('Download session completed, stopping progress monitoring');
                 clearInterval(progressMonitoringInterval);
                 progressMonitoringInterval = null;
-                document.getElementById('cancelBtn').classList.add('hidden');
+
+                // Clear watchdog
+                if (progressWatchdog) {
+                    clearInterval(progressWatchdog);
+                    progressWatchdog = null;
+                }
+
+                document.getElementById('cancelBtn')?.classList.add('hidden');
 
                 const completedCount = Object.keys(data.completed_downloads || {}).length;
                 if (completedCount > 0) {
                     showAlert("downloadAlert", `Download session complete! ${completedCount} files downloaded.`, "success");
-					document.getElementById('downloadProgress').classList.remove('hidden');
+                    document.getElementById('downloadProgress').classList.remove('hidden');
                     document.getElementById('clearProgressBtn')?.classList.remove('hidden');
                 }
                 return;
@@ -1115,7 +1420,10 @@ function startProgressMonitoring() {
 
             // Handle active downloads
             const progressBarsContainer = document.getElementById('progressBarsContainer');
-            if (!progressBarsContainer) return;
+            if (!progressBarsContainer) {
+                console.warn('progressBarsContainer not found');
+                return;
+            }
 
             if (data.active && data.concurrent_downloads) {
                 for (const [fileId, fileData] of Object.entries(data.concurrent_downloads)) {
@@ -1133,23 +1441,35 @@ function startProgressMonitoring() {
                             false,
                             percentage,
                             fileData.progress,
-                            fileData.total
+                            fileData.total,
+                            fileData.retry_attempt,
+                            fileData.last_update
                         );
                     } else {
                         // Add new progress bar
+                        console.log(`Adding new progress bar for file: ${fileData.name} (${percentage}%)`);
                         progressBarsContainer.insertAdjacentHTML('beforeend', createProgressBar(
                             fileId,
                             fileData.name,
                             false,
                             percentage,
                             fileData.progress,
-                            fileData.total
+                            fileData.total,
+                            fileData.retry_attempt,
+                            fileData.last_update
                         ));
                     }
                 }
             }
         } catch (error) {
             console.error('Progress check error:', error);
+            errorCount++;
+            if (errorCount >= maxErrors) {
+                console.error(`Too many errors (${errorCount}), stopping progress monitoring`);
+                clearInterval(progressMonitoringInterval);
+                progressMonitoringInterval = null;
+                showAlert("downloadAlert", "Error monitoring download progress. Please refresh the page.", "error");
+            }
         }
     }, 500);
 }
@@ -1173,9 +1493,9 @@ function showAlert(_elementId, message, type) {
     icon = "fa-circle-info";
   }
   const toast = document.createElement("div");
-  toast.className = `flex items-center gap-3 px-4 py-3 rounded shadow-lg text-white text-sm font-medium ${color} animate-fade-in-up`;
-  toast.style.minWidth = "220px";
-  toast.innerHTML = `<i class="fa-solid ${icon} text-lg"></i><span>${message}</span>`;
+  toast.className = `flex items-center gap-4 px-6 py-4 rounded-xl shadow-2xl text-white font-medium ${color} animate-fade-in-up pointer-events-auto`;
+  toast.style.width = "100%";
+  toast.innerHTML = `<i class="fa-solid ${icon} text-2xl"></i><span class="text-base">${message}</span>`;
   toastContainer.appendChild(toast);
   setTimeout(() => {
     toast.classList.add("opacity-0");
@@ -1199,6 +1519,113 @@ style.innerHTML = `
     }
 `;
 document.head.appendChild(style);
+
+// Handle page visibility changes to restore progress monitoring
+document.addEventListener('visibilitychange', async function() {
+    if (!document.hidden) {
+        // Page became visible again
+        console.log('Page became visible, checking download state...');
+
+        try {
+            const response = await authFetch('/download-progress');
+            if (!response) return;
+
+            const data = await response.json();
+
+            // If there's an active download and no monitoring is running
+            if (data.active && !progressMonitoringInterval) {
+                console.log('Active download detected, restoring progress monitoring...');
+
+                // Show progress section and cancel button
+                document.getElementById('downloadProgress').classList.remove('hidden');
+                document.getElementById('cancelBtn').classList.remove('hidden');
+
+                // Restore progress monitoring
+                startProgressMonitoring();
+
+                // Immediately update to show current state
+                updateProgressUI(data);
+            } else if (data.active && progressMonitoringInterval) {
+                // Monitoring is running, just refresh the UI
+                console.log('Active download and monitoring running, refreshing UI...');
+                updateProgressUI(data);
+            } else if (!data.active && data.completed_downloads && Object.keys(data.completed_downloads).length > 0) {
+                // No active download but there are completed ones, show them
+                console.log('Restoring completed downloads view...');
+                document.getElementById('downloadProgress').classList.remove('hidden');
+                document.getElementById('clearProgressBtn')?.classList.remove('hidden');
+                updateProgressUI(data);
+            }
+        } catch (error) {
+            console.error('Error restoring download state:', error);
+        }
+    } else {
+        // Page became hidden
+        console.log('Page became hidden, interval may be throttled by browser');
+    }
+});
+
+// Helper function to update progress UI
+function updateProgressUI(data) {
+    const progressBarsContainer = document.getElementById('progressBarsContainer');
+    if (!progressBarsContainer) return;
+
+    const overallText = document.getElementById('overallText');
+    if (overallText && data.total > 0) {
+        overallText.textContent = `${data.progress || 0}/${data.total} files`;
+    }
+
+    // Update or add completed downloads
+    if (data.completed_downloads) {
+        for (const [fileId, fileData] of Object.entries(data.completed_downloads)) {
+            if (!completedDownloads.has(fileId)) {
+                completedDownloads.set(fileId, fileData.path);
+
+                const existingProgress = document.getElementById(`progress-${fileId}`);
+                if (!existingProgress) {
+                    const percentage = fileData.percentage || 100;
+                    progressBarsContainer.insertAdjacentHTML('beforeend',
+                        createProgressBar(fileId, fileData.name, true, percentage, fileData.size, fileData.size)
+                    );
+                }
+            }
+        }
+    }
+
+    // Update active downloads
+    if (data.active && data.concurrent_downloads) {
+        for (const [fileId, fileData] of Object.entries(data.concurrent_downloads)) {
+            if (completedDownloads.has(fileId)) continue;
+
+            const percentage = fileData.percentage || 0;
+            const existingProgress = document.getElementById(`progress-${fileId}`);
+
+            if (existingProgress) {
+                existingProgress.outerHTML = createProgressBar(
+                    fileId,
+                    fileData.name,
+                    false,
+                    percentage,
+                    fileData.progress,
+                    fileData.total,
+                    fileData.retry_attempt,
+                    fileData.last_update
+                );
+            } else {
+                progressBarsContainer.insertAdjacentHTML('beforeend', createProgressBar(
+                    fileId,
+                    fileData.name,
+                    false,
+                    percentage,
+                    fileData.progress,
+                    fileData.total,
+                    fileData.retry_attempt,
+                    fileData.last_update
+                ));
+            }
+        }
+    }
+}
 
 // On page load, check status and load channels if connected
 (async function() {

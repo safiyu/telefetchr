@@ -189,6 +189,107 @@
             -webkit-text-fill-color: transparent;
             background-clip: text;
         }
+        /* Modal Styles */
+        
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            animation: fadeIn 0.2s forwards;
+        }
+        
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+            }
+        }
+        
+        @keyframes slideUp {
+            from {
+                transform: translateY(30px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 480px;
+            width: 90%;
+            animation: slideUp 0.3s ease-out;
+            overflow: hidden;
+        }
+        
+        .modal-overlay.hidden {
+            display: none;
+        }
+        
+        .modal-header {
+            padding: 24px 24px 16px;
+            border-bottom: 1px solid #e4e4e7;
+        }
+        
+        .modal-body {
+            padding: 24px;
+        }
+        
+        .modal-footer {
+            padding: 16px 24px 24px;
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+        
+        .modal-icon {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 16px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+        }
+        
+        .modal-icon.warning {
+            background: linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%);
+            color: #f59e0b;
+        }
+        
+        .modal-icon.danger {
+            background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+            color: #ef4444;
+        }
+        
+        .btn-outline-secondary {
+            background: white;
+            color: #52525b;
+            border: 1.5px solid #e4e4e7;
+            border-radius: 8px;
+            padding: 0.75rem 1.5rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+        
+        .btn-outline-secondary:hover {
+            background: #fafafa;
+            border-color: #d4d4d8;
+        }
         
         .logout-btn {
             background: transparent;
@@ -230,12 +331,81 @@
             max-width: 100px;
             /* Adjust based on text length */
         }
+        
+        .session-btn {
+            background: transparent;
+            color: #ef4444;
+            border: none;
+            padding: 0.5rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            transition: color 0.2s ease;
+        }
+        
+        .session-btn:hover {
+            color: #dc2626;
+        }
+        
+        .session-btn:focus {
+            outline: 2px solid #ef4444;
+            outline-offset: 2px;
+            border-radius: 4px;
+        }
+        
+        .session-btn i {
+            font-size: 1.25rem;
+        }
+        
+        .session-text {
+            opacity: 0;
+            max-width: 0;
+            overflow: hidden;
+            white-space: nowrap;
+            transition: opacity 0.3s ease, max-width 0.3s ease;
+        }
+        
+        .session-btn:hover .session-text {
+            opacity: 1;
+            max-width: 150px;
+        }
     </style>
 </head>
 
 <body class="min-h-screen flex flex-col">
     <!-- Toast Container for popup messages -->
-    <div id="toastContainer" class="fixed top-6 right-6 z-50 space-y-2"></div>
+    <div id="toastContainer" class="fixed top-10 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 space-y-3 pointer-events-none" style="min-width: 320px; max-width: 500px;"></div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirmModal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div id="modalIcon" class="modal-icon danger">
+                    <i class="fa-solid fa-trash-can"></i>
+                </div>
+                <h2 id="modalTitle" class="text-xl font-bold text-gray-900 text-center">Delete Telegram Session?</h2>
+            </div>
+            <div class="modal-body">
+                <p id="modalMessage" class="text-gray-600 text-center leading-relaxed"></p>
+                <div id="modalDetails" class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg hidden">
+                    <div class="flex items-start gap-2">
+                        <i class="fa-solid fa-circle-info text-yellow-600 mt-0.5"></i>
+                        <div class="text-sm text-yellow-800" id="modalDetailsText"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="modalCancelBtn" class="btn-outline-secondary">
+                    <i class="fa-solid fa-xmark mr-2"></i>Cancel
+                </button>
+                <button id="modalConfirmBtn" class="btn-danger">
+                    <i class="fa-solid fa-check mr-2"></i>Confirm
+                </button>
+            </div>
+        </div>
+    </div>
 
     <header class="p-4 flex justify-between items-center sticky top-0 z-10">
         <div class="flex items-center gap-3">
@@ -248,6 +418,10 @@
                 <span>Connected</span>
             </span>
             <span id="userInfo" class="text-gray-600 text-sm font-medium"></span>
+            <button onclick="logoutSession()" class="session-btn" aria-label="Delete Telegram session and logout">
+                <i class="fa-solid fa-trash"></i>
+                <span class="session-text">Delete Session</span>
+            </button>
             <button onclick="logout()" aria-label="Logout" class="logout-btn">
                 <i class="fa-solid fa-sign-out-alt"></i>
                 <span class="logout-text">Logout</span>
@@ -394,7 +568,7 @@
         <span>Version 1.0</span>
     </footer>
 
-    <script src="/static/js/script.js"></script>
+    <script src="/static/js/script.js?v=4"></script>
 </body>
 
 </html>

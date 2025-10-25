@@ -220,23 +220,35 @@ async def download_all_files(request: DownloadRequest, background_tasks: Backgro
 
 
 @router.post("/files/download/{message_id}")
-async def download_file(message_id: int, channel_username: str, current_user: str = Depends(get_current_user)):
-    """Download a specific file by message ID"""
+async def download_file(message_id: int, channel_username: str, background_tasks: BackgroundTasks, current_user: str = Depends(get_current_user)):
+    """Download a specific file by message ID - starts download in background"""
     if not await telegram_service.is_connected():
         raise HTTPException(status_code=400, detail="Not connected. Login first.")
 
     try:
-        result = await download_service.download_single(channel_username, message_id)
+        # Start download in background to avoid timeout
+        file_id = f"single_{message_id}"
+
+        # Create a background task
+        async def download_task():
+            try:
+                await download_service.download_single(channel_username, message_id)
+                logger.info(f"Single file download completed: {file_id}")
+            except Exception as e:
+                logger.error(f"Background download error for {file_id}: {str(e)}")
+
+        # Run in background
+        import asyncio
+        asyncio.create_task(download_task())
+
         return {
-            "status": "success",
-            "message": "File downloaded successfully",
-            "file_path": result["file_path"]
+            "status": "started",
+            "message": "Download started in background. Check progress below.",
+            "file_id": file_id
         }
     except Exception as e:
         error_msg = str(e)
         logger.error(f"Download error: {error_msg}")
-        if "cancelled" in error_msg.lower():
-            raise HTTPException(status_code=400, detail="Download cancelled")
         raise HTTPException(status_code=400, detail=error_msg)
 
 
@@ -418,3 +430,36 @@ async def reset_state(current_user: str = Depends(get_current_user)):
         "status": "success",
         "message": "State completely reset. Backup saved."
     }
+
+@router.post("/logout-session")
+async def logout_session(current_user: str = Depends(get_current_user)):
+    """Logout and delete Telegram session"""
+    try:
+        # Disconnect the Telegram client
+        await telegram_service.disconnect()
+
+        # Delete session file
+        session_file = Config.SESSION_FILE + '.session'
+        if os.path.exists(session_file):
+            os.remove(session_file)
+            logger.info(f"Deleted session file: {session_file}")
+
+        # Also remove any other session-related files
+        for ext in ['', '.session-journal']:
+            file_path = Config.SESSION_FILE + ext
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                logger.info(f"Deleted file: {file_path}")
+
+        # Clear download state
+        state_manager.clear_state()
+
+        await telegram_service.connect()  # Reconnect to allow fresh login next time
+
+        return {
+            "status": "success",
+            "message": "Telegram session deleted successfully"
+        }
+    except Exception as e:
+        logger.error(f"Error deleting session: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
