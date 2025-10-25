@@ -7,6 +7,7 @@ let savePath = "";
 let selectedFiles = new Set();
 let progressMonitoringInterval = null;
 let completedDownloads = new Map(); // Track completed downloads
+let hasShownCompletionToast = false; // Track if completion toast has been shown
 let lastProgressUpdate = null; // Track last progress update time
 let progressWatchdog = null; // Watchdog to detect stalled progress monitoring
 
@@ -972,6 +973,9 @@ function clearIndividualProgress(fileId) {
     }
 }
 
+// Make function globally accessible for inline onclick handlers
+window.clearIndividualProgress = clearIndividualProgress;
+
 function formatBytes(bytes) {
     if (!bytes || bytes === 0) return "0 Bytes";
     const k = 1024;
@@ -1024,7 +1028,7 @@ function createProgressBar(
                 ${
                   isComplete
                     ? `
-                    <button onclick="clearIndividualProgress('${fileId}')" class="py-1 px-2 rounded bg-gray-500 text-white text-xs font-semibold shadow hover:bg-gray-600 focus:outline-none transition flex items-center gap-1">
+                    <button onclick="clearIndividualProgress('${fileId.replace(/'/g, "\\'")}')" class="py-1 px-2 rounded bg-gray-500 text-white text-xs font-semibold shadow hover:bg-gray-600 focus:outline-none transition flex items-center gap-1">
                         <i class="fa-solid fa-xmark"></i> Clear
                     </button>
                 `
@@ -1270,6 +1274,9 @@ function startProgressMonitoring() {
     let errorCount = 0;
     const maxErrors = 5;
 
+    // Reset completion toast flag when starting new monitoring session
+    hasShownCompletionToast = false;
+
     console.log('Starting progress monitoring with 500ms interval');
     lastProgressUpdate = Date.now();
 
@@ -1404,7 +1411,8 @@ function startProgressMonitoring() {
                 document.getElementById('cancelBtn')?.classList.add('hidden');
 
                 const completedCount = Object.keys(data.completed_downloads || {}).length;
-                if (completedCount > 0) {
+                if (completedCount > 0 && !hasShownCompletionToast) {
+                    hasShownCompletionToast = true;
                     showAlert("downloadAlert", `Download session complete! ${completedCount} files downloaded.`, "success");
                     document.getElementById('downloadProgress').classList.remove('hidden');
                     document.getElementById('clearProgressBtn')?.classList.remove('hidden');
