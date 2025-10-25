@@ -15,15 +15,38 @@
 
 ```
 telefetchr/
-├── Dockerfile         # Dockerfile for building the image
-├── docker-compose.yml # Docker Compose configuration
-├── .dockerignore # Ignore unnecessary files
-├── requirements.txt # Python dependencies
-├── launch.py                # FastAPI app entry point
-├── view.html                # Modern web UI
-├── script.js   # JavaScript for the web UI
-├── downloads/               # Created automatically, stores downloaded files
-└── sessions/                # Created automatically, stores session files
+├── app/
+│   ├── api/
+│   │   ├── __init__.py
+│   │   └── routes.py
+│   ├── models/
+│   │   ├── __init__.py
+│   │   └── schemas.py
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── auth_service.py
+│   │   ├── download_service.py
+│   │   └── telegram_service.py
+│   ├── static/
+│   │   ├── css/
+│   │   ├── js/
+│   │   │   └── script.js
+│   │   └── images/
+│   ├── utils/
+│   │   ├── __init__.py
+│   │   ├── auth_dependencies.py
+│   │   └── state_manager.py
+│   ├── __init__.py
+│   └── config.py
+├── downloads/
+├── sessions/
+├── .env
+├── .gitignore
+├── Dockerfile
+├── README.md
+├── docker-compose.yml
+├── main.py
+└── requirements.txt
 ```
 
 ## Environment Variables (MANDATORY): 
