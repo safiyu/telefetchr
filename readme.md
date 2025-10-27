@@ -2,7 +2,8 @@
 # Telefetchr (Telegram file downloader)
 
 ## Screenshot
-<img width="1909" height="934" alt="screenshot" src="https://github.com/user-attachments/assets/e91f774a-3aa8-46f6-ad46-53aad2dd7245" />
+<img width="1910" height="918" alt="image" src="https://github.com/user-attachments/assets/deb5c8e9-e68c-40ff-87df-245dfa127d49" />
+
 
 ## Prerequisites
 
@@ -14,15 +15,38 @@
 
 ```
 telefetchr/
-├── Dockerfile         # Dockerfile for building the image
-├── docker-compose.yml # Docker Compose configuration
-├── .dockerignore # Ignore unnecessary files
-├── requirements.txt # Python dependencies
-├── launch.py                # FastAPI app entry point
-├── view.html                # Modern web UI
-├── script.js   # JavaScript for the web UI
-├── downloads/               # Created automatically, stores downloaded files
-└── sessions/                # Created automatically, stores session files
+├── app/
+│   ├── api/
+│   │   ├── __init__.py
+│   │   └── routes.py
+│   ├── models/
+│   │   ├── __init__.py
+│   │   └── schemas.py
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── auth_service.py
+│   │   ├── download_service.py
+│   │   └── telegram_service.py
+│   ├── static/
+│   │   ├── css/
+│   │   ├── js/
+│   │   │   └── script.js
+│   │   └── images/
+│   ├── utils/
+│   │   ├── __init__.py
+│   │   ├── auth_dependencies.py
+│   │   └── state_manager.py
+│   ├── __init__.py
+│   └── config.py
+├── downloads/
+├── sessions/
+├── .env
+├── .gitignore
+├── Dockerfile
+├── README.md
+├── docker-compose.yml
+├── main.py
+└── requirements.txt
 ```
 
 ## Environment Variables (MANDATORY): 
@@ -495,4 +519,24 @@ services:
 
 ## License
 
-This project is licensed under the MIT License.
+MIT License
+
+Copyright (c) 2025 Safiyu
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
