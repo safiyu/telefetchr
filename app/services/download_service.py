@@ -434,7 +434,7 @@ class DownloadService:
         return session_id
 
     async def download_single(self, channel_username: str, message_id: int) -> Dict:
-        """Download a single file"""
+        """Download a single file with retry mechanism"""
         target_dir = Config.SAVE_PATH
         os.makedirs(target_dir, exist_ok=True)
 
@@ -455,50 +455,20 @@ class DownloadService:
             "cancelled": False,
             "channel": channel_username,
             "session_id": status.get("session_id") or str(uuid.uuid4()),
-            "started_at": status.get("started_at") or datetime.now().isoformat()
-        })
-
-        status["concurrent_downloads"][file_id] = {
-            "name": file_name,
+            "started_at": status.get("started_at") or datetime.now().isoformat(),
             "progress": 0,
-            "total": 0,
-            "percentage": 0
-        }
+            "total": 1
+        })
         self.state_manager.save_state()
 
-        def progress_callback(current, total):
-            if status["cancelled"]:
-                raise Exception("Download cancelled by user")
-            status["current_file_progress"] = current
-            status["current_file_size"] = total
-            status["downloaded_bytes"] = current
-            status["concurrent_downloads"][file_id]["progress"] = current
-            status["concurrent_downloads"][file_id]["total"] = total
-            status["concurrent_downloads"][file_id]["percentage"] = int((current / total * 100)) if total > 0 else 0
-            self.state_manager.save_state()
+        # Use the robust download_single_file method which has retry and stall detection
+        try:
+            file_path = await self.download_single_file(message, target_dir, file_id)
+        except Exception as e:
+            logger.error(f"Failed to download single file: {e}")
+            file_path = None
 
-        file_path = await self.telegram_service.download_media(
-            message,
-            target_dir,
-            progress_callback
-        )
-
-        if file_path:
-            # Get the final file size from disk
-            final_size = os.path.getsize(file_path) if os.path.exists(file_path) else status["concurrent_downloads"][file_id]["total"]
-
-            status["completed_downloads"][file_id] = {
-                "name": file_name,
-                "path": file_path,
-                "size": final_size,
-                "percentage": 100,
-                "completed_at": datetime.now().isoformat()
-            }
-            status["progress"] = len(status["completed_downloads"])
-
-        if file_id in status["concurrent_downloads"]:
-            del status["concurrent_downloads"][file_id]
-
+        status = self.state_manager.get_status()
         status.update({
             "active": False,
             "current_file": "",

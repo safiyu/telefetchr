@@ -7,7 +7,6 @@ let savePath = "";
 let selectedFiles = new Set();
 let progressMonitoringInterval = null;
 let completedDownloads = new Map(); // Track completed downloads
-let hasShownCompletionToast = false; // Track if completion toast has been shown
 let lastProgressUpdate = null; // Track last progress update time
 let progressWatchdog = null; // Watchdog to detect stalled progress monitoring
 
@@ -60,7 +59,7 @@ function showConfirmModal(options) {
 
         // Set icon
         modalIcon.className = 'modal-icon ' + (options.iconType || 'danger');
-        modalIcon.innerHTML = `<i class="fa-solid ${escapeHtml(options.icon || 'fa-trash-can')}"></i>`;
+        modalIcon.innerHTML = `<i class="fa-solid ${options.icon || 'fa-trash-can'}"></i>`;
 
         // Set details if provided
         if (options.details) {
@@ -71,8 +70,8 @@ function showConfirmModal(options) {
         }
 
         // Set button text
-        confirmBtn.innerHTML = `<i class="fa-solid fa-check mr-2"></i>${escapeHtml(options.confirmText || 'Confirm')}`;
-        cancelBtn.innerHTML = `<i class="fa-solid fa-xmark mr-2"></i>${escapeHtml(options.cancelText || 'Cancel')}`;
+        confirmBtn.innerHTML = `<i class="fa-solid fa-check mr-2"></i>${options.confirmText || 'Confirm'}`;
+        cancelBtn.innerHTML = `<i class="fa-solid fa-xmark mr-2"></i>${options.cancelText || 'Cancel'}`;
 
         // Set button style
         confirmBtn.className = options.confirmClass || 'btn-danger';
@@ -333,33 +332,48 @@ async function checkSavedState() {
             const completedCount = data.completed_count || 0;
             const totalCount = data.total || 0;
             const remainingCount = totalCount - completedCount;
+            const wasCancelled = data.cancelled || false;
 
-            console.log(`Found saved state: ${completedCount}/${totalCount} completed, ${remainingCount} remaining`);
+            console.log(`Found saved state: ${completedCount}/${totalCount} completed, ${remainingCount} remaining, cancelled: ${wasCancelled}`);
 
-            // Show resume option
+            // Determine the status message and icon
+            const statusIcon = wasCancelled ?
+                '<i class="fa-solid fa-circle-xmark text-red-400 mr-3 text-2xl"></i>' :
+                '<i class="fa-solid fa-circle-pause text-yellow-400 mr-3 text-2xl"></i>';
+
+            const statusTitle = wasCancelled ?
+                'Cancelled download session found' :
+                'Previous download session found';
+
+            const statusColor = wasCancelled ? 'red' : 'yellow';
+
+            // Show resume option only if there are remaining files AND it wasn't cancelled
+            const showResumeButton = remainingCount > 0 && !wasCancelled;
+
             const resumeHtml = `
-                <div id="resumeNotification" class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+                <div id="resumeNotification" class="bg-${statusColor}-50 border-l-4 border-${statusColor}-400 p-4 mb-4">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center">
-                            <i class="fa-solid fa-circle-pause text-yellow-400 mr-3 text-2xl"></i>
+                            ${statusIcon}
                             <div>
-                                <p class="text-sm font-semibold text-yellow-800">Previous download session found</p>
-                                <p class="text-xs text-yellow-700 mt-1">
-                                    <strong>Channel:</strong> ${escapeHtml(data.channel || 'Unknown')}<br>
+                                <p class="text-sm font-semibold text-${statusColor}-800">${statusTitle}</p>
+                                <p class="text-xs text-${statusColor}-700 mt-1">
+                                    <strong>Channel:</strong> ${data.channel || 'Unknown'}<br>
                                     <strong>Progress:</strong> ${completedCount}/${totalCount} files completed
                                     ${remainingCount > 0 ? `(${remainingCount} remaining)` : '(All done!)'}
+                                    ${wasCancelled ? '<br><strong>Status:</strong> Cancelled by user' : ''}
                                 </p>
-                                <p class="text-xs text-gray-500 mt-1">Session ID: ${escapeHtml(data.session_id || 'N/A')}</p>
+                                <p class="text-xs text-gray-500 mt-1">Session ID: ${data.session_id || 'N/A'}</p>
                             </div>
                         </div>
                         <div class="flex gap-2">
-                            ${remainingCount > 0 ? `
+                            ${showResumeButton ? `
                                 <button onclick="resumeDownload()" class="py-2 px-4 rounded bg-yellow-500 text-white font-semibold shadow hover:bg-yellow-600 focus:outline-none transition flex items-center gap-2">
                                     <i class="fa-solid fa-play"></i> Resume Download
                                 </button>
                             ` : ''}
                             <button onclick="viewCompletedDownloads()" class="py-2 px-4 rounded bg-blue-500 text-white font-semibold shadow hover:bg-blue-600 focus:outline-none transition flex items-center gap-2">
-                                <i class="fa-solid fa-eye"></i> View (${completedCount})
+                                <i class="fa-solid fa-eye"></i> View${completedCount > 0 ? ` (${completedCount})` : ''}
                             </button>
                             <button onclick="clearSavedState()" class="py-2 px-4 rounded bg-gray-500 text-white font-semibold shadow hover:bg-gray-600 focus:outline-none transition flex items-center gap-2">
                                 <i class="fa-solid fa-xmark"></i> Clear
@@ -390,10 +404,6 @@ async function checkSavedState() {
         // Restore completed downloads to UI if they exist (whether active or not)
         if (data.completed_count > 0) {
             const progressResponse = await authFetch("/download-progress");
-            if (!progressResponse) {
-                console.error("Failed to fetch progress data for restoring completed downloads");
-                return;
-            }
             const progressData = await progressResponse.json();
 
             if (progressData.completed_downloads) {
@@ -421,39 +431,97 @@ async function checkSavedState() {
     }
 }
 
+function toggleDebugPanel() {
+    const panel = document.getElementById('debugPanel');
+    if (panel) {
+        if (panel.classList.contains('hidden')) {
+            panel.classList.remove('hidden');
+            refreshDebugInfo();
+        } else {
+            panel.classList.add('hidden');
+        }
+    }
+}
+
+async function refreshDebugInfo() {
+    try {
+        const response = await authFetch('/debug/state');
+        const data = await response.json();
+
+        const debugInfo = document.getElementById('debugInfo');
+        if (debugInfo) {
+            debugInfo.textContent = JSON.stringify(data, null, 2);
+        }
+
+        // Also log to console
+        console.log('Debug State:', data);
+
+    } catch (error) {
+        console.error('Error fetching debug info:', error);
+        const debugInfo = document.getElementById('debugInfo');
+        if (debugInfo) {
+            debugInfo.textContent = 'Error: ' + error.message;
+        }
+    }
+}
+
 async function viewCompletedDownloads() {
     try {
         const progressResponse = await authFetch("/download-progress");
-        if (!progressResponse) {
-            showAlert("downloadAlert", "Failed to load completed downloads", "error");
-            return;
-        }
         const progressData = await progressResponse.json();
 
         // Show progress section
         document.getElementById("downloadProgress").classList.remove("hidden");
         document.getElementById("clearProgressBtn")?.classList.remove("hidden");
 
-        if (progressData.completed_downloads) {
-            const progressBarsContainer = document.getElementById("progressBarsContainer");
-            if (progressBarsContainer) {
-                // Clear and rebuild
-                progressBarsContainer.innerHTML = '';
+        const progressBarsContainer = document.getElementById("progressBarsContainer");
+        if (!progressBarsContainer) return;
 
-                // Add all completed downloads
-                for (const [fileId, fileData] of Object.entries(progressData.completed_downloads)) {
-                    completedDownloads.set(fileId, fileData.path);
-                    const percentage = fileData.percentage || 100;
-                    progressBarsContainer.insertAdjacentHTML('beforeend',
-                        createProgressBar(fileId, fileData.name, true, percentage, fileData.size, fileData.size)
-                    );
-                }
+        // Clear the container
+        progressBarsContainer.innerHTML = '';
 
-                const count = Object.keys(progressData.completed_downloads).length;
-                showAlert("downloadAlert", `Showing ${count} completed download${count !== 1 ? 's' : ''}`, "success");
+        if (progressData.completed_downloads && Object.keys(progressData.completed_downloads).length > 0) {
+            // Add all completed downloads
+            for (const [fileId, fileData] of Object.entries(progressData.completed_downloads)) {
+                completedDownloads.set(fileId, fileData.path);
+                const percentage = fileData.percentage || 100;
+                progressBarsContainer.insertAdjacentHTML('beforeend',
+                    createProgressBar(fileId, fileData.name, true, percentage, fileData.size, fileData.size)
+                );
             }
+
+            const count = Object.keys(progressData.completed_downloads).length;
+            showAlert("downloadAlert", `Showing ${count} completed download${count !== 1 ? 's' : ''}`, "success");
         } else {
-            showAlert("downloadAlert", "No completed downloads found", "info");
+            // No completed downloads - show session info instead
+            const total = progressData.total || 0;
+            const channel = progressData.channel || 'Unknown';
+            const cancelled = progressData.cancelled || false;
+
+            const messageHtml = `
+                <div class="text-center p-8 bg-gray-50 rounded-lg">
+                    <i class="fa-solid fa-${cancelled ? 'circle-xmark text-red-400' : 'circle-info text-blue-400'} text-5xl mb-4"></i>
+                    <h3 class="text-lg font-semibold text-gray-700 mb-2">No Completed Downloads</h3>
+                    <p class="text-sm text-gray-600">
+                        ${cancelled ?
+                            `The download session was cancelled before any files were completed.` :
+                            `No files have been downloaded yet.`
+                        }
+                    </p>
+                    ${total > 0 ? `
+                        <div class="mt-4 p-3 bg-white rounded border border-gray-200">
+                            <p class="text-xs text-gray-500 mb-1"><strong>Channel:</strong> ${channel}</p>
+                            <p class="text-xs text-gray-500"><strong>Total files:</strong> ${total}</p>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+
+            progressBarsContainer.innerHTML = messageHtml;
+
+            showAlert("downloadAlert", cancelled ?
+                "Session was cancelled with no completed downloads" :
+                "No completed downloads found", "info");
         }
     } catch (error) {
         showAlert("downloadAlert", "Error loading completed downloads: " + error.message, "error");
@@ -475,13 +543,6 @@ function toggleDebugPanel() {
 async function refreshDebugInfo() {
     try {
         const response = await authFetch('/debug/state');
-        if (!response) {
-            const debugInfo = document.getElementById('debugInfo');
-            if (debugInfo) {
-                debugInfo.textContent = 'Failed to fetch debug state';
-            }
-            return;
-        }
         const data = await response.json();
 
         const debugInfo = document.getElementById('debugInfo');
@@ -506,11 +567,6 @@ async function clearSavedState() {
         const response = await authFetch("/download/clear-completed", {
             method: "POST",
         });
-
-        if (!response) {
-            showAlert("downloadAlert", "Failed to clear saved state", "error");
-            return;
-        }
 
         const data = await response.json();
 
@@ -544,11 +600,6 @@ async function clearProgress() {
             method: "POST",
         });
 
-        if (!response) {
-            showAlert("downloadAlert", "Failed to clear progress", "error");
-            return;
-        }
-
         const data = await response.json();
 
         if (response.ok) {
@@ -576,10 +627,6 @@ async function resumeDownload() {
     try {
         // First, load the existing completed downloads into UI
         const progressResponse = await authFetch("/download-progress");
-        if (!progressResponse) {
-            showAlert("downloadAlert", "Failed to resume download", "error");
-            return;
-        }
         const progressData = await progressResponse.json();
 
         // Show progress section
@@ -652,8 +699,8 @@ async function checkStatus() {
             connectionStatus.innerHTML =
                 '<i class="fa-solid fa-circle mr-2 text-white animate-pulse"></i><span class="font-bold tracking-wide">Connected</span>';
             userInfo.innerHTML = `<p><strong>User:</strong> ${
-        escapeHtml(data.user.first_name)
-      } (@${escapeHtml(data.user.username || "N/A")})</p>`;
+        data.user.first_name
+      } (@${data.user.username || "N/A"})</p>`;
             loginSection.classList.add("hidden");
             downloadSection.classList.remove("hidden");
         } else if (data.status === "not_authenticated" || data.status === "disconnected") {
@@ -858,7 +905,7 @@ function displayFiles(files) {
                 <button onclick="deselectAllFiles()" class="py-1 px-3 rounded bg-gray-500 text-white font-semibold shadow hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition flex items-center gap-1">
                     <i class="fa-solid fa-xmark"></i> Deselect All
                 </button>
-                <button onclick="downloadSelected('${escapeHtml(currentChannel).replace(/'/g, "\\'")}')" id="downloadSelectedBtn" class="py-1 px-3 rounded bg-gray-500 text-white font-semibold shadow hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-400 transition flex items-center gap-1">
+                <button onclick="downloadSelected('${currentChannel}')" id="downloadSelectedBtn" class="py-1 px-3 rounded bg-gray-500 text-white font-semibold shadow hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-400 transition flex items-center gap-1">
                     <i class="fa-solid fa-download"></i> Download Selected (<span id="selectedCount">0</span>)
                 </button>
             </div>
@@ -893,9 +940,9 @@ function displayFiles(files) {
                     <i class="fa-solid ${icon} text-3xl text-indigo-400"></i>
                 </div>
                 <div class="flex-1 min-w-0">
-                    <div class="font-semibold text-gray-800 truncate" title="${escapeHtml(
+                    <div class="font-semibold text-gray-800 truncate" title="${
                       file.file_name
-                    )}">${escapeHtml(file.file_name)}</div>
+                    }">${file.file_name}</div>
                     <div class="text-xs text-gray-500 mt-1">${
                       file.file_type.charAt(0).toUpperCase() +
                       file.file_type.slice(1)
@@ -905,7 +952,7 @@ function displayFiles(files) {
                 </div>
                 <button onclick="downloadSingle(${
                   file.file_id
-                }, '${escapeHtml(currentChannel).replace(/'/g, "\\'")}')" class="py-1 px-3 rounded bg-indigo-500 text-white font-semibold shadow hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition flex items-center gap-1">
+                }, '${currentChannel}')" class="py-1 px-3 rounded bg-indigo-500 text-white font-semibold shadow hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition flex items-center gap-1">
                     <i class="fa-solid fa-download"></i> Download
                 </button>
             </div>
@@ -954,23 +1001,14 @@ function updateSelectedCount() {
 
 async function clearIndividualProgress(fileId) {
     try {
-        // Call backend to remove from server state
-        const response = await authFetch(`/download/clear-individual/${fileId}`, {
+        // Clear from backend state
+        const response = await authFetch(`/download/completed/${fileId}`, {
             method: "DELETE",
         });
 
-        if (!response) {
-            showAlert("downloadAlert", "Failed to clear download", "error");
-            return;
-        }
-
-        const data = await response.json();
-
-        if (response.ok || data.status === "success") {
-            // Remove from client-side tracking
+        if (response && response.ok) {
+            // Clear from frontend
             completedDownloads.delete(fileId);
-
-            // Remove from UI
             const element = document.getElementById(`progress-${fileId}`);
             if (element) {
                 element.remove();
@@ -982,28 +1020,27 @@ async function clearIndividualProgress(fileId) {
             );
             if (progressBarsContainer && progressBarsContainer.children.length === 0) {
                 document.getElementById("downloadProgress").classList.add("hidden");
+                document.getElementById("clearProgressBtn")?.classList.add("hidden");
+            }
+
+            // Update overall progress text if visible
+            const overallText = document.getElementById('overallText');
+            if (overallText) {
+                // Fetch updated progress from backend
+                const progressResponse = await authFetch("/download-progress");
+                if (progressResponse && progressResponse.ok) {
+                    const progressData = await progressResponse.json();
+                    if (progressData.total > 0) {
+                        overallText.textContent = `${progressData.progress || 0}/${progressData.total} files`;
+                    }
+                }
             }
         } else {
-            showAlert("downloadAlert", data.message || "Failed to clear download", "error");
+            console.error("Failed to clear individual download from backend");
         }
     } catch (error) {
-        console.error("Error clearing individual progress:", error);
-        showAlert("downloadAlert", "Error: " + error.message, "error");
+        console.error("Error clearing individual download:", error);
     }
-}
-
-// Make function globally accessible for inline onclick handlers
-window.clearIndividualProgress = clearIndividualProgress;
-
-// HTML escape function to prevent XSS
-function escapeHtml(unsafe) {
-    if (!unsafe) return '';
-    return unsafe
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
 }
 
 function formatBytes(bytes) {
@@ -1051,14 +1088,14 @@ function createProgressBar(
         <div id="${progressId}" class="file-progress-block" style="margin: 16px 0; padding: 12px; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
             <div class="flex justify-between items-center mb-2">
                 <div class="file-name flex items-center" style="font-size: 1em; font-weight: 600;">
-                    ${escapeHtml(fileName)}
+                    ${fileName}
                     ${retryBadge}
                     ${stallWarning}
                 </div>
                 ${
                   isComplete
                     ? `
-                    <button onclick="clearIndividualProgress('${fileId.replace(/'/g, "\\'")}')" class="py-1 px-2 rounded bg-gray-500 text-white text-xs font-semibold shadow hover:bg-gray-600 focus:outline-none transition flex items-center gap-1">
+                    <button onclick="clearIndividualProgress('${fileId}')" class="py-1 px-2 rounded bg-gray-500 text-white text-xs font-semibold shadow hover:bg-gray-600 focus:outline-none transition flex items-center gap-1">
                         <i class="fa-solid fa-xmark"></i> Clear
                     </button>
                 `
@@ -1134,7 +1171,7 @@ async function downloadSingle(messageId, channel) {
     document.getElementById("cancelBtn").classList.remove("hidden");
 
     const response = await authFetch(
-      `/files/download/${messageId}?channel_username=${encodeURIComponent(channel)}`,
+      `/files/download/${messageId}?channel_username=${channel}`,
       {
         method: "POST",
       }
@@ -1304,9 +1341,6 @@ function startProgressMonitoring() {
     let errorCount = 0;
     const maxErrors = 5;
 
-    // Reset completion toast flag when starting new monitoring session
-    hasShownCompletionToast = false;
-
     console.log('Starting progress monitoring with 500ms interval');
     lastProgressUpdate = Date.now();
 
@@ -1316,22 +1350,18 @@ function startProgressMonitoring() {
         if (timeSinceUpdate > 10000) { // 10 seconds without update
             console.warn(`Progress monitoring appears stalled (${timeSinceUpdate}ms since last update)`);
 
-            // Only restart if interval is actually stopped (not just stalled)
-            if (!progressMonitoringInterval) {
-                // Check if download is still active
-                authFetch('/download-progress').then(response => {
-                    if (!response) return;
-                    return response.json();
-                }).then(data => {
-                    // Double-check interval is still null before restarting
-                    if (data && data.active && !progressMonitoringInterval) {
-                        console.log('Watchdog: Restarting stalled progress monitoring');
-                        startProgressMonitoring();
-                    }
-                }).catch(err => {
-                    console.error('Watchdog check failed:', err);
-                });
-            }
+            // Check if download is still active
+            authFetch('/download-progress').then(response => {
+                if (!response) return;
+                return response.json();
+            }).then(data => {
+                if (data && data.active && !progressMonitoringInterval) {
+                    console.log('Watchdog: Restarting stalled progress monitoring');
+                    startProgressMonitoring();
+                }
+            }).catch(err => {
+                console.error('Watchdog check failed:', err);
+            });
         }
     }, 5000);
 
@@ -1430,10 +1460,10 @@ function startProgressMonitoring() {
                 }
             }
 
-            // Update overall progress text
+            // Update overall progress text (do this before checking completion)
             const overallText = document.getElementById('overallText');
             if (overallText && data.total > 0) {
-                overallText.textContent = `${data.progress || 0}/${data.total} completed`;
+                overallText.textContent = `${data.progress || 0}/${data.total} files`;
             }
 
             // Check if download is complete
@@ -1451,8 +1481,7 @@ function startProgressMonitoring() {
                 document.getElementById('cancelBtn')?.classList.add('hidden');
 
                 const completedCount = Object.keys(data.completed_downloads || {}).length;
-                if (completedCount > 0 && !hasShownCompletionToast) {
-                    hasShownCompletionToast = true;
+                if (completedCount > 0) {
                     showAlert("downloadAlert", `Download session complete! ${completedCount} files downloaded.`, "success");
                     document.getElementById('downloadProgress').classList.remove('hidden');
                     document.getElementById('clearProgressBtn')?.classList.remove('hidden');
@@ -1537,7 +1566,7 @@ function showAlert(_elementId, message, type) {
   const toast = document.createElement("div");
   toast.className = `flex items-center gap-4 px-6 py-4 rounded-xl shadow-2xl text-white font-medium ${color} animate-fade-in-up pointer-events-auto`;
   toast.style.width = "100%";
-  toast.innerHTML = `<i class="fa-solid ${icon} text-2xl"></i><span class="text-base">${escapeHtml(message)}</span>`;
+  toast.innerHTML = `<i class="fa-solid ${icon} text-2xl"></i><span class="text-base">${message}</span>`;
   toastContainer.appendChild(toast);
   setTimeout(() => {
     toast.classList.add("opacity-0");
@@ -1614,7 +1643,7 @@ function updateProgressUI(data) {
 
     const overallText = document.getElementById('overallText');
     if (overallText && data.total > 0) {
-        overallText.textContent = `${data.progress || 0}/${data.total} completed`;
+        overallText.textContent = `${data.progress || 0}/${data.total} files`;
     }
 
     // Update or add completed downloads

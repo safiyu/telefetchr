@@ -281,9 +281,19 @@ async def resume_download(current_user: str = Depends(get_current_user)):
 async def get_download_state(current_user: str = Depends(get_current_user)):
     """Get the current saved download state"""
     status = state_manager.get_status()
+    # Only consider it a "saved state" if there's meaningful data
+    has_meaningful_state = bool(
+        status.get("session_id") and (
+            status.get("channel") or
+            status.get("completed_downloads") or
+            status.get("total", 0) > 0
+        )
+    )
+
     return {
-        "has_saved_state": bool(status.get("session_id")),
+        "has_saved_state": has_meaningful_state,
         "active": status.get("active", False),
+        "cancelled": status.get("cancelled", False),
         "session_id": status.get("session_id"),
         "channel": status.get("channel"),
         "started_at": status.get("started_at"),
@@ -299,19 +309,42 @@ async def clear_completed_downloads(current_user: str = Depends(get_current_user
     """Clear completed downloads from state"""
     status = state_manager.get_status()
     status["completed_downloads"] = {}
-    if not status.get("active"):
-        status["session_id"] = None
-        status["channel"] = None
-        status["started_at"] = None
-        status["total"] = 0
-        status["progress"] = 0
-        status["cancelled"] = False
-    state_manager.save_state()
+
+    # Check if there's an active download
+    if status.get("active"):
+        # Only clear completed downloads, keep the active session
+        status["completed_downloads"] = {}
+        status["progress"] = 0  # Reset progress since we're clearing completed
+        state_manager.save_state()
+    else:
+        # No active download, clear everything
+        state_manager.clear_state()
+    
     return {
         "status": "success",
         "message": "Completed downloads cleared"
     }
 
+@router.delete("/download/completed/{file_id}")
+async def clear_individual_download(file_id: str, current_user: str = Depends(get_current_user)):
+    """Clear a single completed download from state"""
+    status = state_manager.get_status()
+
+    if file_id in status.get("completed_downloads", {}):
+        del status["completed_downloads"][file_id]
+        # Update progress counter
+        status["progress"] = len(status["completed_downloads"])
+        state_manager.save_state()
+
+        return {
+            "status": "success",
+            "message": f"Download {file_id} cleared"
+        }
+    else:
+        return {
+            "status": "error",
+            "message": "Download not found"
+        }
 
 @router.delete("/download/clear-individual/{file_id}")
 async def clear_individual_download(file_id: str, current_user: str = Depends(get_current_user)):
