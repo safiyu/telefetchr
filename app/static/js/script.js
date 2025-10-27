@@ -1430,6 +1430,12 @@ function startProgressMonitoring() {
                 }
             }
 
+            // Update overall progress text
+            const overallText = document.getElementById('overallText');
+            if (overallText && data.total > 0) {
+                overallText.textContent = `${data.progress || 0}/${data.total} completed`;
+            }
+
             // Check if download is complete
             if (!data.active && hasStarted) {
                 console.log('Download session completed, stopping progress monitoring');
@@ -1452,12 +1458,6 @@ function startProgressMonitoring() {
                     document.getElementById('clearProgressBtn')?.classList.remove('hidden');
                 }
                 return;
-            }
-
-            // Update overall progress text
-            const overallText = document.getElementById('overallText');
-            if (overallText && data.total > 0) {
-                overallText.textContent = `${data.progress || 0}/${data.total} files`;
             }
 
             // Handle active downloads
@@ -1614,7 +1614,7 @@ function updateProgressUI(data) {
 
     const overallText = document.getElementById('overallText');
     if (overallText && data.total > 0) {
-        overallText.textContent = `${data.progress || 0}/${data.total} files`;
+        overallText.textContent = `${data.progress || 0}/${data.total} completed`;
     }
 
     // Update or add completed downloads

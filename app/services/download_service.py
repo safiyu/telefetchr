@@ -189,34 +189,23 @@ class DownloadService:
                     raise
 
                 if file_path:
-                    # Get fresh status to ensure we're working with latest state
-                    status = self.state_manager.get_status()
-
                     # Get the final file size from disk
                     final_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
 
                     # If we don't have the size from disk, try to get from concurrent state
+                    status = self.state_manager.get_status()
                     if final_size == 0 and file_id in status.get("concurrent_downloads", {}):
                         final_size = status["concurrent_downloads"][file_id].get("total", 0)
 
-                    # Move to completed downloads with 100% progress
-                    status["completed_downloads"][file_id] = {
+                    # Use thread-safe method to mark file as completed
+                    file_data = {
                         "name": file_name,
                         "path": file_path,
                         "size": final_size,
                         "percentage": 100,
                         "completed_at": datetime.now().isoformat()
                     }
-
-                    # Remove from concurrent downloads
-                    if file_id in status.get("concurrent_downloads", {}):
-                        del status["concurrent_downloads"][file_id]
-
-                    # Update overall progress counter immediately
-                    status["progress"] = len(status["completed_downloads"])
-
-                    # Save the updated state
-                    self.state_manager.save_state()
+                    await self.state_manager.mark_file_completed(file_id, file_data)
 
                     logger.info(f"Completed download: {file_name}, size: {final_size} bytes, marked as 100%")
                     return file_path

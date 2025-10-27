@@ -4,6 +4,7 @@ import logging
 from datetime import datetime
 from typing import Dict, Any
 import uuid
+import asyncio
 
 from app.config import Config
 
@@ -16,6 +17,7 @@ class StateManager:
     def __init__(self):
         self.state_file = Config.STATE_FILE
         self.download_status = self._initialize_status()
+        self._lock = asyncio.Lock()
 
     def _initialize_status(self) -> Dict[str, Any]:
         """Initialize default download status"""
@@ -165,3 +167,21 @@ class StateManager:
         """Update download status"""
         self.download_status.update(updates)
         self.save_state()
+
+    async def mark_file_completed(self, file_id: str, file_data: Dict[str, Any]):
+        """Thread-safe method to mark a file as completed and update progress"""
+        async with self._lock:
+            # Add to completed downloads
+            self.download_status["completed_downloads"][file_id] = file_data
+
+            # Remove from concurrent downloads if present
+            if file_id in self.download_status.get("concurrent_downloads", {}):
+                del self.download_status["concurrent_downloads"][file_id]
+
+            # Update progress based on current completed count
+            self.download_status["progress"] = len(self.download_status["completed_downloads"])
+
+            # Save the state
+            self.save_state()
+
+            logger.info(f"File {file_id} marked as completed. Progress: {self.download_status['progress']}/{self.download_status.get('total', 0)}")
