@@ -61,9 +61,10 @@ class DownloadService:
                     if status["cancelled"]:
                         raise Exception("Download cancelled by user")
 
+                    # Check if progress has stalled (no change in 60 seconds)
                     if current == last_progress_bytes:
                         time_since_progress = (datetime.now() - last_progress_time).total_seconds()
-                        if time_since_progress > 50:
+                        if time_since_progress > 60:
                             logger.warning(f"Download stalled at {current}/{total} bytes for {time_since_progress}s")
                             raise Exception(f"Download stalled - no progress for {time_since_progress}s")
                     else:
@@ -103,8 +104,8 @@ class DownloadService:
                         logger.error(f"✗ Failed to create download task: {e}")
                         raise
 
-                    last_check_file_size = 0
-                    last_check_time = datetime.now()
+                    last_check_file_size = -1  # Use -1 to indicate initial state
+                    last_size_change_time = datetime.now()
                     check_count = 0
 
                     while not download_task.done():
@@ -134,24 +135,19 @@ class DownloadService:
                         state_bytes = current_status.get("progress", 0)
                         total_bytes = current_status.get("total", 0)
                         percentage = current_status.get("percentage", 0)
-                        time_elapsed = (datetime.now() - last_check_time).total_seconds()
 
-                        logger.info(f"Monitor check #{check_count} for {file_name}: state={state_bytes}/{total_bytes} ({percentage}%), disk={actual_file_size}, elapsed={time_elapsed}s")
+                        logger.info(f"Monitor check #{check_count} for {file_name}: state={state_bytes}/{total_bytes} ({percentage}%), disk={actual_file_size}")
 
-                        # Use actual file size for progress detection
-                        if actual_file_size == last_check_file_size:
-                            if time_elapsed > 60:  
-                                 # No file growth in 60 seconds
-                                logger.error(f"STALL DETECTED! File not growing for {time_elapsed}s. Disk size: {actual_file_size} bytes")
-                                logger.error(f"Cancelling download task and will retry...")
-                                download_task.cancel()
-                                raise Exception(f"Download stalled - file not growing for {time_elapsed}s")
+                        # Just log the progress, stall detection is handled by progress_callback
+                        # File monitor stall detection removed to avoid false positives from buffering
+                        if actual_file_size != last_check_file_size:
+                            if last_check_file_size >= 0:
+                                logger.info(f"File growing: {last_check_file_size} -> {actual_file_size} bytes (+{actual_file_size - last_check_file_size})")
                             else:
-                                logger.warning(f"File size unchanged ({actual_file_size} bytes) for {time_elapsed}s - will cancel if reaches 30s")
-                        else:
-                            logger.info(f"File growing: {last_check_file_size} -> {actual_file_size} bytes (+{actual_file_size - last_check_file_size})")
+                                logger.info(f"First check: file size = {actual_file_size} bytes")
                             last_check_file_size = actual_file_size
-                            last_check_time = datetime.now()
+                        else:
+                            logger.debug(f"File size unchanged: {actual_file_size} bytes (this is normal during buffering)")
 
                             # Update state with actual file size if callback hasn't been called
                             if state_bytes == 0 and actual_file_size > 0:
@@ -174,12 +170,12 @@ class DownloadService:
 
                     return result
 
-                # Add timeout wrapper for the download (5 minutes per file - increased from 2 minutes)
-                logger.info(f"About to call download_with_monitoring() with 300s timeout")
+                # Add timeout wrapper for the download (20 minutes per file)
+                logger.info(f"About to call download_with_monitoring() with 1200s timeout")
                 try:
                     file_path = await asyncio.wait_for(
                         download_with_monitoring(),
-                        timeout=1200  # 20 minutes timeout for entire download (allows for larger files)
+                        timeout=1200  # 20 minutes timeout for entire download
                     )
                     logger.info(f"download_with_monitoring() completed, file_path={file_path}")
                 except asyncio.TimeoutError:
@@ -215,6 +211,9 @@ class DownloadService:
                     # Remove from concurrent downloads
                     if file_id in status.get("concurrent_downloads", {}):
                         del status["concurrent_downloads"][file_id]
+
+                    # Update overall progress counter immediately
+                    status["progress"] = len(status["completed_downloads"])
 
                     # Save the updated state
                     self.state_manager.save_state()
@@ -326,8 +325,7 @@ class DownloadService:
                     for result in results:
                         if result and not isinstance(result, Exception):
                             downloaded.append(result)
-                            status["progress"] = len(downloaded)
-                            self.state_manager.save_state()
+                            # Progress counter is now updated in download_single_file
                             logger.info(f"Downloaded ({len(downloaded)}/{total_files}): {result}")
 
                 status["active"] = False
@@ -425,8 +423,7 @@ class DownloadService:
                     for result in results:
                         if result and not isinstance(result, Exception):
                             downloaded.append(result)
-                            status["progress"] = len(downloaded)
-                            self.state_manager.save_state()
+                            # Progress counter is now updated in download_single_file
                             logger.info(f"Downloaded ({len(downloaded)}/{total_files}): {result}")
 
                 status["active"] = False
@@ -448,7 +445,7 @@ class DownloadService:
         return session_id
 
     async def download_single(self, channel_username: str, message_id: int) -> Dict:
-        """Download a single file with simple, reliable method"""
+        """Download a single file"""
         target_dir = Config.SAVE_PATH
         os.makedirs(target_dir, exist_ok=True)
 
@@ -489,12 +486,8 @@ class DownloadService:
             status["concurrent_downloads"][file_id]["progress"] = current
             status["concurrent_downloads"][file_id]["total"] = total
             status["concurrent_downloads"][file_id]["percentage"] = int((current / total * 100)) if total > 0 else 0
-            status["concurrent_downloads"][file_id]["last_update"] = datetime.now().isoformat()
             self.state_manager.save_state()
 
-        # Simple download without aggressive timeout/stall detection
-        # This has proven more reliable for individual downloads
-        logger.info(f"Starting single file download (simple method): {file_name}")
         file_path = await self.telegram_service.download_media(
             message,
             target_dir,
