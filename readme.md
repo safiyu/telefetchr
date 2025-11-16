@@ -70,7 +70,7 @@ environment:
 Once the container is running, open your browser and navigate to:
 
 ```
-http://localhost:8000
+http://localhost:9868
 ```
 
 ## First Time Login
@@ -120,7 +120,7 @@ services:
     image: safiyu/telefetchr:latest
     container_name: telefetchr
     ports:
-      - "8000:8000"
+      - "9868:9868"
     volumes:
       - /path/to/sessions:/app/sessions
       - /path/to/downloads:/app/downloads
@@ -167,7 +167,7 @@ services:
 3. **Access the application:**
    Open your browser and navigate to:
    ```
-   http://localhost:8000
+   http://localhost:9868
    ```
 ### Option 2: Using Docker directly
 
@@ -178,7 +178,7 @@ docker build -t telefetchr .
 # Run the container
 docker run -d \
   --name telefetchr \
-  -p 8000:8000 \
+  -p 9868:9868 \
   -v $(pwd)/downloads:/app/downloads \
   -v $(pwd)/sessions:/app/sessions \
   -e API_ID=123456 \
@@ -190,7 +190,7 @@ docker run -d \
 # Run the container (windows)
 docker run -d `
   --name telefetchr `
-  -p 8000:8000 `
+  -p 9868:9868 `
   -v ${PWD}/downloads:/app/downloads `
   -v ${PWD}/sessions:/app/sessions `
   -v ${PWD}/config.yaml:/app/config.yaml:ro `
@@ -282,17 +282,17 @@ docker-compose logs
 
 **Common issues:**
 - Invalid API credentials
-- Port 8000 already in use
+- Port 9868 already in use
 - Permission issues with network drive
 - Path not set correctly
 
 ### Port Already in Use
 
-If port 8000 is already occupied, edit `docker-compose.yml`:
+If port 9868 is already occupied, edit `docker-compose.yml`:
 
 ```yaml
 ports:
-  - "8080:8000"  # Change 8080 to any available port
+  - "8080:9868"  # Change 8080 to any available port
 ```
 
 Then access the app at `http://localhost:8080`

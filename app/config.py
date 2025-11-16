@@ -24,7 +24,7 @@ class Config:
 
     # Server Configuration
     HOST = os.getenv("HOST", "0.0.0.0")
-    PORT = int(os.getenv("PORT", "8000"))
+    PORT = int(os.getenv("PORT", "9868"))
 
     # Authentication Configuration
     SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-this-in-production")

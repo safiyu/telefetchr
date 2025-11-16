@@ -5,7 +5,7 @@ services:
     build: .
     container_name: telefetchr
     ports:
-      - "8000:8000"
+      - "9868:9868"
     volumes:
       - ./sessions:/app/sessions
       - ./downloads:/app/downloads
