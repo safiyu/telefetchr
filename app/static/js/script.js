@@ -194,21 +194,19 @@ async function authFetch(url, options = {}) {
         ...getAuthHeaders(),
         ...(options.headers || {})
     };
-
+    
     try {
         const response = await fetch(url, {
             ...options,
             headers
         });
-
+        
         // If unauthorized, handle silently for background requests
         if (response.status === 401) {
             console.warn('Authentication token expired or invalid');
-
             // Only show alert and redirect if this is NOT a background progress check
             if (!url.includes('/download-progress')) {
                 showAlert('downloadAlert', 'Session expired. Please log in again.', 'warning');
-
                 // Redirect to login after a short delay
                 setTimeout(() => {
                     localStorage.removeItem('access_token');
@@ -218,15 +216,19 @@ async function authFetch(url, options = {}) {
                 // For progress checks, just log and return null silently
                 console.log('Progress check failed due to expired token - monitoring will stop');
             }
-
             return null;
         }
-
+        
+        // IMPORTANT FIX: Allow login endpoints to return error responses
+        // so they can be handled by the calling function
+        if (url.includes('/login/')) {
+            return response; // Return the response even if not ok
+        }
+        
         // Check for other error status codes
         if (!response.ok) {
             const errorText = await response.text();
             console.error(`HTTP ${response.status} error from ${url}:`, errorText);
-
             // Don't show alert for background progress checks
             if (!url.includes('/download-progress')) {
                 // Special message for timeout errors
@@ -238,19 +240,16 @@ async function authFetch(url, options = {}) {
                     showAlert('downloadAlert', `Server error (${response.status}). Please try again.`, 'error');
                 }
             }
-
             return null;
         }
-
+        
         return response;
     } catch (error) {
         console.error(`Network error for ${url}:`, error);
-
         // Don't show alert for background progress checks
         if (!url.includes('/download-progress')) {
             showAlert('downloadAlert', 'Network error. Please check your connection.', 'error');
         }
-
         return null;
     }
 }
@@ -730,11 +729,20 @@ async function requestCode() {
         const response = await authFetch("/login/request-code", {
             method: "POST",
         });
-
+        
+        if (!response) {
+            showAlert("loginAlert", "No response from server", "error");
+            return;
+        }
+        
         const data = await response.json();
-
+        
         if (response.ok) {
             showAlert("loginAlert", data.message, "success");
+            
+            // Clear the verification code input when requesting a new code
+            document.getElementById("verificationCode").value = "";
+            
             document.getElementById("requestCodeBtn").classList.add("hidden");
             document.getElementById("codeForm").classList.remove("hidden");
         } else {
