@@ -63,6 +63,8 @@ environment:
       - ADMIN_USERNAME=yourusername
       - ADMIN_PASSWORD=yourpassword
       - ACCESS_TOKEN_EXPIRE_MINUTES=1440  # 24 hours
+      - PUID=1000
+      - PGID=1000
 ```
 
 ## Accessing the Application
@@ -130,6 +132,13 @@ services:
       - API_HASH=abcddfabc123456 # your api_hash from my.telegram.org
       - PHONE_NUMBER=33334567890 # without + sign
       - MAX_CONCURRENT_DOWNLOADS=3
+      # Generate secret: python -c "import secrets; print(secrets.token_urlsafe(32))"
+      - SECRET_KEY=your_secret
+      - ADMIN_USERNAME=admin
+      - ADMIN_PASSWORD=admin123
+      - ACCESS_TOKEN_EXPIRE_MINUTES=1440
+      - PUID=1000
+      - PGID=1000
     restart: always
 ```
 
@@ -185,6 +194,11 @@ docker run -d \
   -e API_HASH=abcdef123456 \
   -e PHONE_NUMBER=1234567890 \
   -e MAX_CONCURRENT_DOWNLOADS=3 \
+  -e SECRET_KEY=SDFDFD \
+  -e ADMIN_USERNAME=admin \
+  -e ADMIN_PASSWORD=admin123 \
+  -e PUID=1000 \
+  -e PGID=1000 \
   telefetchr
 
 # Run the container (windows)
@@ -198,6 +212,11 @@ docker run -d `
   -e API_HASH=abcdef123456 `
   -e PHONE_NUMBER=1234567890 `
   -e MAX_CONCURRENT_DOWNLOADS=3 `
+  -e SECRET_KEY=SDFDFD `
+  -e ADMIN_USERNAME=admin `
+  -e ADMIN_PASSWORD=admin123 `
+  -e PUID=1000 `
+  -e PGID=1000 `
   telefetchr
 
 
