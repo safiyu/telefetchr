@@ -105,4 +105,10 @@ app.include_router(router)
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host=Config.HOST, port=Config.PORT)
+    uvicorn.run(
+        app, 
+        host=Config.HOST, 
+        port=Config.PORT,
+        proxy_headers=True,
+        forwarded_allow_ips="*"
+    )

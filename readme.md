@@ -63,6 +63,7 @@ environment:
       - ADMIN_USERNAME=yourusername
       - ADMIN_PASSWORD=yourpassword
       - ACCESS_TOKEN_EXPIRE_MINUTES=1440  # 24 hours
+      - TRUSTED_SUBNETS=192.168.1.0/24  # Optional auth bypass
       - PUID=1000
       - PGID=1000
 ```

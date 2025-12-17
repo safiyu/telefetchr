@@ -1,7 +1,11 @@
 import logging
-from typing import Optional, List
 from datetime import datetime
-from telethon import TelegramClient
+from typing import Optional, List
+import math
+import os
+import asyncio
+import aiofiles
+from telethon import TelegramClient, utils
 from telethon.tl.types import MessageMediaDocument, MessageMediaPhoto, Channel, User
 from telethon.network import ConnectionTcpMTProxyRandomizedIntermediate
 
@@ -258,3 +262,135 @@ class TelegramService:
             file=file_path,
             progress_callback=throttled_progress_callback if progress_callback else None
         )
+
+    async def download_media_parallel(self, message, file_path: str, progress_callback=None, workers: int = 4):
+        """Download media using parallel workers (segmented download)"""
+        # Determine file size
+        file_size = 0
+        if isinstance(message.media, MessageMediaDocument):
+            file_size = message.media.document.size
+        elif isinstance(message.media, MessageMediaPhoto):
+            # Photos are usually small, use standard download
+            return await self.download_media(message, file_path, progress_callback)
+        
+        if file_size == 0:
+             return await self.download_media(message, file_path, progress_callback)
+
+        chunk_size = math.ceil(file_size / workers)
+        downloaded_bytes = 0
+        lock = asyncio.Lock()
+        
+        last_callback_time = [datetime.now()]
+        
+        async def worker(worker_id: int, start_byte: int, end_byte: int):
+            nonlocal downloaded_bytes
+            
+            # Using temporary part file for this worker
+            part_file_path = f"{file_path}.part{worker_id}"
+            current_offset = start_byte
+            
+            try:
+                # Use configured chunk size (default 4MB) for faster downloads
+                request_chunk_size = Config.DOWNLOAD_CHUNK_SIZE
+
+                async for chunk in self.client.iter_download(
+                    message.media,
+                    offset=start_byte,
+                    limit=end_byte - start_byte,
+                    chunk_size=None,
+                    request_size=request_chunk_size
+                ):
+                    if not chunk:
+                        break
+                        
+                    # Write sequentially to part file
+                    async with aiofiles.open(part_file_path, 'ab') as f:
+                        await f.write(chunk)
+                    
+                    chunk_len = len(chunk)
+                    current_offset += chunk_len
+                    
+                    async with lock:
+                        downloaded_bytes += chunk_len
+                        # Progress callback
+                        if progress_callback:
+                            now = datetime.now()
+                            elapsed = (now - last_callback_time[0]).total_seconds()
+                            if elapsed >= Config.DOWNLOAD_REQUEST_DELAY or downloaded_bytes == file_size:
+                                progress_callback(downloaded_bytes, file_size)
+                                last_callback_time[0] = now
+                                
+                    if current_offset >= end_byte:
+                        break
+
+            except Exception as e:
+                logger.error(f"Worker {worker_id} failed: {e}")
+                # Cleanup part file on failure
+                if os.path.exists(part_file_path):
+                    try:
+                        os.remove(part_file_path)
+                    except:
+                        pass
+                raise
+
+        tasks = []
+        for i in range(workers):
+            start = i * chunk_size
+            end = min((i + 1) * chunk_size, file_size)
+            if start >= end:
+                break
+            # Clear any existing part file first
+            part_path = f"{file_path}.part{i}"
+            if os.path.exists(part_path):
+                try:
+                    os.remove(part_path)
+                except:
+                    pass
+            tasks.append(worker(i, start, end))
+
+        try:
+            await asyncio.gather(*tasks)
+            # Merge parts after successful download
+            await self.merge_parts(file_path, len(tasks))
+            
+        except Exception as e:
+            logger.error(f"Parallel download failed: {e}")
+            # Cleanup all parts
+            for i in range(workers):
+                part_path = f"{file_path}.part{i}"
+                if os.path.exists(part_path):
+                    try:
+                        os.remove(part_path)
+                    except:
+                        pass
+            # Cleanup target file if it exists (incomplete merge)
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            raise
+
+        return file_path
+
+    async def merge_parts(self, file_path: str, num_parts: int):
+        """Merge download parts into final file"""
+        logger.info(f"Merging {num_parts} parts into {file_path}")
+        
+        # Use aiofiles for merging to allow event loop to run (though it's IO bound)
+        async with aiofiles.open(file_path, 'wb') as outfile:
+            for i in range(num_parts):
+                part_path = f"{file_path}.part{i}"
+                if os.path.exists(part_path):
+                    async with aiofiles.open(part_path, 'rb') as infile:
+                        while True:
+                            chunk = await infile.read(1024 * 1024)  # 1MB copy buffer
+                            if not chunk:
+                                break
+                            await outfile.write(chunk)
+                    
+                    # Remove part file after merging
+                    try:
+                        os.remove(part_path)
+                    except Exception as e:
+                        logger.warning(f"Failed to remove part file {part_path}: {e}")
+                else:
+                    logger.error(f"Missing part file: {part_path}")
+                    raise FileNotFoundError(f"Part file missing: {part_path}")

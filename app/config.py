@@ -14,8 +14,9 @@ class Config:
     SAVE_PATH = os.path.abspath('downloads')
 
     # Telethon Download Configuration
-    DOWNLOAD_CHUNK_SIZE = int(os.getenv("DOWNLOAD_CHUNK_SIZE", "524288"))  # 512KB chunks (smaller = more stable)
-    DOWNLOAD_REQUEST_DELAY = float(os.getenv("DOWNLOAD_REQUEST_DELAY", "0.1"))  # 100ms delay between chunk requests
+    DOWNLOAD_CHUNK_SIZE = int(os.getenv("DOWNLOAD_CHUNK_SIZE", "4194304"))  # 4MB chunks (faster)
+    DOWNLOAD_REQUEST_DELAY = float(os.getenv("DOWNLOAD_REQUEST_DELAY", "0.01"))  # 10ms delay between chunk requests
+    DOWNLOAD_WORKERS = int(os.getenv("DOWNLOAD_WORKERS", "8"))  # Number of parallel workers for downloading single file
 
     # Session Configuration
     SESSION_DIR = os.path.abspath('sessions')
@@ -34,6 +35,10 @@ class Config:
     # Default admin credentials (change these!)
     ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
     ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")  # Will be hashed
+    
+    # Trusted Subnets for Auth Bypass (comma-separated CIDRs)
+    # Example: "192.168.1.0/24,10.0.0.0/8"
+    TRUSTED_SUBNETS = [s.strip() for s in os.getenv("TRUSTED_SUBNETS", "").split(",") if s.strip()]
 
     @classmethod
     def ensure_directories(cls):

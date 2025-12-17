@@ -1,4 +1,3 @@
-<!-- Modern Minimal TeleFetchr UI -->
 <!DOCTYPE html>
 <html lang="en">
 
@@ -8,567 +7,457 @@
     <title>TeleFetchr</title>
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="/static/images/favicon.png" />
-    <!-- For Apple devices -->
-    <link rel="apple-touch-icon" href="/static/images/favicon.png" />
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-family: 'Outfit', sans-serif;
         }
-        
+
         body {
-            background: #fafafa;
+            background-color: #0f172a;
+            color: #e2e8f0;
         }
-        /* Card styles */
-        
-        .card {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
-            padding: 1.5rem;
-            transition: box-shadow 0.2s ease;
+
+        /* Glassmorphism Card */
+        .glass-card {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
-        
-        .card:hover {
-            box-shadow: 0 8px 12px rgba(0, 0, 0, 0.1);
+
+        .header-gradient {
+            background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
-        /* Header styles */
-        
-        header {
-            background: white;
-            border-bottom: 1px solid #e4e4e7;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
-        }
-        /* Button styles */
-        
-        .btn-primary {
+
+        .btn-gradient {
             background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-            color: white;
-            border-radius: 8px;
-            padding: 0.75rem 1.5rem;
-            font-weight: 600;
-            transition: all 0.2s ease;
-            border: none;
-            cursor: pointer;
-            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+            transition: all 0.3s ease;
         }
-        
-        .btn-primary:hover {
+
+        .btn-gradient:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 16px rgba(99, 102, 241, 0.35);
+            box-shadow: 0 10px 20px -10px rgba(99, 102, 241, 0.6);
         }
-        
-        .btn-secondary {
-            background: white;
-            color: #18181b;
-            border: 1.5px solid #e4e4e7;
-            border-radius: 8px;
-            padding: 0.75rem 1.5rem;
-            font-weight: 500;
-            transition: all 0.2s ease;
-            cursor: pointer;
-        }
-        
-        .btn-secondary:hover {
-            background: #fafafa;
-            border-color: #d4d4d8;
-        }
-        
-        .btn-success {
-            background: #10b981;
-            color: white;
-            border-radius: 8px;
-            padding: 0.75rem 1.5rem;
-            font-weight: 600;
-            transition: all 0.2s ease;
-            border: none;
-            cursor: pointer;
-        }
-        
-        .btn-success:hover {
-            background: #059669;
-            transform: translateY(-2px);
-        }
-        
-        .btn-danger {
-            background: #ef4444;
-            color: white;
-            border-radius: 8px;
-            padding: 0.75rem 1.5rem;
-            font-weight: 600;
-            transition: all 0.2s ease;
-            border: none;
-            cursor: pointer;
-        }
-        
-        .btn-danger:hover {
-            background: #dc2626;
-        }
-        /* Input styles */
-        
-        input[type="text"],
-        input[type="number"],
+
+        input,
         select {
-            border: 1.5px solid #e4e4e7;
-            border-radius: 8px;
-            padding: 0.75rem 1rem;
-            background: #fafafa;
-            transition: all 0.2s ease;
-            outline: none;
+            background: #1e293b !important;
+            border-color: #334155 !important;
+            color: #f1f5f9 !important;
         }
-        
+
         input:focus,
         select:focus {
-            border-color: #6366f1;
-            background: white;
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+            border-color: #818cf8 !important;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2) !important;
         }
-        /* Progress bar */
-        
-        .progress-bar {
-            background: #e4e4e7;
-            border-radius: 8px;
-            overflow: hidden;
-            position: relative;
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
         }
-        
-        .progress-fill {
-            background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%);
-            height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 0.75rem;
-            font-weight: 600;
-            transition: width 0.3s ease;
-            min-width: 30px;
+
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
         }
-        
-        .progress-fill.bg-green-500 {
-            background: #10b981 !important;
-        }
-        /* Badge */
-        
-        .badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 6px 12px;
-            border-radius: 6px;
-            font-size: 13px;
-            font-weight: 500;
-        }
-        
-        .badge-success {
-            background: #d1fae5;
-            color: #065f46;
-        }
-        
-        .badge-warning {
-            background: #fef3c7;
-            color: #92400e;
-        }
-        
-        .badge-info {
-            background: #dbeafe;
-            color: #1e40af;
-        }
-        /* Logo */
-        
-        .logo-text {
-            font-size: 1.75rem;
-            font-weight: 700;
-            color: #18181b;
-            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-        /* Modal Styles */
-        
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.6);
-            backdrop-filter: blur(4px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-            opacity: 0;
-            animation: fadeIn 0.2s forwards;
-        }
-        
-        @keyframes fadeIn {
-            to {
-                opacity: 1;
-            }
-        }
-        
-        @keyframes slideUp {
-            from {
-                transform: translateY(30px);
-                opacity: 0;
-            }
-            to {
-                transform: translateY(0);
-                opacity: 1;
-            }
-        }
-        
-        .modal-content {
-            background: white;
-            border-radius: 16px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            max-width: 480px;
-            width: 90%;
-            animation: slideUp 0.3s ease-out;
-            overflow: hidden;
-        }
-        
-        .modal-overlay.hidden {
-            display: none;
-        }
-        
-        .modal-header {
-            padding: 24px 24px 16px;
-            border-bottom: 1px solid #e4e4e7;
-        }
-        
-        .modal-body {
-            padding: 24px;
-        }
-        
-        .modal-footer {
-            padding: 16px 24px 24px;
-            display: flex;
-            gap: 12px;
-            justify-content: flex-end;
-        }
-        
-        .modal-icon {
-            width: 64px;
-            height: 64px;
-            margin: 0 auto 16px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 32px;
-        }
-        
-        .modal-icon.warning {
-            background: linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%);
-            color: #f59e0b;
-        }
-        
-        .modal-icon.danger {
-            background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
-            color: #ef4444;
-        }
-        
-        .btn-outline-secondary {
-            background: white;
-            color: #52525b;
-            border: 1.5px solid #e4e4e7;
-            border-radius: 8px;
-            padding: 0.75rem 1.5rem;
-            font-weight: 600;
-            transition: all 0.2s ease;
-            cursor: pointer;
-        }
-        
-        .btn-outline-secondary:hover {
-            background: #fafafa;
-            border-color: #d4d4d8;
-        }
-        
-        .logout-btn {
-            background: transparent;
-            color: #ef4444;
-            border: none;
-            padding: 0.5rem;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            transition: color 0.2s ease;
-        }
-        
-        .logout-btn:hover {
-            color: #dc2626;
-        }
-        
-        .logout-btn:focus {
-            outline: 2px solid #ef4444;
-            outline-offset: 2px;
+
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
             border-radius: 4px;
         }
-        
-        .logout-btn i {
-            font-size: 1.25rem;
-        }
-        
-        .logout-text {
-            opacity: 0;
-            max-width: 0;
-            overflow: hidden;
-            white-space: nowrap;
-            transition: opacity 0.3s ease, max-width 0.3s ease;
-        }
-        
-        .logout-btn:hover .logout-text {
-            opacity: 1;
-            max-width: 100px;
-            /* Adjust based on text length */
-        }
-        
-        .session-btn {
-            background: transparent;
-            color: #ef4444;
-            border: none;
-            padding: 0.5rem;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            transition: color 0.2s ease;
-        }
-        
-        .session-btn:hover {
-            color: #dc2626;
-        }
-        
-        .session-btn:focus {
-            outline: 2px solid #ef4444;
-            outline-offset: 2px;
-            border-radius: 4px;
-        }
-        
-        .session-btn i {
-            font-size: 1.25rem;
-        }
-        
-        .session-text {
-            opacity: 0;
-            max-width: 0;
-            overflow: hidden;
-            white-space: nowrap;
-            transition: opacity 0.3s ease, max-width 0.3s ease;
-        }
-        
-        .session-btn:hover .session-text {
-            opacity: 1;
-            max-width: 150px;
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
         }
     </style>
 </head>
 
-<body class="min-h-screen flex flex-col">
-    <!-- Toast Container for popup messages -->
-    <div id="toastContainer" class="fixed top-10 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 space-y-3 pointer-events-none" style="min-width: 320px; max-width: 500px;"></div>
+<body class="min-h-screen flex flex-col antialiased">
+    <!-- Toast Container -->
+    <div id="toastContainer" class="fixed top-6 right-6 z-50 space-y-3 pointer-events-none transition-all duration-300">
+    </div>
 
-    <!-- Confirmation Modal -->
-    <div id="confirmModal" class="modal-overlay hidden">
-        <div class="modal-content">
-            <div class="modal-header">
-                <div id="modalIcon" class="modal-icon danger">
-                    <i class="fa-solid fa-trash-can"></i>
+    <!-- Modals (kept hidden by default) -->
+    <div id="confirmModal"
+        class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70 backdrop-blur-sm transition-opacity">
+        <div
+            class="bg-gray-800 rounded-xl shadow-2xl max-w-md w-full mx-4 border border-gray-700 overflow-hidden transform scale-95 transition-transform duration-200">
+            <div class="p-6">
+                <div id="modalIcon"
+                    class="w-16 h-16 mx-auto bg-red-500/10 rounded-full flex items-center justify-center mb-4 text-red-500 text-3xl">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
                 </div>
-                <h2 id="modalTitle" class="text-xl font-bold text-gray-900 text-center">Delete Telegram Session?</h2>
-            </div>
-            <div class="modal-body">
-                <p id="modalMessage" class="text-gray-600 text-center leading-relaxed"></p>
-                <div id="modalDetails" class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg hidden">
-                    <div class="flex items-start gap-2">
-                        <i class="fa-solid fa-circle-info text-yellow-600 mt-0.5"></i>
-                        <div class="text-sm text-yellow-800" id="modalDetailsText"></div>
-                    </div>
+                <h3 id="modalTitle" class="text-xl font-bold text-center text-white mb-2">Are you sure?</h3>
+                <p id="modalMessage" class="text-gray-400 text-center mb-6">This action cannot be undone.</p>
+
+                <div id="modalDetails" class="hidden bg-yellow-900/20 border border-yellow-700/50 rounded-lg p-3 mb-6">
+                    <p id="modalDetailsText" class="text-sm text-yellow-500 text-center"></p>
                 </div>
-            </div>
-            <div class="modal-footer">
-                <button id="modalCancelBtn" class="btn-outline-secondary">
-                    <i class="fa-solid fa-xmark mr-2"></i>Cancel
-                </button>
-                <button id="modalConfirmBtn" class="btn-danger">
-                    <i class="fa-solid fa-check mr-2"></i>Confirm
-                </button>
+
+                <div class="flex gap-3 justify-center">
+                    <button id="modalCancelBtn"
+                        class="px-5 py-2.5 rounded-lg border border-gray-600 text-gray-300 hover:bg-gray-700 font-medium transition-colors">
+                        Cancel
+                    </button>
+                    <button id="modalConfirmBtn"
+                        class="px-5 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium shadow-lg shadow-red-900/30 transition-all">
+                        Confirm
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 
-    <header class="p-4 flex justify-between items-center sticky top-0 z-10">
-        <div class="flex items-center gap-3">
-            <img src="/static/images/logo.png" alt="TeleFetchr Logo" class="h-14 w-auto" />
-            <span class="logo-text">TeleFetchr</span>
+    <!-- Sidebar / Navigation (for larger layout) or Top Bar -->
+    <header class="glass-card m-4 px-6 py-4 flex justify-between items-center sticky top-4 z-40">
+        <div class="flex items-center gap-4">
+            <img src="/static/images/logo.png" alt="TeleFetchr Logo" class="h-14 w-auto drop-shadow-lg" />
+            <h1 class="text-2xl font-bold tracking-tight header-gradient">TeleFetchr</h1>
         </div>
-        <div id="statusBadge" class="flex items-center gap-3">
-            <span id="connectionStatus" class="badge badge-success">
-                <i class="fa-solid fa-circle text-xs"></i>
-                <span>Connected</span>
-            </span>
-            <span id="userInfo" class="text-gray-600 text-sm font-medium"></span>
-            <button onclick="logoutSession()" class="session-btn" aria-label="Delete Telegram session and logout">
-                <i class="fa-solid fa-trash"></i>
-                <span class="session-text">Delete Session</span>
-            </button>
-            <button onclick="logout()" aria-label="Logout" class="logout-btn">
-                <i class="fa-solid fa-sign-out-alt"></i>
-                <span class="logout-text">Logout</span>
-            </button>
-        </div>
-    </header>
 
-    <main class="flex-1 flex flex-col items-center py-8 px-4">
-        <div class="w-full max-w-4xl space-y-6">
-            <!-- Login Card -->
-            <div id="loginSection" class="card space-y-4 hidden">
-                <h2 class="text-lg font-semibold text-gray-900 flex items-center gap-2"><i class="fa-solid fa-lock text-indigo-500"></i> Login Required</h2>
-                <div id="codeForm" class="space-y-3 hidden">
-                    <div class="flex items-center gap-2 text-gray-700"><i class="fa-solid fa-sms text-indigo-500"></i>Enter the code sent to your phone:</div>
-                    <input type="text" id="verificationCode" class="w-full" placeholder="12345">
-                    <button onclick="verifyCode()" class="w-full btn-primary">Verify</button>
-                </div>
-                <div id="passwordForm" class="space-y-3 hidden">
-                    <div class="flex items-center gap-2 text-gray-700"><i class="fa-solid fa-key text-indigo-500"></i>Enter your 2FA password:</div>
-                    <input type="password" id="password2fa" class="w-full" placeholder="Your 2FA password">
-                    <button onclick="verify2FA()" class="w-full btn-primary">Submit</button>
-                </div>
-                <div id="requestCodeBtn">
-                    <button onclick="requestCode()" class="w-full btn-success"><i class="fa-solid fa-paper-plane mr-2"></i>Send Verification Code</button>
-                </div>
+        <div id="statusBadge" class="flex items-center gap-4">
+            <!-- Status Pill -->
+            <div id="connectionStatus"
+                class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-500/10 border border-green-500/20 text-green-400 text-sm font-medium">
+                <span class="relative flex h-2 w-2">
+                    <span
+                        class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                </span>
+                Connected
             </div>
 
-            <!-- Channel & Settings Card -->
-            <div id="downloadSection" class="card space-y-4 hidden">
-                <h2 class="text-lg font-semibold text-gray-900 flex items-center gap-2"><i class="fa-solid fa-download text-indigo-500"></i> Download Files</h2>
-                <div class="bg-gray-50 p-3 rounded-lg flex items-center gap-2 border border-gray-200">
-                    <i class="fa-solid fa-folder-open text-indigo-500"></i>
-                    <span class="font-medium text-gray-700">Save Path:</span>
-                    <span id="savePathText" class="text-gray-600">Loading...</span>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                        <label class="block font-medium mb-2 text-gray-700 text-sm">Channel</label>
-                        <select id="channelUsername" class="w-full"></select>
-                    </div>
-                    <div>
-                        <label class="block font-medium mb-2 text-gray-700 text-sm">Number of Files</label>
-                        <input type="number" id="fileLimit" value="10" min="1" max="1000" class="w-full">
-                    </div>
-                    <div>
-                        <label class="block font-medium mb-2 text-gray-700 text-sm">File Type</label>
-                        <select id="fileType" class="w-full">
-                            <option value="">All Files</option>
-                            <option value="document">Documents Only</option>
-                            <option value="photo">Photos Only</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Search & Filter Section -->
-                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                    <div class="flex items-center justify-between mb-3">
-                        <h3 class="font-semibold text-gray-900 flex items-center gap-2">
-                            <i class="fa-solid fa-filter text-indigo-500"></i> Filters
-                        </h3>
-                        <button onclick="toggleFilters()" id="toggleFiltersBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-semibold cursor-pointer">
-                            <i class="fa-solid fa-chevron-down"></i> Show
-                        </button>
-                    </div>
-                    <div id="filtersPanel" class="hidden space-y-3">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div>
-                                <label class="block font-medium mb-1 text-gray-700 text-xs">Search Filename</label>
-                                <input type="text" id="searchQuery" placeholder="e.g., report, invoice..." class="w-full text-sm">
-                            </div>
-                            <div>
-                                <label class="block font-medium mb-1 text-gray-700 text-xs">File Extension</label>
-                                <input type="text" id="fileExtension" placeholder="e.g., pdf, mp4, jpg" class="w-full text-sm">
-                            </div>
-                        </div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div>
-                                <label class="block font-medium mb-1 text-gray-700 text-xs">Min Size (MB)</label>
-                                <input type="number" id="minSize" placeholder="0" min="0" step="0.1" class="w-full text-sm">
-                            </div>
-                            <div>
-                                <label class="block font-medium mb-1 text-gray-700 text-xs">Max Size (MB)</label>
-                                <input type="number" id="maxSize" placeholder="Unlimited" min="0" step="0.1" class="w-full text-sm">
-                            </div>
-                        </div>
-                        <div class="flex justify-end gap-2">
-                            <button onclick="clearFilters()" class="btn-secondary text-sm py-2 px-3">
-                                <i class="fa-solid fa-eraser"></i> Clear Filters
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                <div class="flex flex-wrap gap-2 mt-2">
-                    <button onclick="listFiles()" class="flex-1 btn-primary"><i class="fa-solid fa-list mr-2"></i>List Files</button>
-                    <button onclick="downloadAll()" class="flex-1 btn-success"><i class="fa-solid fa-cloud-arrow-down mr-2"></i>Download All</button>
-                    <button onclick="cancelDownload()" id="cancelBtn" class="flex-1 btn-danger hidden"><i class="fa-solid fa-ban mr-2"></i>Cancel</button>
-                    <button onclick="clearProgress()" id="clearProgressBtn" class="flex-1 btn-secondary hidden">
-                        <i class="fa-solid fa-eraser mr-2"></i>Clear Progress
-                    </button>
-                </div>
-
-                <!-- Progress Section -->
-                <div id="downloadProgress" class="hidden mt-4">
-                    <h3 class="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                        Downloads
-                        <span id="overallText" class="text-sm text-gray-600"></span>
-                    </h3>
-                    <div id="progressBarsContainer" class="space-y-4"></div>
-                </div>
-
-                <div id="filesList" class="mt-4"></div>
-
-                <div id="debugPanel" class="mt-4 p-4 bg-gray-100 rounded-lg hidden">
-                    <div class="flex justify-between items-center mb-2">
-                        <h3 class="font-semibold text-gray-700">Debug Information
-                            <div class="flex justify-between text-xs text-gray-500">(Caution: Hope you know what you're doing!)</div>
-                        </h3>
-                        <div class="flex gap-2">
-                            <button onclick="cleanupState()" class="py-1 px-2 rounded bg-yellow-500 text-white text-xs hover:bg-yellow-600">
-                              <i class="fa-solid fa-broom"></i> Cleanup
-                            </button>
-                            <button onclick="resetState()" class="py-1 px-2 rounded bg-red-500 text-white text-xs hover:bg-red-600">
-                                <i class="fa-solid fa-trash"></i> Reset
-                            </button>
-                            <button onclick="refreshDebugInfo()" class="py-1 px-2 rounded bg-gray-500 text-white text-xs hover:bg-gray-600">
-                                <i class="fa-solid fa-refresh"></i> Refresh
-                            </button>
-                        </div>
-                    </div>
-                    <pre id="debugInfo" class="text-xs bg-white p-2 rounded overflow-auto max-h-96"></pre>
-                </div>
-
-                <!-- Add toggle button in the header -->
-                <button onclick="toggleDebugPanel()" class="py-1 px-3 rounded bg-gray-600 text-white text-sm">
-                    <i class="fa-solid fa-bug"></i> Debug
+            <!-- Profile Dropdown Trigger (Simplified for now) -->
+            <div class="flex items-center gap-3 pl-4 border-l border-gray-700" id="userInfoActions">
+                <span id="userInfo" class="text-sm font-medium text-gray-300 hidden md:inline-block"></span>
+                <button onclick="logoutSession()"
+                    class="text-gray-400 hover:text-red-400 transition-colors p-2 rounded-lg hover:bg-red-500/10"
+                    title="Delete Session">
+                    <i class="fa-solid fa-power-off"></i>
+                </button>
+                <button onclick="logout()"
+                    class="text-gray-400 hover:text-white transition-colors p-2 rounded-lg hover:bg-gray-700"
+                    title="Logout">
+                    <i class="fa-solid fa-sign-out-alt"></i>
                 </button>
             </div>
         </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl mx-auto w-full px-4 pb-12 flex flex-col items-center justify-center">
+
+        <!-- Login Form -->
+        <div id="loginSection" class="w-full max-w-md hidden">
+            <div class="glass-card p-8 border-t-4 border-indigo-500">
+                <div class="text-center mb-8">
+                    <h2 class="text-2xl font-bold text-white mb-2">Welcome Back</h2>
+                    <p class="text-gray-400">Sign in to your Telegram account to start downloading.</p>
+                </div>
+
+                <div id="requestCodeBtn" class="space-y-4">
+                    <div class="bg-indigo-900/20 p-4 rounded-lg border border-indigo-500/20 mb-6">
+                        <p class="text-indigo-300 text-sm text-center"><i
+                                class="fa-solid fa-shield-halved mr-2"></i>Secure Login via Telegram API</p>
+                    </div>
+                    <button onclick="requestCode()"
+                        class="w-full btn-gradient py-3.5 rounded-xl text-white font-semibold shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2 group">
+                        <span>Send Verification Code</span>
+                        <i class="fa-solid fa-arrow-right group-hover:translate-x-1 transition-transform"></i>
+                    </button>
+                </div>
+
+                <div id="codeForm" class="hidden space-y-5 animate-fade-in">
+                    <div>
+                        <label class="block text-gray-300 text-sm font-medium mb-1.5">Verification Code</label>
+                        <input type="text" id="verificationCode"
+                            class="w-full px-4 py-3 rounded-lg border focus:ring-2 focus:ring-indigo-500 transition-all outline-none"
+                            placeholder="XXXXX" autocomplete="one-time-code">
+                    </div>
+                    <button onclick="verifyCode()"
+                        class="w-full btn-gradient py-3 rounded-lg text-white font-semibold shadow-lg">Verify &
+                        Login</button>
+                </div>
+
+                <div id="passwordForm" class="hidden space-y-5 animate-fade-in">
+                    <div>
+                        <label class="block text-gray-300 text-sm font-medium mb-1.5">2FA Password</label>
+                        <input type="password" id="password2fa"
+                            class="w-full px-4 py-3 rounded-lg border focus:ring-2 focus:ring-indigo-500 transition-all outline-none"
+                            placeholder="••••••••">
+                    </div>
+                    <button onclick="verify2FA()"
+                        class="w-full btn-gradient py-3 rounded-lg text-white font-semibold shadow-lg">Unlock
+                        Account</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard (Download Section) -->
+        <div id="downloadSection" class="w-full hidden space-y-6">
+
+            <!-- Stats Row -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Save Path Card -->
+                <div class="glass-card p-5 flex items-start justify-between relative overflow-hidden group">
+                    <div class="absolute right-0 top-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                        <i class="fa-solid fa-folder-open text-6xl text-white"></i>
+                    </div>
+                    <div>
+                        <p class="text-gray-400 text-sm font-medium mb-1">Save Location</p>
+                        <p id="savePathText" class="text-white font-mono text-sm break-all font-semibold">/downloads</p>
+                    </div>
+                    <div class="bg-blue-500/20 p-2 rounded-lg text-blue-400">
+                        <i class="fa-solid fa-hard-drive"></i>
+                    </div>
+                </div>
+
+                <!-- Active Workers Card -->
+                <div class="glass-card p-5 flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-400 text-sm font-medium mb-1">Parallel Workers</p>
+                        <div class="flex items-baseline gap-2">
+                            <h3 class="text-2xl font-bold text-white">4</h3>
+                            <span class="text-xs text-green-400 font-medium">Active</span>
+                        </div>
+                    </div>
+                    <div class="bg-purple-500/20 p-2 rounded-lg text-purple-400">
+                        <i class="fa-solid fa-network-wired"></i>
+                    </div>
+                </div>
+
+                <!-- Session Status -->
+                <div class="glass-card p-5 flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-400 text-sm font-medium mb-1">Session Duration</p>
+                        <h3 class="text-2xl font-bold text-white" id="sessionTimer">00:00</h3>
+                    </div>
+                    <div class="bg-indigo-500/20 p-2 rounded-lg text-indigo-400">
+                        <i class="fa-solid fa-clock"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Navigation -->
+            <div class="flex space-x-4 border-b border-gray-700 pb-2">
+                <button onclick="switchTab('search')" id="tab-search"
+                    class="px-4 py-2 text-white border-b-2 border-indigo-500 font-medium transition-colors">
+                    <i class="fa-solid fa-search mr-2"></i> Search & Download
+                </button>
+                <button onclick="switchTab('queue')" id="tab-queue"
+                    class="px-4 py-2 text-gray-400 hover:text-white font-medium transition-colors border-b-2 border-transparent hover:border-gray-600">
+                    <i class="fa-solid fa-list mr-2"></i> Queue <span id="queueCountBadge"
+                        class="ml-2 bg-indigo-600 text-white text-xs px-2 py-0.5 rounded-full hidden">0</span>
+                </button>
+            </div>
+
+            <!-- SEARCH TAB CONTENT -->
+            <div id="searchTabContent" class="space-y-6">
+                <!-- Main Controls -->
+                <div class="glass-card p-6 md:p-8">
+                    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+                        <div class="lg:col-span-2">
+                            <label
+                                class="block text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">Source
+                                Channel</label>
+                            <div class="relative">
+                                <i
+                                    class="fa-brands fa-telegram absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
+                                <select id="channelUsername"
+                                    class="w-full pl-11 pr-4 py-3 rounded-lg appearance-none cursor-pointer focus:ring-2 focus:ring-indigo-500 transition-all outline-none border border-gray-700 bg-gray-900">
+                                    <option>Loading channels...</option>
+                                </select>
+                                <i
+                                    class="fa-solid fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 text-xs pointer-events-none"></i>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label
+                                class="block text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">Limit</label>
+                            <div class="relative">
+                                <i
+                                    class="fa-solid fa-list-ol absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
+                                <input type="number" id="fileLimit" value="10" min="1" max="1000"
+                                    class="w-full pl-11 pr-4 py-3 rounded-lg border border-gray-700 bg-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none transition-all">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label
+                                class="block text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">Type</label>
+                            <div class="relative">
+                                <i
+                                    class="fa-solid fa-filter absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
+                                <select id="fileType"
+                                    class="w-full pl-11 pr-4 py-3 rounded-lg border border-gray-700 bg-gray-900 appearance-none cursor-pointer focus:ring-2 focus:ring-indigo-500 outline-none transition-all">
+                                    <option value="">All Files</option>
+                                    <option value="document">Documents</option>
+                                    <option value="photo">Photos</option>
+                                </select>
+                                <i
+                                    class="fa-solid fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 text-xs pointer-events-none"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Advanced Filters Toggle -->
+                    <div class="mb-4">
+                        <button id="toggleFiltersBtn" onclick="toggleFilters()" type="button"
+                            class="text-indigo-400 text-sm hover:text-indigo-300 flex items-center gap-2 transition-colors">
+                            <i class="fa-solid fa-filter"></i> Show Advanced Filters
+                        </button>
+                    </div>
+
+                    <!-- Advanced Filters Panel -->
+                    <div id="filtersPanel"
+                        class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 p-4 bg-gray-800/50 rounded-xl border border-gray-700/50">
+                        <div>
+                            <label
+                                class="block text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">Search
+                                Query</label>
+                            <div class="relative">
+                                <i
+                                    class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
+                                <input type="text" id="searchQuery" placeholder="Filename contains..."
+                                    class="w-full pl-11 pr-4 py-3 rounded-lg border border-gray-700 bg-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none transition-all">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label
+                                class="block text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">Extension</label>
+                            <div class="relative">
+                                <i class="fa-solid fa-file absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
+                                <input type="text" id="fileExtension" placeholder="e.g. .mp4"
+                                    class="w-full pl-11 pr-4 py-3 rounded-lg border border-gray-700 bg-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none transition-all">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">Min
+                                Size
+                                (MB)</label>
+                            <div class="relative">
+                                <i
+                                    class="fa-solid fa-weight-hanging absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
+                                <input type="number" id="minSize" min="0" placeholder="0"
+                                    class="w-full pl-11 pr-4 py-3 rounded-lg border border-gray-700 bg-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none transition-all">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">Max
+                                Size
+                                (MB)</label>
+                            <div class="relative">
+                                <i
+                                    class="fa-solid fa-weight-hanging absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
+                                <input type="number" id="maxSize" min="0" placeholder="0"
+                                    class="w-full pl-11 pr-4 py-3 rounded-lg border border-gray-700 bg-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none transition-all">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="flex flex-col sm:flex-row gap-3 border-t border-gray-700 pt-6">
+                        <button onclick="listFiles()"
+                            class="flex-1 py-3 px-6 rounded-lg bg-gray-700 text-white font-medium hover:bg-gray-600 transition-colors flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-magnifying-glass"></i> Scan Files
+                        </button>
+                        <button onclick="downloadAll()"
+                            class="flex-1 btn-gradient py-3 px-6 rounded-lg text-white font-bold shadow-lg flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-cloud-arrow-down"></i> Add All to Queue
+                        </button>
+
+                        <button onclick="cancelDownload()" id="cancelBtn"
+                            class="hidden flex-none py-3 px-6 rounded-lg bg-red-500/10 border border-red-500/50 text-red-500 font-medium hover:bg-red-500 hover:text-white transition-all">
+                            <i class="fa-solid fa-stop"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Active Download Progress -->
+                <div id="downloadProgress" class="hidden animate-fade-in space-y-4">
+                    <div class="flex justify-between items-end px-1">
+                        <h3 id="downloadProgressTitle" class="text-lg font-semibold text-white flex items-center gap-2">
+                            <i id="downloadProgressIcon" class="fa-solid fa-circle-notch fa-spin text-indigo-500"></i>
+                            Active Downloads
+                        </h3>
+                        <button id="clearProgressBtn" onclick="clearProgress()"
+                            class="text-xs text-gray-400 hover:text-white underline">Clear History</button>
+                    </div>
+
+                    <div id="progressBarsContainer" class="space-y-4">
+                        <!-- Dynamic Progress Bars will be inserted here -->
+                    </div>
+                </div>
+
+                <!-- File List (Scan Results) -->
+                <div id="filesList" class="hidden glass-card p-6 animate-slide-up">
+                    <!-- Content handled by JS -->
+                </div>
+            </div>
+
+            <!-- QUEUE TAB CONTENT -->
+            <div id="queueTabContent" class="hidden space-y-6">
+                <div class="glass-card p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <div class="flex items-center gap-3">
+                            <h2 class="text-xl font-bold text-white">Download Queue</h2>
+                            <span id="queueTotalCount" class="bg-gray-700 text-gray-300 text-xs px-2 py-1 rounded-md">0
+                                items</span>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="refreshQueue()"
+                                class="p-2 text-gray-400 hover:text-white transition-colors" title="Refresh Queue">
+                                <i class="fa-solid fa-rotate"></i>
+                            </button>
+                            <button onclick="clearQueue()"
+                                class="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-sm rounded-lg border border-red-500/20 transition-colors">
+                                <i class="fa-solid fa-trash mr-1"></i> Clear Queue
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="queueList" class="space-y-3 min-h-[200px]">
+                        <!-- Queue items injected here -->
+                        <div class="text-center text-gray-500 py-10">
+                            <i class="fa-solid fa-basket-shopping text-4xl mb-3 opacity-30"></i>
+                            <p>Queue is empty</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Debug Panel Toggle -->
+            <div class="flex justify-center pt-8 opacity-50 hover:opacity-100 transition-opacity">
+                <button onclick="toggleDebugPanel()"
+                    class="text-xs text-gray-500 hover:text-gray-300 flex items-center gap-1.5">
+                    <i class="fa-solid fa-bug"></i> Debug Console
+                </button>
+            </div>
+            <div id="debugPanel"
+                class="hidden mt-2 p-4 bg-black rounded-lg border border-gray-800 font-mono text-xs text-green-400 overflow-x-auto">
+                <pre id="debugInfo">Waiting for data...</pre>
+                <div class="mt-2 flex gap-2">
+                    <button onclick="refreshDebugInfo()"
+                        class="px-2 py-1 bg-gray-800 rounded hover:bg-gray-700">Refresh</button>
+                </div>
+            </div>
+
+        </div>
     </main>
 
-    <footer class="bg-white shadow-inner p-4 text-center text-gray-500 text-sm mt-8">
-        <span>© 2025 safiyu</span> ·
-        <a href="https://github.com/safiyu/telefetchr" class="text-indigo-500 hover:underline" target="_blank"><i class="fa-brands fa-github"></i> GitHub</a> ·
-        <span>Version 1.0</span>
-    </footer>
-
-    <script src="/static/js/script.js?v=4"></script>
+    <script src="/static/js/script.js?v=5"></script>
 </body>
 
 </html>

@@ -1,8 +1,8 @@
 import os
 import logging
 from datetime import timedelta
-from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends, Request
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
 from app.models.schemas import (
     LoginRequest,
@@ -16,7 +16,7 @@ from app.services.telegram_service import TelegramService
 from app.services.download_service import DownloadService
 from app.services.auth_service import AuthService
 from app.utils.state_manager import StateManager
-from app.utils.auth_dependencies import get_current_user
+from app.utils.auth_dependencies import get_current_user, is_trusted_ip
 from app.config import Config
 
 logger = logging.getLogger(__name__)
@@ -41,8 +41,12 @@ def set_services(tg_service: TelegramService, dl_service: DownloadService, st_ma
 
 
 @router.get("/", response_class=HTMLResponse)
-async def get_ui():
-    """Serve the login page"""
+async def get_ui(request: Request):
+    """Serve the login page or redirect if trusted"""
+    client_ip = request.client.host
+    if is_trusted_ip(client_ip):
+        return RedirectResponse(url="/app")
+        
     html_path = os.path.join('app', 'static', 'login.html')
     with open(html_path, 'r', encoding='utf-8') as f:
         return HTMLResponse(content=f.read())
@@ -521,3 +525,46 @@ async def logout_session(current_user: str = Depends(get_current_user)):
     except Exception as e:
         logger.error(f"Error deleting session: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
+
+# Queue Management Endpoints
+
+from app.models.schemas import QueueReorderRequest
+
+@router.get("/queue")
+async def get_queue(current_user: str = Depends(get_current_user)):
+    """Get the current download queue"""
+    return {
+        "status": "success",
+        "queue": state_manager.get_queue()
+    }
+
+@router.post("/queue/reorder")
+async def reorder_queue(request: QueueReorderRequest, current_user: str = Depends(get_current_user)):
+    """Reorder the download queue"""
+    state_manager.reorder_queue(request.queue_ids)
+    return {
+        "status": "success", 
+        "message": "Queue reordered",
+        "queue": state_manager.get_queue()
+    }
+
+@router.delete("/queue/{item_id}")
+async def remove_from_queue(item_id: str, current_user: str = Depends(get_current_user)):
+    """Remove an item from the queue"""
+    state_manager.remove_from_queue(item_id)
+    return {
+        "status": "success",
+        "message": f"Item {item_id} removed from queue",
+        "queue": state_manager.get_queue()
+    }
+
+@router.post("/queue/clear")
+async def clear_queue(current_user: str = Depends(get_current_user)):
+    """Clear all items from the queue"""
+    queue = state_manager.get_queue()
+    for item in queue:
+        state_manager.remove_from_queue(item["id"])
+    return {
+        "status": "success",
+        "message": "Queue cleared"
+    }

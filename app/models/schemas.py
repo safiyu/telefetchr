@@ -47,3 +47,6 @@ class FileInfo(BaseModel):
     file_size: int
     file_type: str
     date: str
+
+class QueueReorderRequest(BaseModel):
+    queue_ids: List[str]

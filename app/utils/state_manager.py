@@ -2,7 +2,7 @@ import json
 import os
 import logging
 from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 import uuid
 import asyncio
 
@@ -31,10 +31,12 @@ class StateManager:
             "downloaded_bytes": 0,
             "concurrent_downloads": {},
             "completed_downloads": {},
+            "cancelled_files": {},
             "cancelled": False,
             "session_id": str(uuid.uuid4()),
             "started_at": None,
-            "channel": None
+            "channel": None,
+            "queue": []
         }
 
     def save_state(self):
@@ -52,10 +54,12 @@ class StateManager:
                 "current_file_size": self.download_status.get("current_file_size", 0),
                 "downloaded_bytes": self.download_status.get("downloaded_bytes", 0),
                 "completed_downloads": self.download_status.get("completed_downloads", {}),
+                "cancelled_files": self.download_status.get("cancelled_files", {}),
                 "cancelled": self.download_status.get("cancelled", False),
                 "session_id": self.download_status.get("session_id"),
                 "started_at": self.download_status.get("started_at"),
-                "channel": self.download_status.get("channel")
+                "channel": self.download_status.get("channel"),
+                "queue": self.download_status.get("queue", [])
             }
 
             # Write to temp file first, then rename (atomic operation)
@@ -184,4 +188,92 @@ class StateManager:
             # Save the state
             self.save_state()
 
+            self.save_state()
+
             logger.info(f"File {file_id} marked as completed. Progress: {self.download_status['progress']}/{self.download_status.get('total', 0)}")
+
+    # Queue Management Methods
+
+    def get_queue(self) -> List[Dict[str, Any]]:
+        """Get current download queue"""
+        return self.download_status.get("queue", [])
+
+    def add_to_queue(self, items: List[Dict[str, Any]]):
+        """Add items to the download queue"""
+        if "queue" not in self.download_status:
+            self.download_status["queue"] = []
+        
+        # Add new items with default status
+        for item in items:
+            item["added_at"] = datetime.now().isoformat()
+            item["status"] = "queued"
+            if "priority" not in item:
+                item["priority"] = 0
+            self.download_status["queue"].append(item)
+        
+        self.save_state()
+        logger.info(f"Added {len(items)} items to queue. Total in queue: {len(self.download_status['queue'])}")
+
+    def remove_from_queue(self, queue_id: str):
+        """Remove an item from the queue"""
+        if "queue" in self.download_status:
+            original_len = len(self.download_status["queue"])
+            self.download_status["queue"] = [
+                item for item in self.download_status["queue"] 
+                if item.get("id") != queue_id
+            ]
+            if len(self.download_status["queue"]) < original_len:
+                self.save_state()
+                logger.info(f"Removed item {queue_id} from queue")
+
+    def reorder_queue(self, queue_ids: List[str]):
+        """Reorder queue based on list of IDs"""
+        if "queue" not in self.download_status:
+            return
+            
+        current_queue = {item["id"]: item for item in self.download_status["queue"]}
+        new_queue = []
+        
+        # Add items in the new order
+        for q_id in queue_ids:
+            if q_id in current_queue:
+                new_queue.append(current_queue[q_id])
+                del current_queue[q_id] # Remove processed
+        
+        # Append any remaining items (that weren't in the reorder list)
+        for item in current_queue.values():
+            new_queue.append(item)
+            
+        self.download_status["queue"] = new_queue
+        self.save_state()
+        logger.info("Queue reordered")
+
+    def get_next_queued_item(self) -> Optional[Dict[str, Any]]:
+        """Get the next item to download based on priority and time"""
+        if "queue" not in self.download_status or not self.download_status["queue"]:
+            return None
+            
+        # Filter for 'queued' items only
+        queued_items = [
+            item for item in self.download_status["queue"] 
+            if item.get("status") == "queued"
+        ]
+        
+        if not queued_items:
+            return None
+            
+        # Sort by priority (desc) then added_at (asc)
+        # Priority 10 comes before Priority 0
+        queued_items.sort(key=lambda x: (-x.get("priority", 0), x.get("added_at", "")))
+        
+        return queued_items[0]
+
+    def update_queue_item_status(self, queue_id: str, status: str):
+        """Update status of a queue item"""
+        if "queue" in self.download_status:
+            for item in self.download_status["queue"]:
+                if item.get("id") == queue_id:
+                    item["status"] = status
+                    self.save_state()
+                    break
+
