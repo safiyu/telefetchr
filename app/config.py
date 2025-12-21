@@ -10,7 +10,7 @@ class Config:
     PHONE_NUMBER = f'+{os.getenv("PHONE_NUMBER")}'
 
     # Download Configuration
-    MAX_CONCURRENT_DOWNLOADS = int(os.getenv("MAX_CONCURRENT_DOWNLOADS", "3"))
+    MAX_CONCURRENT_DOWNLOADS = int(os.getenv("MAX_CONCURRENT_DOWNLOADS", "10"))
     SAVE_PATH = os.path.abspath('downloads')
 
     # Telethon Download Configuration
@@ -28,7 +28,10 @@ class Config:
     PORT = int(os.getenv("PORT", "9868"))
 
     # Authentication Configuration
-    SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-this-in-production")
+    _secret_key = os.getenv("SECRET_KEY")
+    if not _secret_key or _secret_key == "your-secret-key-change-this-in-production":
+        raise ValueError("SECRET_KEY environment variable must be set to a secure value!")
+    SECRET_KEY = _secret_key
     ALGORITHM = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))  # 24 hours
 

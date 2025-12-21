@@ -11,6 +11,7 @@ from telethon.network import ConnectionTcpMTProxyRandomizedIntermediate
 
 from app.config import Config
 from app.models.schemas import FileInfo
+from app.utils.text_utils import tidy_display_name
 
 logger = logging.getLogger(__name__)
 
@@ -121,13 +122,13 @@ class TelegramService:
             entity = dialog.entity
             if isinstance(entity, User) and entity.bot:
                 bots.append({
-                    "name": entity.first_name,
+                    "name": tidy_display_name(entity.first_name),
                     "id": entity.id,
                     "username": f"@{entity.username}" if entity.username else None
                 })
             elif isinstance(entity, Channel) and entity.username:
                 channels.append({
-                    "name": dialog.name,
+                    "name": tidy_display_name(dialog.name),
                     "id": entity.id,
                     "username": f"@{entity.username}"
                 })
@@ -220,17 +221,22 @@ class TelegramService:
         return files
 
     async def get_messages(self, channel_username: str, message_ids: List[int]):
-        """Get specific messages by IDs"""
-        messages_to_download = []
-
-        for message_id in message_ids:
-            message = await self.client.get_messages(channel_username, ids=message_id)
-            if message and message.media:
-                messages_to_download.append(message)
-            else:
-                logger.warning(f"Message {message_id} not found or has no media")
-
-        return messages_to_download
+        """Get specific messages by IDs in bulk"""
+        try:
+            # Telethon natively supports fetching a list of IDs
+            messages = await self.client.get_messages(channel_username, ids=message_ids)
+            
+            # Message collection can return None for individual IDs if they don't exist
+            # Filter out None and those without media
+            valid_messages = [m for m in messages if m and m.media]
+            
+            if len(valid_messages) < len(message_ids):
+                logger.warning(f"Only {len(valid_messages)}/{len(message_ids)} valid media messages found")
+                
+            return valid_messages
+        except Exception as e:
+            logger.error(f"Error fetching bulk messages: {e}")
+            return []
 
     async def get_message(self, channel_username: str, message_id: int):
         """Get a single message"""

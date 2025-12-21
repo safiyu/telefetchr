@@ -215,7 +215,7 @@ async def download_all_files(request: DownloadRequest, background_tasks: Backgro
         )
         return {
             "status": "started",
-            "message": f"Download started in background with {Config.MAX_CONCURRENT_DOWNLOADS} parallel downloads.",
+            "message": f"Download started with {Config.MAX_CONCURRENT_DOWNLOADS} files.",
             "session_id": session_id
         }
     except Exception as e:
@@ -247,7 +247,7 @@ async def download_file(message_id: int, channel_username: str, background_tasks
 
         return {
             "status": "started",
-            "message": "Download started in background. Check progress below.",
+            "message": "Download started.",
             "file_id": file_id
         }
     except Exception as e:
@@ -348,30 +348,6 @@ async def clear_individual_download(file_id: str, current_user: str = Depends(ge
         return {
             "status": "error",
             "message": "Download not found"
-        }
-
-@router.delete("/download/clear-individual/{file_id}")
-async def clear_individual_download(file_id: str, current_user: str = Depends(get_current_user)):
-    """Clear a single completed download from state"""
-    status = state_manager.get_status()
-    completed_downloads = status.get("completed_downloads", {})
-
-    if file_id in completed_downloads:
-        del completed_downloads[file_id]
-        status["completed_downloads"] = completed_downloads
-
-        # Update progress count
-        status["progress"] = len(completed_downloads)
-
-        state_manager.save_state()
-        return {
-            "status": "success",
-            "message": f"Download {file_id} cleared"
-        }
-    else:
-        return {
-            "status": "not_found",
-            "message": f"Download {file_id} not found"
         }
 
 
@@ -490,7 +466,7 @@ async def reset_state(current_user: str = Depends(get_current_user)):
 
     return {
         "status": "success",
-        "message": "State completely reset. Backup saved."
+        "message": "State cleared."
     }
 
 @router.post("/logout-session")
@@ -520,7 +496,7 @@ async def logout_session(current_user: str = Depends(get_current_user)):
 
         return {
             "status": "success",
-            "message": "Telegram session deleted successfully"
+            "message": "Telegram session cleared"
         }
     except Exception as e:
         logger.error(f"Error deleting session: {str(e)}")

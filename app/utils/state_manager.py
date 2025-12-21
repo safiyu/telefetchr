@@ -172,6 +172,20 @@ class StateManager:
         self.download_status.update(updates)
         self.save_state()
 
+    def is_file_active_or_queued(self, channel: str, message_id: int) -> bool:
+        """Check if a file from a specific channel is already downloading or in queue"""
+        # Check concurrent downloads
+        for data in self.download_status.get("concurrent_downloads", {}).values():
+            if data.get("channel") == channel and data.get("message_id") == message_id:
+                return True
+        
+        # Check queue
+        for item in self.download_status.get("queue", []):
+            if item.get("channel") == channel and item.get("message_id") == message_id:
+                return True
+                
+        return False
+
     async def mark_file_completed(self, file_id: str, file_data: Dict[str, Any]):
         """Thread-safe method to mark a file as completed and update progress"""
         async with self._lock:

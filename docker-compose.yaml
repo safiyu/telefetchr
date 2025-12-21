@@ -14,7 +14,6 @@ services:
       - API_ID=1234567
       - API_HASH=yourapihash
       - PHONE_NUMBER=1234567890
-      - MAX_CONCURRENT_DOWNLOADS=3
       # Authentication (IMPORTANT: Change these in production!)
       - SECRET_KEY=your-secret-key-change-this-in-production
       - ADMIN_USERNAME=admin
