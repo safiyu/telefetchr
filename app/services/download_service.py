@@ -22,6 +22,7 @@ class DownloadService:
         self.active_download_tasks = {}
         self._queue_processing = False
         self._stop_queue = False 
+        self._queue_event = asyncio.Event()
 
     def _get_file_name(self, message) -> str:
         """Extract file name from message"""
@@ -51,19 +52,24 @@ class DownloadService:
                 self.state_manager.update_queue_item_status(file_id, "failed")
                 return
 
-            # Download using the robust method - passing session_id
-            result = await self.download_single_file(message, target_dir, file_id, session_id=session_id)
+            # Download using the robust method - passing session_id and channel
+            result = await self.download_single_file(message, target_dir, file_id, session_id=session_id, channel_identifier=channel)
             
             if result:
-                self.state_manager.remove_from_queue(file_id)
+                # Already removed from queue, just log success
+                logger.debug(f"Queued item {file_id} finished successfully")
             else:
-                self.state_manager.update_queue_item_status(file_id, "failed")
+                # If it failed, put it back in the queue with failed status
+                item["status"] = "failed"
+                self.state_manager.add_to_queue([item])
                 
         except Exception as e:
             if "cancelled" not in str(e).lower():
                 logger.error(f"Error processing queued item {file_id}: {e}")
             if file_id:
-                self.state_manager.update_queue_item_status(file_id, "failed")
+                # Put back in queue as failed
+                item["status"] = "failed"
+                self.state_manager.add_to_queue([item])
         finally:
             # Task cleanup is handled in the spawning point or here
             if file_id in self.active_download_tasks:
@@ -92,8 +98,12 @@ class DownloadService:
                 
                 queue = self.state_manager.get_queue()
                 if not queue:
-                    # Queue empty, wait a bit then check again
-                    await asyncio.sleep(2)
+                    # Queue empty, wait for event or timeout
+                    try:
+                        await asyncio.wait_for(self._queue_event.wait(), timeout=10)
+                        self._queue_event.clear()
+                    except asyncio.TimeoutError:
+                        pass
                     continue
 
                 # Check concurrency limit
@@ -107,13 +117,15 @@ class DownloadService:
                 # Get next item
                 item = self.state_manager.get_next_queued_item()
                 if not item:
+                    # Clear event if no more items to process right now
+                    self._queue_event.clear()
                     await asyncio.sleep(1)
                     continue
                     
                 logger.info(f"Starting download for queued item {item['id']}")
                 
-                # Mark as downloading BEFORE launching task to prevent race condition
-                self.state_manager.update_queue_item_status(item['id'], "downloading")
+                # Remove from queue immediately as it's been picked up
+                self.state_manager.remove_from_queue(item['id'])
                 
                 # Launch task and track it
                 task = asyncio.create_task(self._download_queued_item(item))
@@ -126,10 +138,18 @@ class DownloadService:
             logger.error(f"Queue processor crashed: {e}")
         finally:
             self._queue_processing = False
+            
+            # Check if all downloads are finished (queue empty and no concurrent)
+            status = self.state_manager.get_status()
+            if not self.state_manager.get_queue() and not status.get("concurrent_downloads"):
+                logger.info("All downloads completed. Marking session as inactive.")
+                self.state_manager.update_status({"active": False, "started_at": None})
+            
             logger.info("Queue processor loop stopped")
 
     def start_queue_processor(self):
         """Start the queue processor if not running"""
+        self._queue_event.set()
         if not self._queue_processing:
             self._stop_queue = False
             asyncio.create_task(self.process_queue())
@@ -252,7 +272,7 @@ class DownloadService:
         
         return session_id
 
-    async def download_single_file(self, message, target_dir: str, file_id: str, max_retries: int = 3, session_id: Optional[str] = None) -> Optional[str]:
+    async def download_single_file(self, message, target_dir: str, file_id: str, max_retries: int = 3, session_id: Optional[str] = None, channel_identifier: Optional[str] = None) -> Optional[str]:
         """Download a single file with progress tracking and retry logic"""
         file_name = self._get_file_name(message)
         logger.info(f"Starting download: {file_name} (ID: {file_id})")
@@ -262,6 +282,8 @@ class DownloadService:
                 status = self.state_manager.get_status()
                 status["concurrent_downloads"][file_id] = {
                     "name": file_name,
+                    "channel": channel_identifier or (message.peer_id.channel_id if hasattr(message.peer_id, 'channel_id') else str(message.peer_id)),
+                    "message_id": message.id,
                     "progress": 0,
                     "total": 0,
                     "percentage": 0,
@@ -333,16 +355,12 @@ class DownloadService:
                         "path": file_path,
                         "size": final_size,
                         "percentage": 100,
-                        "completed_at": datetime.now().isoformat()
+                        "completed_at": datetime.now().isoformat(),
+                        "session_id": session_id
                     }
+                    # mark_file_completed handles adding to history, removing from concurrent, 
+                    # updating progress counter, and saving state.
                     await self.state_manager.mark_file_completed(file_id, file_data)
-                    
-                    # Cleanup from concurrent downloads
-                    status = self.state_manager.get_status()
-                    if file_id in status.get("concurrent_downloads", {}):
-                        del status["concurrent_downloads"][file_id]
-                    self.state_manager.save_state()
-                    
                     return file_path
                 return None
 
@@ -433,16 +451,32 @@ class DownloadService:
             try:
                 completed_ids = set()
                 # Extract message IDs from completed files
-                for fid in status.get("completed_downloads", {}):
+                # We also check if the file ID itself contains the message ID
+                history = status.get("completed_downloads", {})
+                for fid, info in history.items():
                     try:
-                        completed_ids.add(int(fid.split("_")[-1]))
-                    except: pass
+                        # Extract from fid: single_MESSAGEID or file_SESSIONID_MESSAGEID
+                        mid = int(fid.split("_")[-1])
+                        completed_ids.add(mid)
+                    except: 
+                        # Fallback: check if stored in metadata
+                        if "message_id" in info:
+                            completed_ids.add(info["message_id"])
 
-                logger.info(f"Resuming session {session_id}. Channel: {channel}")
+                logger.info(f"Resuming session {session_id}. Channel: {channel}. Found {len(completed_ids)} completed items in history.")
                 
                 messages_to_queue = []
-                async for message in await self.telegram_service.iter_messages(channel, total):
-                    if message.media and message.id not in completed_ids:
+                # Fetch more than 'total' just in case some were added
+                fetch_limit = max(total, 50) 
+                
+                logger.info(f"Scanning channel for up to {fetch_limit} messages to find {total - len(completed_ids)} remaining files...")
+                
+                async for message in await self.telegram_service.iter_messages(channel, fetch_limit):
+                    if message.media:
+                        if message.id in completed_ids:
+                            logger.debug(f"Skipping already completed message {message.id}")
+                            continue
+                            
                         messages_to_queue.append({
                             "id": f"file_{session_id}_{message.id}",
                             "message_id": message.id,
@@ -452,13 +486,20 @@ class DownloadService:
                             "status": "queued",
                             "session_id": session_id
                         })
+                        
+                        # Stop if we found enough remaining files to satisfy the original 'total'
+                        # (But usually we want to resume whatever is missing from the range)
+                        if len(messages_to_queue) >= (total - len(completed_ids)) and len(messages_to_queue) > 0:
+                            if total > 0: # Only cap if total was specifically set
+                                break
 
                 if not messages_to_queue:
-                    logger.info("Nothing to resume")
+                    logger.info("Nothing left to resume")
                     status["active"] = False
                     self.state_manager.save_state()
                     return
 
+                logger.info(f"Re-queueing {len(messages_to_queue)} missing files for resumption")
                 self.state_manager.add_to_queue(messages_to_queue)
                 self.start_queue_processor()
 
@@ -475,43 +516,130 @@ class DownloadService:
         """Add a single file to the queue and start processor"""
         logger.info(f"Adding single file {message_id} from {channel_username} to queue")
         
-        # Verify message exists and get metadata
-        message = await self.telegram_service.get_message(channel_username, message_id)
-        if not message:
-            logger.error(f"Message {message_id} not found")
-            return
-            
-        file_name = self._get_file_name(message)
-        
-        # Get current status to see if there's an active session
+        # PROACTIVE RESET: Clear cancelled flag immediately so UI updates
+        # This must happen before any awaits to ensure immediate state persistence
         status = self.state_manager.get_status()
         session_id = status.get("session_id") or str(uuid.uuid4())
+        
+        is_new_session = not status.get("active") or status.get("cancelled")
+        
+        if is_new_session:
+            # Start fresh session or override cancelled one
+            self.state_manager.update_status({
+                "active": True,
+                "cancelled": False,
+                "channel": channel_username,
+                "session_id": session_id,
+                "started_at": datetime.now().isoformat(),
+                "total": 1,
+                "progress": 0,
+                "concurrent_downloads": {},
+                "cancelled_files": {}
+            })
+        else:
+            # Adding to existing active session -> just increment total
+            # We check if file is already there LATER, but we can proactively increment
+            # OR better, only increment if we ACTUALLY queue it later.
+            # For now, let's at least clear the cancelled flag just in case 
+            # (though is_new_session handles the main case)
+            if status.get("cancelled"):
+                 self.state_manager.update_status({"cancelled": False})
+        
+        self.state_manager.save_state()
+
+        # IMMEDIATE QUEUEING: Add placeholder to queue so UI updates instantly
         file_id = f"single_{message_id}"
         
-        # If not already downloading or queued
         if not self.state_manager.is_file_active_or_queued(channel_username, message_id):
-            # If not active, start a "session"
-            if not status.get("active"):
-                self._reset_session_state(channel_username, 1, session_id)
-            else:
-                # If active, just increment total
-                current_total = status.get("total", 0)
+            if not is_new_session:
+                current_total = self.state_manager.get_status().get("total", 0)
                 self.state_manager.update_status({"total": current_total + 1})
-                
+            
+            # Use placeholder name initially
             item = {
                 "id": file_id,
                 "message_id": message_id,
                 "channel": channel_username,
-                "name": file_name,
-                "priority": 2, # Higher priority than "download all" (0) or "selected" (0)
+                "name": f"Fetching metadata for message {message_id}...",
+                "priority": 2, 
                 "status": "queued",
                 "session_id": session_id
             }
             
             self.state_manager.add_to_queue([item])
+            self._queue_event.set()
             self.start_queue_processor()
+            
+            # Now fetch real metadata in background
+            # We don't await this so the response returns to user instantly
+            asyncio.create_task(self._update_placeholder_metadata(channel_username, message_id, file_id))
         else:
             logger.info(f"File {message_id} is already active or in queue")
+
+    async def _update_placeholder_metadata(self, channel_username: str, message_id: int, file_id: str):
+        """Fetch real metadata for a placeholder item in queue"""
+        try:
+            message = await self.telegram_service.get_message(channel_username, message_id)
+            if not message:
+                logger.error(f"Message {message_id} not found during metadata update")
+                self.state_manager.update_queue_item_status(file_id, "failed")
+                return
+                
+            file_name = self._get_file_name(message)
+            
+            # Update item in queue
+            status = self.state_manager.get_status()
+            queue = status.get("queue", [])
+            updated = False
+            for item in queue:
+                if item.get("id") == file_id:
+                    item["name"] = file_name
+                    updated = True
+                    break
+            
+            if updated:
+                self.state_manager.save_state()
+                logger.info(f"Updated metadata for {file_id}: {file_name}")
+                
+        except Exception as e:
+            logger.error(f"Error updating placeholder metadata: {e}")
+
+    async def cancel_individual_download(self, file_id: str) -> Dict:
+        """Cancel an individual active download"""
+        logger.info(f"Cancel individual download requested for: {file_id}")
+        
+        # Check if task is active
+        if file_id in self.active_download_tasks:
+            logger.info(f"Cancelling active task for {file_id}")
+            self.active_download_tasks[file_id].cancel()
+            # Task cleanup in _download_queued_item will remove it from self.active_download_tasks
+        
+        # Move from concurrent_downloads to cancelled_files
+        status = self.state_manager.get_status()
+        concurrent = status.get("concurrent_downloads", {})
+        
+        if file_id in concurrent:
+            data = concurrent[file_id]
+            status["cancelled_files"][file_id] = {
+                "name": data.get("name"),
+                "progress": data.get("progress"),
+                "total": data.get("total"),
+                "timestamp": datetime.now().isoformat()
+            }
+            del status["concurrent_downloads"][file_id]
+            
+            # Update state
+            self.state_manager.save_state()
+            return {"status": "success", "message": f"Download for {data.get('name')} cancelled."}
+        
+        # If it was just in the queue (not yet downloading)
+        queue = self.state_manager.get_queue()
+        for item in queue:
+            if item.get("id") == file_id:
+                self.state_manager.remove_from_queue(file_id)
+                return {"status": "success", "message": f"Item {item.get('name')} removed from queue."}
+        
+        return {"status": "error", "message": "Download not found or already finished."}
 
     def cleanup_tasks(self):
         """Cleanup active download tasks (not fully needed with queue but good for shutdown)"""

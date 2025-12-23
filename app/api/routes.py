@@ -1,7 +1,7 @@
 import os
 import logging
 from datetime import timedelta
-from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends, Request
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends, Request, Query
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
 from app.models.schemas import (
@@ -224,30 +224,25 @@ async def download_all_files(request: DownloadRequest, background_tasks: Backgro
 
 
 @router.post("/files/download/{message_id}")
-async def download_file(message_id: int, channel_username: str, background_tasks: BackgroundTasks, current_user: str = Depends(get_current_user)):
+async def download_file(
+    message_id: int, 
+    background_tasks: BackgroundTasks,
+    channel_username: str = Query(..., description="Channel username or ID"),
+    current_user: str = Depends(get_current_user)
+):
     """Download a specific file by message ID - starts download in background"""
     if not await telegram_service.is_connected():
         raise HTTPException(status_code=400, detail="Not connected. Login first.")
-
+    
     try:
-        # Start download in background to avoid timeout
         file_id = f"single_{message_id}"
-
-        # Create a background task
-        async def download_task():
-            try:
-                await download_service.download_single(channel_username, message_id)
-                logger.info(f"Single file download completed: {file_id}")
-            except Exception as e:
-                logger.error(f"Background download error for {file_id}: {str(e)}")
-
-        # Run in background
-        import asyncio
-        asyncio.create_task(download_task())
-
+        
+        # Add to background tasks properly
+        background_tasks.add_task(download_service.download_single, channel_username, message_id)
+        
         return {
             "status": "started",
-            "message": "Download started.",
+            "message": "Download added to queue.",
             "file_id": file_id
         }
     except Exception as e:
@@ -266,6 +261,15 @@ async def get_download_progress(current_user: str = Depends(get_current_user)):
 async def cancel_download(current_user: str = Depends(get_current_user)):
     """Cancel the current download operation"""
     result = await download_service.cancel_download()
+    return result
+
+
+@router.post("/download/cancel/{file_id}")
+async def cancel_individual_download(file_id: str, current_user: str = Depends(get_current_user)):
+    """Cancel a specific download by its ID"""
+    result = await download_service.cancel_individual_download(file_id)
+    if result.get("status") == "error":
+        raise HTTPException(status_code=404, detail=result.get("message"))
     return result
 
 
@@ -333,22 +337,26 @@ async def clear_completed_downloads(current_user: str = Depends(get_current_user
 async def clear_individual_download(file_id: str, current_user: str = Depends(get_current_user)):
     """Clear a single completed download from state"""
     status = state_manager.get_status()
+    found = False
 
     if file_id in status.get("completed_downloads", {}):
         del status["completed_downloads"][file_id]
         # Update progress counter
         status["progress"] = len(status["completed_downloads"])
-        state_manager.save_state()
+        found = True
+    
+    if not found and file_id in status.get("cancelled_files", {}):
+        del status["cancelled_files"][file_id]
+        found = True
 
+    if found:
+        state_manager.save_state()
         return {
             "status": "success",
-            "message": f"Download {file_id} cleared"
+            "message": f"Record for {file_id} cleared"
         }
-    else:
-        return {
-            "status": "error",
-            "message": "Download not found"
-        }
+    
+    raise HTTPException(status_code=404, detail=f"Download {file_id} not found in history")
 
 
 @router.get("/files/downloaded")

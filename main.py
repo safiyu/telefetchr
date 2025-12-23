@@ -42,6 +42,9 @@ async def lifespan(app: FastAPI):
         # Initialize state manager and load saved state
         state_manager = StateManager()
         state_manager.load_state()
+        
+        # Cleanup incomplete/interrupted downloads from previous run
+        state_manager.cleanup_state(force=True)
 
         # Initialize Telegram service
         telegram_service = TelegramService()
@@ -64,7 +67,12 @@ async def lifespan(app: FastAPI):
             logger.info(
                 f"Resumable session found: {completed_count}/{total_count} files completed"
             )
-
+            
+            # Auto-resume if active
+            if state_manager.get_status().get("active") and not state_manager.get_status().get("cancelled"):
+                logger.info("Resuming active download session")
+                download_service.start_queue_processor()
+        
     except Exception as e:
         logger.error(f"Startup error: {str(e)}")
 

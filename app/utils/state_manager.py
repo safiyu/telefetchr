@@ -53,6 +53,7 @@ class StateManager:
                 "current_file_progress": self.download_status.get("current_file_progress", 0),
                 "current_file_size": self.download_status.get("current_file_size", 0),
                 "downloaded_bytes": self.download_status.get("downloaded_bytes", 0),
+                "concurrent_downloads": self.download_status.get("concurrent_downloads", {}),
                 "completed_downloads": self.download_status.get("completed_downloads", {}),
                 "cancelled_files": self.download_status.get("cancelled_files", {}),
                 "cancelled": self.download_status.get("cancelled", False),
@@ -80,23 +81,28 @@ class StateManager:
                 with open(self.state_file, 'r') as f:
                     saved_state = json.load(f)
 
-                    # Only restore if the state is meaningful
-                    if saved_state.get("session_id") and saved_state.get("channel"):
-                        # If there was an active download, mark it as not active
-                        if saved_state.get("active"):
-                            saved_state["active"] = False
-                            saved_state["cancelled"] = True
-                            logger.info("Found interrupted download session - marked for resume")
-
+                    # Only restore if basic structure is there
+                    if saved_state.get("session_id"):
+                        # If there was an active download session, we should keep its status 
+                        # but the processor loop itself is dead, so it needs to be restarted by DownloadService.
+                        # We don't force 'active' to False yet; DownloadService will decide if it can resume.
+                        
                         # Merge with current status
                         self.download_status.update(saved_state)
 
-                        # Clear concurrent downloads (they're not valid after restart)
-                        self.download_status["concurrent_downloads"] = {}
+                        # Re-ensure some defaults if missing from file
+                        if "queue" not in self.download_status:
+                            self.download_status["queue"] = []
+                        if "concurrent_downloads" not in self.download_status:
+                            self.download_status["concurrent_downloads"] = {}
+                        if "cancelled_files" not in self.download_status:
+                            self.download_status["cancelled_files"] = {}
 
-                        logger.info(f"Loaded saved download state: {len(saved_state.get('completed_downloads', {}))} completed files")
+                        logger.info(f"Loaded saved download state session {self.download_status.get('session_id')}: {len(self.download_status.get('completed_downloads', {}))} completed files")
                     else:
-                        logger.info("No valid saved state found")
+                        logger.info("Loaded empty or invalid state file")
+            else:
+                logger.info("No state file found, using defaults")
 
         except json.JSONDecodeError as e:
             logger.error(f"Corrupted state file: {e}")
@@ -129,8 +135,8 @@ class StateManager:
         except Exception as e:
             logger.error(f"Error clearing state: {e}")
 
-    def cleanup_state(self):
-        """Clean up corrupted or incomplete state"""
+    def cleanup_state(self, force: bool = False):
+        """Clean up corrupted or incomplete state. Move concurrent downloads back to queue."""
         # Backup current state
         if os.path.exists(self.state_file):
             backup_file = self.state_file + '.backup.' + str(int(datetime.now().timestamp()))
@@ -143,22 +149,32 @@ class StateManager:
 
         # Clean up incomplete downloads
         cleaned_items = []
-        if not self.download_status.get("active") and self.download_status.get("concurrent_downloads"):
-            cleaned_items = list(self.download_status["concurrent_downloads"].keys())
-            self.download_status["concurrent_downloads"] = {}
-            logger.info(f"Cleaned up {len(cleaned_items)} incomplete downloads")
+        
+        # We clean up if explicitly forced (startup) OR if session is not supposed to be active
+        if force or not self.download_status.get("active"):
+            concurrent = self.download_status.get("concurrent_downloads", {})
+            if concurrent:
+                logger.info(f"Cleaning up {len(concurrent)} concurrent downloads...")
+                if "queue" not in self.download_status:
+                    self.download_status["queue"] = []
+                
+                for file_id, data in list(concurrent.items()):
+                    # Add back to queue if not already there
+                    already_queued = any(item.get("id") == file_id for item in self.download_status["queue"])
+                    if not already_queued:
+                        data["status"] = "queued"
+                        self.download_status["queue"].append(data)
+                        cleaned_items.append(file_id)
+                
+                self.download_status["concurrent_downloads"] = {}
+                logger.info(f"Re-queued {len(cleaned_items)} interrupted downloads")
 
-        # Reset fields that don't make sense when not active
+        # Reset session metrics if not active
         if not self.download_status.get("active"):
             self.download_status["current_file"] = ""
             self.download_status["current_file_progress"] = 0
             self.download_status["current_file_size"] = 0
             self.download_status["downloaded_bytes"] = 0
-
-        # If there are no completed downloads and no channel, reset everything
-        if not self.download_status.get("completed_downloads") and not self.download_status.get("channel"):
-            self.download_status.update(self._initialize_status())
-            logger.info("Reset state completely (no valid session data)")
 
         self.save_state()
         return cleaned_items
@@ -173,15 +189,20 @@ class StateManager:
         self.save_state()
 
     def is_file_active_or_queued(self, channel: str, message_id: int) -> bool:
-        """Check if a file from a specific channel is already downloading or in queue"""
-        # Check concurrent downloads
-        for data in self.download_status.get("concurrent_downloads", {}).values():
-            if data.get("channel") == channel and data.get("message_id") == message_id:
-                return True
-        
+        """Check if a file is already in queue or being downloaded"""
         # Check queue
-        for item in self.download_status.get("queue", []):
+        queue = self.download_status.get("queue", [])
+        for item in queue:
             if item.get("channel") == channel and item.get("message_id") == message_id:
+                # ONLY return True if it's actually waiting
+                if item.get("status") == "queued":
+                    return True
+        
+        # Check concurrent downloads
+        concurrent = self.download_status.get("concurrent_downloads", {})
+        for fid, data in concurrent.items():
+            # Support both string and int channel identifiers
+            if str(data.get("channel")) == str(channel) and data.get("message_id") == message_id:
                 return True
                 
         return False
@@ -196,15 +217,27 @@ class StateManager:
             if file_id in self.download_status.get("concurrent_downloads", {}):
                 del self.download_status["concurrent_downloads"][file_id]
 
-            # Update progress based on current completed count
-            self.download_status["progress"] = len(self.download_status["completed_downloads"])
+            # Update progress - Count only files from the CURRENT session
+            session_id = self.download_status.get("session_id")
+            current_count = 0
+            for fid in self.download_status.get("completed_downloads", {}):
+                if session_id and session_id in fid:
+                    current_count += 1
+                elif fid.startswith("single_"):
+                    # For single downloads, they effectively ARE their own session 
+                    # but if we started a new bulk session, they shouldn't count towards its progress
+                    pass
+            
+            # Fallback: if we can't match session_id, use global count as before 
+            # (but usually we'll have a session_id)
+            if current_count == 0 and session_id:
+                # If everything in history is old, progress for this new session is just 0
+                self.download_status["progress"] = 0
+            else:
+                self.download_status["progress"] = current_count or len(self.download_status["completed_downloads"])
 
-            # Save the state
             self.save_state()
-
-            self.save_state()
-
-            logger.info(f"File {file_id} marked as completed. Progress: {self.download_status['progress']}/{self.download_status.get('total', 0)}")
+            logger.info(f"File {file_id} marked as completed. Session Progress: {self.download_status['progress']}/{self.download_status.get('total', 0)}")
 
     # Queue Management Methods
 
@@ -218,15 +251,25 @@ class StateManager:
             self.download_status["queue"] = []
         
         # Add new items with default status
+        existing_ids = {item.get("id") for item in self.download_status["queue"]}
+        added_count = 0
+        
         for item in items:
+            if item.get("id") in existing_ids:
+                continue
+                
             item["added_at"] = datetime.now().isoformat()
-            item["status"] = "queued"
+            if "status" not in item:
+                item["status"] = "queued"
             if "priority" not in item:
                 item["priority"] = 0
             self.download_status["queue"].append(item)
+            existing_ids.add(item.get("id"))
+            added_count += 1
         
-        self.save_state()
-        logger.info(f"Added {len(items)} items to queue. Total in queue: {len(self.download_status['queue'])}")
+        if added_count > 0:
+            self.save_state()
+            logger.info(f"Added {added_count} items to queue. Total in queue: {len(self.download_status['queue'])}")
 
     def remove_from_queue(self, queue_id: str):
         """Remove an item from the queue"""

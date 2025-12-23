@@ -348,7 +348,7 @@ async function checkSavedState() {
         console.log('Saved state response:', data);
 
         if (data.has_saved_state && !data.active) {
-            const completedCount = data.completed_count || 0;
+            const completedCount = data.progress || 0;
             const totalCount = data.total || 0;
             const remainingCount = totalCount - completedCount;
             const wasCancelled = data.cancelled || false;
@@ -1091,6 +1091,12 @@ async function clearIndividualProgress(fileId) {
                 element.remove();
             }
 
+            // Also try removing the cancelled variant if it exists
+            const cancelledElement = document.getElementById(`progress-cancelled-${fileId}`);
+            if (cancelledElement) {
+                cancelledElement.remove();
+            }
+
             // If no more progress items, hide the entire progress section
             const progressBarsContainer = document.getElementById(
                 "progressBarsContainer"
@@ -1149,7 +1155,8 @@ function createProgressBar(
     retryAttempt = null,
     lastUpdate = null,
     speed = 0,
-    eta = 0
+    eta = 0,
+    isQueued = false
 ) {
     const progressId = `progress-${fileId}`;
     let retryBadge = '';
@@ -1194,18 +1201,26 @@ function createProgressBar(
                             <div class="flex items-center gap-2 mt-0.5">
                                 ${retryBadge}
                                 ${stallWarning}
-                                ${!isComplete && !retryBadge && !stallWarning ? `<span class="text-xs text-indigo-300 flex items-center gap-1"><i class="fa-solid fa-bolt text-[10px]"></i> ${speedText}</span>` : ''}
+                                ${isQueued ? `<span class="text-xs text-yellow-500/80 flex items-center gap-1"><i class="fa-solid fa-hourglass-start text-[10px]"></i> Waiting in queue...</span>` : ''}
+                                ${!isComplete && !isQueued && !retryBadge && !stallWarning ? `<span class="text-xs text-indigo-300 flex items-center gap-1"><i class="fa-solid fa-bolt text-[10px]"></i> ${speedText}</span>` : ''}
                             </div>
                         </div>
                     </div>
                     
                     ${isComplete ? `
-                        <button onclick="clearIndividualProgress('${fileId}')" class="w-7 h-7 flex items-center justify-center bg-gray-500/20 text-gray-400 hover:bg-red-500/20 hover:text-red-400 transition-all rounded-lg focus:outline-none">
+                        <button onclick="clearIndividualProgress('${fileId}')" class="w-7 h-7 flex items-center justify-center bg-gray-500/20 text-gray-400 hover:bg-red-500/20 hover:text-red-400 transition-all rounded-lg focus:outline-none" title="Clear History">
                             <i class="fa-solid fa-xmark text-xs"></i>
                         </button>
                     ` : `
-                        <div class="text-right">
-                            <div class="text-lg font-bold text-white">${percentage}%</div>
+                        <div class="flex flex-col items-end gap-1">
+                            <div class="flex items-center gap-2">
+                                <span class="text-lg font-bold text-white">${isQueued ? '0' : percentage}%</span>
+                                <button onclick="cancelIndividualDownload('${fileId}')" 
+                                    class="w-7 h-7 flex items-center justify-center ${isQueued ? 'bg-orange-500/10 text-orange-400 hover:bg-orange-600' : 'bg-red-500/10 text-red-400 hover:bg-red-600'} hover:text-white transition-all rounded-lg focus:outline-none" 
+                                    title="${isQueued ? 'Remove from Queue' : 'Cancel Download'}">
+                                    <i class="fa-solid ${isQueued ? 'fa-trash-can' : 'fa-stop'} text-[10px]"></i>
+                                </button>
+                            </div>
                             <div class="text-xs text-gray-400 font-mono">${etaText}</div>
                         </div>
                     `}
@@ -1220,12 +1235,14 @@ function createProgressBar(
                 </div>
 
                 <div class="flex justify-between items-center text-xs text-gray-400 font-medium">
-                    <span>${formatBytes(current)} of ${formatBytes(total)}</span>
+                    <span>${isQueued ? 'Awaiting start...' : `${formatBytes(current)} of ${formatBytes(total)}`}</span>
                     ${isComplete
             ? '<span class="text-green-400 flex items-center gap-1"><i class="fa-solid fa-check-circle"></i> Complete</span>'
-            : retryAttempt > 1
-                ? '<span class="text-yellow-400">Retrying connection...</span>'
-                : '<span class="text-indigo-400">Downloading...</span>'
+            : isQueued
+                ? '<span class="text-yellow-500/70 flex items-center gap-1"><i class="fa-solid fa-clock"></i> Queued</span>'
+                : retryAttempt > 1
+                    ? '<span class="text-yellow-400 flex items-center gap-1"><i class="fa-solid fa-spinner fa-spin"></i> Retrying...</span>'
+                    : '<span class="text-indigo-400 flex items-center gap-1"><i class="fa-solid fa-spinner fa-spin"></i> Downloading</span>'
         }
                 </div>
             </div>
@@ -1263,6 +1280,10 @@ function createCancelledProgressBar(
                             </div>
                         </div>
                     </div>
+                    
+                    <button onclick="clearIndividualProgress('${fileId}')" class="w-7 h-7 flex items-center justify-center bg-gray-500/20 text-gray-400 hover:bg-red-500/20 hover:text-red-400 transition-all rounded-lg focus:outline-none" title="Dismiss">
+                        <i class="fa-solid fa-xmark text-xs"></i>
+                    </button>
                 </div>
 
                 <!-- Progress Track -->
@@ -1317,6 +1338,38 @@ async function downloadSelected(channel) {
         showAlert("downloadAlert", "Error: " + error.message, "error");
     } finally {
         setButtonLoading("downloadSelectedBtn", false);
+    }
+}
+
+async function cancelIndividualDownload(fileId) {
+    try {
+        const response = await authFetch(`/download/cancel/${fileId}`, {
+            method: "POST",
+        });
+
+        if (!response) return;
+        const data = await response.json();
+
+        if (response.ok) {
+            showAlert("downloadAlert", data.message, "info");
+
+            // Removing the element immediately for better UX
+            const element = document.getElementById(`progress-${fileId}`);
+            if (element) {
+                element.remove();
+            }
+
+            // check if no more progress items
+            const progressBarsContainer = document.getElementById("progressBarsContainer");
+            if (progressBarsContainer && progressBarsContainer.children.length === 0) {
+                document.getElementById("downloadProgress").classList.add("hidden");
+            }
+        } else {
+            showAlert("downloadAlert", data.detail || "Cancellation failed", "error");
+        }
+    } catch (error) {
+        console.error("Cancel individual download error:", error);
+        showAlert("downloadAlert", "Error: " + error.message, "error");
     }
 }
 
@@ -1866,6 +1919,11 @@ function updateProgressUI(data) {
         overallText.textContent = `${data.progress || 0}/${data.total} files`;
     }
 
+    // 3.1 Update queue badge (ensures sync even when queue tab is inactive)
+    if (data.queue) {
+        updateQueueBadge(data.queue.length);
+    }
+
     // 4. Update or add completed downloads
     if (data.completed_downloads) {
         for (const [fileId, fileData] of Object.entries(data.completed_downloads)) {
@@ -1900,11 +1958,13 @@ function updateProgressUI(data) {
                 fileData.progress,
                 fileData.total,
                 fileData.retry_attempt,
-                fileData.last_update
+                fileData.last_update,
+                fileData.speed,
+                fileData.eta,
+                false // isQueued
             );
 
             if (existingProgress) {
-                // Only update if it's not already identical (optimization)
                 if (existingProgress.outerHTML !== html) {
                     existingProgress.outerHTML = html;
                 }
@@ -1912,18 +1972,79 @@ function updateProgressUI(data) {
                 progressBarsContainer.insertAdjacentHTML('beforeend', html);
             }
         }
+    }
 
-        // Clean up UI: Remove progress bars for files that are no longer active OR completed
-        const activeIds = new Set(Object.keys(data.concurrent_downloads));
+    // 5.1. Render Queued downloads (immediate feedback)
+    if (data.active && data.queue && data.queue.length > 0) {
+        data.queue.forEach(item => {
+            // Only show in progress if not already actively downloading or completed
+            const isActive = data.concurrent_downloads && data.concurrent_downloads[item.id];
+            const isCompleted = completedDownloads.has(item.id);
+
+            if (!isActive && !isCompleted) {
+                const existingProgress = document.getElementById(`progress-${item.id}`);
+                const html = createProgressBar(
+                    item.id,
+                    item.name,
+                    false, // isComplete
+                    0,     // percentage
+                    0,     // current
+                    0,     // total
+                    null,  // retry
+                    null,  // lastUpdate
+                    0,     // speed
+                    0,     // eta
+                    true   // isQueued
+                );
+
+                if (existingProgress) {
+                    if (existingProgress.outerHTML !== html) {
+                        existingProgress.outerHTML = html;
+                    }
+                } else {
+                    progressBarsContainer.insertAdjacentHTML('beforeend', html);
+                }
+            }
+        });
+    }
+
+    // 5.2. Handle empty active state (Initializing)
+    if (data.active) {
+        const hasQueued = data.queue && data.queue.length > 0;
+        const hasActive = data.concurrent_downloads && Object.keys(data.concurrent_downloads).length > 0;
+        const hasCompletedInSession = Array.from(progressBarsContainer.children).some(el => el.id.startsWith('progress-') && !el.id.includes('cancelled'));
+
+        if (!hasQueued && !hasActive && !hasCompletedInSession) {
+            // No items to show yet, display initializing placeholder
+            if (!document.getElementById('initializing-placeholder')) {
+                progressBarsContainer.innerHTML = `
+                    <div id="initializing-placeholder" class="text-center py-12 animate-pulse bg-gray-800/20 rounded-2xl border border-gray-700/30">
+                        <i class="fa-solid fa-circle-notch fa-spin text-indigo-400 text-4xl mb-4"></i>
+                        <p class="text-white font-medium">Starting download session...</p>
+                        <p class="text-xs text-gray-400 mt-2">Fetching file metadata and preparing queue</p>
+                    </div>
+                `;
+            }
+        } else {
+            // Items exist, make sure placeholder is gone
+            const placeholder = document.getElementById('initializing-placeholder');
+            if (placeholder) {
+                placeholder.remove();
+            }
+        }
+    }
+
+    // 5.3. Clean up UI: Remove progress bars for files that are no longer active, queued, or completed
+    if (data.active) {
+        const activeIds = new Set(Object.keys(data.concurrent_downloads || {}));
+        const queueIds = new Set((data.queue || []).map(i => i.id));
         const completedIds = new Set(Object.keys(data.completed_downloads || {}));
 
         Array.from(progressBarsContainer.querySelectorAll('[id^="progress-"]')).forEach(el => {
             const id = el.id.replace('progress-', '');
-            if (!activeIds.has(id) && !completedIds.has(id)) {
-                // If it's not active and not completed, it might have been removed or something
-                // But wait, what about cancelled files? 
-                // We handle cancelled files separately in viewCompletedDownloads
-                // For live updates, we only care about active and completed.
+            if (id.startsWith('cancelled-')) return; // Keep cancelled items
+
+            if (!activeIds.has(id) && !queueIds.has(id) && !completedIds.has(id)) {
                 el.remove();
             }
         });
