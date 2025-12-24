@@ -672,28 +672,36 @@ async function checkStatus() {
         const downloadSection = document.getElementById("downloadSection");
 
         if (data.status === "connected") {
-            connectionStatus.className = "comic-badge badge-green flex items-center gap-2 text-[10px] sm:text-xs";
+            connectionStatus.className = "flex items-center";
             connectionStatus.innerHTML =
-                `<span class="relative flex h-1.5 w-1.5 sm:h-2 sm:w-2">
-                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-black opacity-40"></span>
-                    <span class="relative inline-flex rounded-full h-1.5 w-1.5 sm:h-2 sm:w-2 bg-black"></span>
+                `<span class="relative flex h-3 w-3 sm:h-4 sm:w-4">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-3 w-3 sm:h-4 sm:w-4 bg-green-500"></span>
                 </span>
-                <span class="hidden md:inline">Connected</span><span class="md:hidden">Live</span>`;
+                <span class="hidden md:inline ml-2 text-xs font-medium text-green-400">Connected</span>`;
             userInfo.innerHTML = `<p><i class="fa-solid fa-user text-[10px] opacity-70 mr-1.5" title="Logged in user"></i> ${data.user.first_name
                 } (@${data.user.username || "N/A"})</p>`;
             loginSection.classList.add("hidden");
             downloadSection.classList.remove("hidden");
         } else if (data.status === "not_authenticated" || data.status === "disconnected") {
-            connectionStatus.className = "comic-badge badge-yellow flex items-center gap-2 text-[10px] sm:text-xs";
+            connectionStatus.className = "flex items-center";
             connectionStatus.innerHTML =
-                '<i class="fa-solid fa-circle-exclamation mr-1 text-black"></i><span class="hidden md:inline">Authentication Required</span><span class="md:hidden">Auth</span>';
+                `<span class="relative flex h-3 w-3 sm:h-4 sm:w-4">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-500 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-3 w-3 sm:h-4 sm:w-4 bg-yellow-500"></span>
+                </span>
+                <span class="hidden md:inline ml-2 text-xs font-medium text-yellow-400">Auth Required</span>`;
             userInfo.innerHTML = "";
             loginSection.classList.remove("hidden");
             downloadSection.classList.add("hidden");
         } else {
-            connectionStatus.className = "comic-badge badge-red flex items-center gap-2 text-[10px] sm:text-xs";
+            connectionStatus.className = "flex items-center";
             connectionStatus.innerHTML =
-                '<i class="fa-solid fa-circle-xmark mr-1"></i><span class="hidden md:inline">Connection Error</span><span class="md:hidden">Offline</span>';
+                `<span class="relative flex h-3 w-3 sm:h-4 sm:w-4">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-3 w-3 sm:h-4 sm:w-4 bg-red-500"></span>
+                </span>
+                <span class="hidden md:inline ml-2 text-xs font-medium text-red-400">Connection Error</span>`;
             userInfo.innerHTML = "";
             loginSection.classList.add("hidden");
             downloadSection.classList.add("hidden");
@@ -2282,24 +2290,24 @@ window.debugRender = function () {
 async function showAbout() {
     const modal = document.getElementById('aboutModal');
     const changelogContainer = document.getElementById('changelogContent');
-    
+
     // Show modal first with loading state
     modal.classList.remove('hidden');
     document.body.style.overflow = 'hidden'; // Prevent scroll
-    
+
     try {
         const response = await authFetch('/about');
         if (!response) return;
         const data = await response.json();
-        
+
         // Update version if needed (already set in HTML but good for sync)
         document.getElementById('aboutVersion').textContent = `v${data.version}`;
         document.getElementById('appVersion').textContent = `v${data.version}`;
-        
+
         // Parse markdown-ish changelog to HTML
         const htmlContent = parseChangelog(data.changelog);
         changelogContainer.innerHTML = htmlContent;
-        
+
     } catch (error) {
         console.error('Error fetching about info:', error);
         changelogContainer.innerHTML = '<p class="text-red-400">Failed to load release notes.</p>';
@@ -2314,7 +2322,7 @@ function closeAboutModal() {
 
 function parseChangelog(markdown) {
     if (!markdown) return 'No release notes available.';
-    
+
     // Very simple markdown to HTML parser for the changelog
     return markdown
         .replace(/### (.*)/g, '<h5 class="text-amber-500/80 font-bold text-xs uppercase tracking-widest mt-4 mb-2">$1</h5>')
