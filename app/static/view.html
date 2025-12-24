@@ -618,16 +618,19 @@
             <!-- Debug Panel Toggle -->
             <div class="flex justify-center pt-8 opacity-40 hover:opacity-100 transition-opacity">
                 <button onclick="toggleDebugPanel()"
-                    class="px-3 py-1 rounded-full bg-gray-500/20 text-[10px] uppercase font-medium tracking-widest text-gray-500 hover:text-gray-300 flex items-center gap-1.5 transition-all focus:outline-none">
-                    <i class="fa-solid fa-terminal text-[8px]"></i> Debug Console
+                    class="px-3 py-1 rounded-full bg-gray-500 bg-opacity-20 text-xs uppercase font-medium tracking-widest text-gray-500 hover:text-gray-300 flex items-center gap-1.5 transition-all focus:outline-none border border-black"
+                    style="box-shadow: 2px 2px 0px rgba(0,0,0,0.3)">
+                    <i class="fa-solid fa-terminal text-xs"></i> Debug Console
                 </button>
             </div>
             <div id="debugPanel"
-                class="hidden mt-4 p-5 bg-black/60 backdrop-blur-md rounded-xl border border-gray-800/50 font-mono text-[11px] text-green-400/90 overflow-x-auto shadow-2xl">
+                class="hidden mt-4 p-5 bg-black bg-opacity-60 backdrop-blur-md rounded-xl border-2 border-black font-mono text-xs text-green-400 overflow-x-auto"
+                style="box-shadow: 4px 4px 0px rgba(0,0,0,0.4)">
                 <pre id="debugInfo" class="leading-relaxed">Waiting for data...</pre>
                 <div class="mt-4 flex gap-2">
                     <button onclick="refreshDebugInfo()"
-                        class="px-4 py-1.5 bg-green-500/20 rounded-lg text-green-400 text-xs font-medium hover:bg-green-600 hover:text-white transition-all focus:outline-none">
+                        class="px-4 py-1.5 bg-green-500 bg-opacity-20 rounded-lg text-green-400 text-xs font-medium hover:bg-green-600 hover:text-white transition-all focus:outline-none border border-black"
+                        style="box-shadow: 2px 2px 0px rgba(0,0,0,0.2)">
                         <i class="fa-solid fa-arrows-rotate mr-1.5"></i> Refresh
                     </button>
                 </div>
@@ -636,7 +639,7 @@
         </div>
     </main>
 
-    <script src="/static/js/script.js?v=14"></script>
+    <script src="/static/js/script.js?v=16"></script>
     <!-- Toast Container -->
     <div id="toastContainer"
         class="fixed bottom-8 left-4 right-4 sm:bottom-auto sm:top-6 sm:right-6 sm:left-auto flex flex-col items-center sm:items-end gap-3 pointer-events-none transition-all duration-300"

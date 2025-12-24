@@ -1,122 +1,41 @@
+# Telefetchr
 
-# Telefetchr (Telegram file downloader)
+A modern Telegram file downloader with a sleek Comic-themed UI.
 
-## Screenshot
-<img width="1910" height="918" alt="image" src="https://github.com/user-attachments/assets/deb5c8e9-e68c-40ff-87df-245dfa127d49" />
+## Screenshots
 
+### Main Dashboard
+![Main Dashboard](screenshots/main-dashboard.png)
+*Clean interface with session info, search controls, and the "Previous Download Session" alert*
 
-## Prerequisites
+### File Search & Selection
+![File List](screenshots/file-list.png)
+*Browse and select files with the Comic-themed file list*
 
-- Docker installed on your system
-- Docker Compose installed (usually comes with Docker Desktop)
-- Telegram API credentials (api_id and api_hash from https://my.telegram.org)
+### Active Downloads
+![Active Download](screenshots/active-download.png)
+*Real-time progress tracking with toast notifications*
 
-## Directory Structure
+## Features
 
-```
-telefetchr/
-├── app/
-│   ├── api/
-│   │   ├── __init__.py
-│   │   └── routes.py
-│   ├── models/
-│   │   ├── __init__.py
-│   │   └── schemas.py
-│   ├── services/
-│   │   ├── __init__.py
-│   │   ├── auth_service.py
-│   │   ├── download_service.py
-│   │   └── telegram_service.py
-│   ├── static/
-│   │   ├── css/
-│   │   ├── js/
-│   │   │   └── script.js
-│   │   └── images/
-│   ├── utils/
-│   │   ├── __init__.py
-│   │   ├── auth_dependencies.py
-│   │   └── state_manager.py
-│   ├── __init__.py
-│   └── config.py
-├── downloads/
-├── sessions/
-├── .env
-├── .gitignore
-├── Dockerfile
-├── README.md
-├── docker-compose.yml
-├── main.py
-└── requirements.txt
-```
+- 🎨 **Modern Comic Theme UI** - Clean, playful design with black borders and vibrant colors
+- 📥 **Bulk Downloads** - Download multiple files from Telegram channels simultaneously
+- ⚡ **Fast & Efficient** - Parallel downloads with configurable workers
+- 💾 **Network Storage Support** - Direct downloads to NAS/network drives
+- 🔄 **Session Persistence** - Resume interrupted downloads automatically
+- 🔐 **Secure Authentication** - JWT-based auth with optional subnet bypass
 
-## Environment Variables (MANDATORY): 
+## Quick Start
 
-```yaml
-environment:
-      - PYTHONUNBUFFERED=1
-      - API_ID=12345 # your api_id from my.telegram.org
-      - API_HASH=saasdasdf12324 # your api_hash from my.telegram.org
-      - PHONE_NUMBER=12345 # without + sign
-      - MAX_CONCURRENT_DOWNLOADS=3 # optional, default is 10
-      # Generate secret: python -c "import secrets; print(secrets.token_urlsafe(32))"
-      - SECRET_KEY=your_generated_secret_key_here
-      - ADMIN_USERNAME=yourusername
-      - ADMIN_PASSWORD=yourpassword
-      - ACCESS_TOKEN_EXPIRE_MINUTES=1440  # 24 hours
-      - TRUSTED_SUBNETS=192.168.1.0/24  # Optional auth bypass
-      - PUID=1000
-      - PGID=1000
-```
+### Prerequisites
 
-## Accessing the Application
+- Docker & Docker Compose
+- Telegram API credentials from [my.telegram.org](https://my.telegram.org)
 
-Once the container is running, open your browser and navigate to:
+### Installation
 
-```
-http://localhost:9868
-```
+1. **Create `docker-compose.yml`:**
 
-## First Time Login
-
-1. The application will prompt you to login
-2. Click "Send Verification Code"
-3. Enter the code you receive via Telegram
-4. If you have 2FA enabled, enter your password
-5. The session will be saved in the `sessions/` directory
-
-## Persistent Data
-
-- **Downloads**: All downloaded files are stored in this path 
-- **Sessions**: Telegram session files are stored in this path
-- Both directories are mounted as volumes, so data persists even if you restart or rebuild the container
-
-## Network Paths for Downloads
-
-If you want to download files to a network location:
-
-### Linux/Mac:
-```bash
-# Mount network share first
-sudo mount -t cifs //server/share /mnt/network -o username=user,password=pass
-
-# Update docker-compose.yml to add volume:
-volumes:
-  - /mnt/network:/app/downloads
-```
-
-### Windows:
-```powershell
-# Map network drive first (e.g., Z:)
-net use Z: \\server\share /user:username password
-
-# Update docker-compose.yml:
-volumes:
-  - Z:/:/app/downloads
-```
-
-## Build and Run Instructions
-
-### Option 1: Using Docker Compose (Recommended)
 ```yaml
 services:
   telefetchr:
@@ -125,438 +44,153 @@ services:
     ports:
       - "9868:9868"
     volumes:
-      - /path/to/sessions:/app/sessions
-      - /path/to/downloads:/app/downloads
+      - ./sessions:/app/sessions
+      - ./downloads:/app/downloads
     environment:
       - PYTHONUNBUFFERED=1
-      - API_ID=123456 # your api_id from my.telegram.org
-      - API_HASH=abcddfabc123456 # your api_hash from my.telegram.org
-      - PHONE_NUMBER=33334567890 # without + sign
-      - MAX_CONCURRENT_DOWNLOADS=3
-      # Generate secret: python -c "import secrets; print(secrets.token_urlsafe(32))"
-      - SECRET_KEY=your_secret
+      - API_ID=123456                    # From my.telegram.org
+      - API_HASH=your_api_hash           # From my.telegram.org
+      - PHONE_NUMBER=1234567890          # Without + sign
+      - SECRET_KEY=your_secret_key       # Generate: python -c "import secrets; print(secrets.token_urlsafe(32))"
       - ADMIN_USERNAME=admin
-      - ADMIN_PASSWORD=admin123
-      - ACCESS_TOKEN_EXPIRE_MINUTES=1440
-      - PUID=1000
-      - PGID=1000
-    restart: always
+      - ADMIN_PASSWORD=yourpassword
+      - ACCESS_TOKEN_EXPIRE_MINUTES=1440 # Optional, default: 1440 (24h)
+      - TRUSTED_SUBNETS=192.168.1.0/24   # Optional, comma-separated CIDRs for auth bypass
+      - PUID=1000                        # Optional
+      - PGID=1000                        # Optional
+    restart: unless-stopped
 ```
 
-**Linux/macOS (NFS/SMB mount):**
+**Note:** If using with a VPN container, replace `ports:` section with:
 ```yaml
-- /mnt/nas/downloads:/app/downloads
+network_mode: "container:vpn"  # Replace 'vpn' with your VPN container name
 ```
 
-**Windows (mapped network drive):**
-```yaml
-- Z:/downloads:/app/downloads
-```
-
-**Windows (UNC path):**
-```yaml
-- //server/share/downloads:/app/downloads
-```
-
-## Installation & Usage
-
-### Starting the Application
-
-1. **Build and start the container:**
-   ```bash
-   docker-compose up -d
-   ```
-   
-   The `-d` flag runs the container in detached mode (background).
-
-2. **Check if the container is running:**
-   ```bash
-   docker-compose ps
-   ```
-
-3. **Access the application:**
-   Open your browser and navigate to:
-   ```
-   http://localhost:9868
-   ```
-### Option 2: Using Docker directly
+2. **Start the application:**
 
 ```bash
-# Build the image
-docker build -t telefetchr .
-
-# Run the container
-docker run -d \
-  --name telefetchr \
-  -p 9868:9868 \
-  -v $(pwd)/downloads:/app/downloads \
-  -v $(pwd)/sessions:/app/sessions \
-  -e API_ID=123456 \
-  -e API_HASH=abcdef123456 \
-  -e PHONE_NUMBER=1234567890 \
-  -e MAX_CONCURRENT_DOWNLOADS=3 \
-  -e SECRET_KEY=SDFDFD \
-  -e ADMIN_USERNAME=admin \
-  -e ADMIN_PASSWORD=admin123 \
-  -e PUID=1000 \
-  -e PGID=1000 \
-  telefetchr
-
-# Run the container (windows)
-docker run -d `
-  --name telefetchr `
-  -p 9868:9868 `
-  -v ${PWD}/downloads:/app/downloads `
-  -v ${PWD}/sessions:/app/sessions `
-  -v ${PWD}/config.yaml:/app/config.yaml:ro `
-  -e API_ID=123456 `
-  -e API_HASH=abcdef123456 `
-  -e PHONE_NUMBER=1234567890 `
-  -e MAX_CONCURRENT_DOWNLOADS=3 `
-  -e SECRET_KEY=SDFDFD `
-  -e ADMIN_USERNAME=admin `
-  -e ADMIN_PASSWORD=admin123 `
-  -e PUID=1000 `
-  -e PGID=1000 `
-  telefetchr
-
-
-# View logs
-docker logs -f telefetchr
-
-# Stop the container
-docker stop telefetchr
-docker rm telefetchr
+docker-compose up -d
 ```
 
-## Common Commands
+3. **Access the web interface:**
 
-### View Logs
-
-**Follow logs in real-time:**
-```bash
-docker-compose logs -f
+```
+http://localhost:9868
 ```
 
-**View logs for specific service:**
-```bash
-docker-compose logs -f telefetchr
-```
+4. **First-time login:**
+   - Click "Send Verification Code"
+   - Enter the code from Telegram
+   - If 2FA is enabled, enter your password
 
-**View last 100 lines:**
-```bash
-docker-compose logs --tail=100
-```
+## Network Storage Setup
 
-### Stop the Application
+### Linux/macOS (NFS/SMB)
 
-**Stop containers (keeps data):**
-```bash
-docker-compose stop
-```
-
-**Stop and remove containers:**
-```bash
-docker-compose down
-```
-
-### Restart the Application
+Mount your network share first:
 
 ```bash
-docker-compose restart
+# NFS
+sudo mount -t nfs server:/share /mnt/nas
+
+# SMB/CIFS
+sudo mount -t cifs //server/share /mnt/nas -o username=user,password=pass
 ```
 
-### Rebuild After Code Changes
+Update `docker-compose.yml`:
 
-If you modify `launch.py` or other application files:
-
-```bash
-docker-compose up -d --build
-```
-
-### Access Container Shell
-
-To access the container's shell for debugging:
-
-```bash
-docker-compose exec telefetchr /bin/bash
-```
-
-## Data Persistence
-
-The following directories are mounted as volumes and will persist data:
-
-- **Network Drive** (configured in docker-compose.yml) - All downloaded files go directly to your network storage
-- **sessions/** - Telegram session data (keeps you logged in)
-
-Files are downloaded directly to your network drive location, so they're immediately available to other systems on your network.
-
-## Troubleshooting
-
-### Container Won't Start
-
-**Check logs:**
-```bash
-docker-compose logs
-```
-
-**Common issues:**
-- Invalid API credentials
-- Port 9868 already in use
-- Permission issues with network drive
-- Path not set correctly
-
-### Port Already in Use
-
-If port 9868 is already occupied, edit `docker-compose.yml`:
-
-```yaml
-ports:
-  - "8080:9868"  # Change 8080 to any available port
-```
-
-Then access the app at `http://localhost:8080`
-
-### Permission Issues
-
-If you encounter permission issues with network drive access:
-
-**For Linux/macOS NFS mounts:**
-```bash
-# Ensure the mount has correct permissions
-sudo chmod 755 /mnt/your-network-drive
-```
-
-**For Docker on Linux with network storage:**
-```bash
-# Run container with specific user ID
-docker-compose down
-```
-
-Then edit `docker-compose.yml` to add:
-```yaml
-user: "1000:1000"  # Replace with your user:group ID
-```
-
-**Check your user ID:**
-```bash
-id -u  # Gets your user ID
-id -g  # Gets your group ID
-```
-
-### Reset Everything
-
-To completely reset (warning: deletes all data):
-
-```bash
-docker-compose down -v
-rm -rf downloads/* sessions/*
-docker-compose up -d --build
-```
-
-## Advanced Configuration
-
-### Mounting Network Drives
-
-#### Linux - NFS Mount
-
-First, mount your NFS share on the host:
-
-```bash
-# Install NFS client
-sudo apt-get install nfs-common
-
-# Create mount point
-sudo mkdir -p /mnt/nas
-
-# Mount NFS share
-sudo mount -t nfs server.local:/share /mnt/nas
-
-# Or add to /etc/fstab for automatic mounting:
-echo "server.local:/share /mnt/nas nfs defaults 0 0" | sudo tee -a /etc/fstab
-```
-
-Then update docker-compose.yml:
 ```yaml
 volumes:
   - /mnt/nas:/app/downloads
 ```
 
-#### Linux - SMB/CIFS Mount
+### Windows
 
-```bash
-# Install CIFS utilities
-sudo apt-get install cifs-utils
-
-# Create credentials file
-sudo nano /etc/.smbcredentials
-# Add:
-# username=your_username
-# password=your_password
-
-# Set permissions
-sudo chmod 600 /etc/.smbcredentials
-
-# Mount SMB share
-sudo mount -t cifs //server/share /mnt/nas -o credentials=/etc/.smbcredentials
-
-# Or add to /etc/fstab:
-echo "//server/share /mnt/nas cifs credentials=/etc/.smbcredentials 0 0" | sudo tee -a /etc/fstab
-```
-
-#### Windows - Network Drive
-
-On Windows with Docker Desktop, use the full path:
+Map network drive (e.g., Z:) then update `docker-compose.yml`:
 
 ```yaml
 volumes:
-  - Z:/TelegramDownloads:/app/downloads  # If Z: is your mapped drive
+  - Z:/downloads:/app/downloads
 ```
 
 Or use UNC path directly:
-```yaml
-volumes:
-  - //192.168.1.100/share/downloads:/app/downloads
-```
-
-#### macOS - Network Drive
-
-Mount your network drive first, then:
 
 ```yaml
 volumes:
-  - /Volumes/NetworkDrive/downloads:/app/downloads
+  - //server/share/downloads:/app/downloads
 ```
 
+## Common Commands
 
-### Resource Limits
+```bash
+# View logs
+docker-compose logs -f
 
-To limit container resources, add to `docker-compose.yml`:
+# Restart
+docker-compose restart
+
+# Stop
+docker-compose down
+
+# Update to latest version
+docker-compose pull
+docker-compose up -d
+```
+
+## Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `API_ID` | ✅ | - | Telegram API ID from my.telegram.org |
+| `API_HASH` | ✅ | - | Telegram API hash from my.telegram.org |
+| `PHONE_NUMBER` | ✅ | - | Phone number without + sign |
+| `SECRET_KEY` | ✅ | - | JWT secret key (generate with Python) |
+| `ADMIN_USERNAME` | ✅ | - | Admin username for login |
+| `ADMIN_PASSWORD` | ✅ | - | Admin password for login |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | ❌ | 1440 | JWT token expiration (minutes) |
+| `TRUSTED_SUBNETS` | ❌ | - | Comma-separated CIDRs for auth bypass (e.g., `192.168.1.0/24`) |
+| `PYTHONUNBUFFERED` | ❌ | 0 | Set to 1 for real-time logging |
+| `PUID` | ❌ | 1000 | User ID for file permissions |
+| `PGID` | ❌ | 1000 | Group ID for file permissions |
+
+## Troubleshooting
+
+### Port Already in Use
+
+Change the port in `docker-compose.yml`:
 
 ```yaml
-services:
-  telefetchr:
-    # ... existing config ...
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 2G
-        reservations:
-          cpus: '1'
-          memory: 512M
+ports:
+  - "8080:9868"  # Use 8080 instead
 ```
 
-## Updating the Application
+### Permission Issues
 
-1. Pull the latest code changes
-2. Rebuild and restart:
-   ```bash
-   docker-compose down
-   docker-compose up -d --build
-   ```
+Ensure correct PUID/PGID in docker-compose.yml:
 
-## Debug Section Fields Explained**:
-
-- **memory_state**: Current state in application memory
-  - `active`: Whether a download is currently in progress
-  - `progress`: Number of files completed
-  - `total`: Total files in the session
-  - `session_id`: Unique identifier for the download session
-  - `channel`: Telegram channel being downloaded from
-  - `completed_count`: Number of files successfully downloaded
-  - `concurrent_count`: Number of files currently downloading
-  - `cancelled`: Whether the download was cancelled
-
-- **file_state**: Information about the persisted state file
-  - `exists`: Whether the state file exists on disk
-  - `size_bytes`: Size of the state file
-  - `path`: Location of the state file
-  - `content`: First 500 characters of the file content
-
-- **completed_downloads**: Dictionary of all completed downloads
-  - Key format: `file_INDEX_MESSAGEID` or `single_MESSAGEID`
-  - Contains filename, size, and completion timestamp
-
-- **active_tasks**: List of currently running background tasks
-
-**Indicators of health**:
-- ✅ `active: false` when no download running
-- ✅ `progress` equals `total` (all files downloaded)
-- ✅ `completed_count` equals `total`
-- ✅ `concurrent_count: 0` when not downloading
-- ✅ `channel` is set to a valid channel name
-- ✅ `session_id` exists
-
-**Indicators of problems**:
-- ❌ `channel: null` but `session_id` exists
-- ❌ `concurrent_count > 0` but `active: false`
-- ❌ `total: 0` but `session_id` exists
-- ❌ `started_at: null` but files were downloaded
-
-**Solution**: Run cleanup state
-
-### Cleanup state`
-
-**Purpose**: Clean up corrupted or incomplete state data
-
-**What it does**:
-1. Creates a backup of the current state file
-2. Removes orphaned `concurrent_downloads` (when not active)
-3. Resets progress fields when no active download
-4. Fully resets if no valid session data exists
-
-**Use Case**: Fix state corruption after interrupted downloads or crashes
-
-### Reset state
-
-**Purpose**: Completely reset all download state (⚠️ USE WITH CAUTION)
-
-**What it does**:
-1. Creates a backup of the current state file
-2. Clears all state data
-3. Resets to initial empty state
-
-**Use Case**: Start fresh when state is severely corrupted
-
-**Response**:
-```json
-{
-  "status": "success",
-  "message": "State completely reset. Backup saved."
-}
+```bash
+# Check your user/group ID
+id -u  # User ID
+id -g  # Group ID
 ```
 
-**⚠️ Warning**: This will delete all download history and progress. Cannot be undone except by restoring from backup.
+### Reset State
 
+If downloads are stuck or corrupted:
 
-## Security Notes
+1. Access the debug console in the web UI
+2. Click "Cleanup State" or "Reset State"
 
-- The `sessions/` directory contains sensitive authentication data
-- Use environment variables for sensitive data in production
-- Consider using Docker secrets for production deployments
+Or manually reset:
 
+```bash
+docker-compose down
+rm -rf sessions/* downloads/*
+docker-compose up -d
+```
 
 ## License
 
-MIT License
+MIT License - Copyright (c) 2025 Safiyu
 
-Copyright (c) 2025 Safiyu
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+See [LICENSE](LICENSE) for full details.

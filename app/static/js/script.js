@@ -386,24 +386,24 @@ async function checkSavedState() {
                 'Cancelled download session found' :
                 'Previous download session found';
 
-            // Dark theme colors
+            // Dark theme colors - Comic Style
             const containerClasses = wasCancelled ?
-                'bg-red-900/40 border-l-4 border-red-500' :
-                'bg-yellow-900/40 border-l-4 border-yellow-500';
+                'bg-red-900 bg-opacity-40 border-2 border-black' :
+                'bg-yellow-900 bg-opacity-40 border-2 border-black';
 
             const textClasses = wasCancelled ? 'text-red-200' : 'text-yellow-200';
-            const subTextClasses = wasCancelled ? 'text-red-300/80' : 'text-yellow-300/80';
+            const subTextClasses = wasCancelled ? 'text-red-300' : 'text-yellow-300';
 
             // Show resume option only if there are remaining files AND it wasn't cancelled
             const showResumeButton = remainingCount > 0 && !wasCancelled;
 
             const resumeHtml = `
-                <div id="resumeNotification" class="${containerClasses} p-4 mb-4 rounded-r-lg shadow-lg relative overflow-hidden">
+                <div id="resumeNotification" class="${containerClasses} p-4 mb-4 rounded-xl relative overflow-hidden" style="box-shadow: 4px 4px 0px rgba(0,0,0,0.4)">
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div class="flex items-start gap-3">
                             <div class="flex-shrink-0 mt-0.5">${statusIcon}</div>
                             <div class="min-w-0">
-                                <p class="text-sm font-semibold ${textClasses} break-words">${statusTitle}</p>
+                                <p class="text-sm font-bold uppercase tracking-wider ${textClasses} break-words" style="text-shadow: 1px 1px 0px rgba(0,0,0,0.5)">${statusTitle}</p>
                                 <div class="text-xs ${subTextClasses} mt-1 space-y-0.5">
                                     <p class="truncate"><span class="opacity-70">Channel:</span> ${data.channel || 'Unknown'}</p>
                                     <p><span class="opacity-70">Progress:</span> ${completedCount}/${totalCount} files ${remainingCount > 0 ? `(${remainingCount} left)` : ''}</p>
@@ -414,14 +414,14 @@ async function checkSavedState() {
                         </div>
                         <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto mt-2 sm:mt-0">
                             ${showResumeButton ? `
-                                <button onclick="resumeDownload()" class="flex-1 sm:flex-none py-2 px-4 rounded-xl bg-yellow-500/20 text-yellow-500 font-medium shadow-lg shadow-yellow-900/10 hover:bg-yellow-600 hover:text-white transition-all flex items-center justify-center gap-2 text-xs sm:text-sm focus:outline-none">
+                                <button onclick="resumeDownload()" class="flex-1 sm:flex-none py-2 px-4 rounded-xl bg-yellow-500 bg-opacity-20 text-yellow-500 font-medium hover:bg-yellow-600 hover:text-white transition-all flex items-center justify-center gap-2 text-xs sm:text-sm focus:outline-none border border-black" style="box-shadow: 2px 2px 0px rgba(0,0,0,0.2)">
                                     <i class="fa-solid fa-play"></i> Resume
                                 </button>
                             ` : ''}
-                            <button onclick="viewCompletedDownloads()" class="flex-1 sm:flex-none py-2 px-4 rounded-xl bg-indigo-500/20 text-indigo-400 font-medium shadow-lg shadow-indigo-900/10 hover:bg-indigo-600 hover:text-white transition-all flex items-center justify-center gap-2 text-xs sm:text-sm focus:outline-none">
+                            <button onclick="viewCompletedDownloads()" class="flex-1 sm:flex-none py-2 px-4 rounded-xl bg-indigo-500 bg-opacity-20 text-indigo-400 font-medium hover:bg-indigo-600 hover:text-white transition-all flex items-center justify-center gap-2 text-xs sm:text-sm focus:outline-none border border-black" style="box-shadow: 2px 2px 0px rgba(0,0,0,0.2)">
                                 <i class="fa-solid fa-eye"></i> View${completedCount > 0 ? ` (${completedCount})` : ''}
                             </button>
-                            <button onclick="clearSavedState()" class="flex-1 sm:flex-none py-2 px-4 rounded-xl bg-gray-500/20 text-gray-400 font-medium hover:bg-gray-600 hover:text-white transition-all flex items-center justify-center gap-2 text-xs sm:text-sm focus:outline-none">
+                            <button onclick="clearSavedState()" class="flex-1 sm:flex-none py-2 px-4 rounded-xl bg-gray-500 bg-opacity-20 text-gray-400 font-medium hover:bg-gray-600 hover:text-white transition-all flex items-center justify-center gap-2 text-xs sm:text-sm focus:outline-none border border-black" style="box-shadow: 2px 2px 0px rgba(0,0,0,0.2)">
                                 <i class="fa-solid fa-xmark"></i> Clear
                             </button>
                         </div>
