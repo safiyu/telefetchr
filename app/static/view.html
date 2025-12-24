@@ -285,7 +285,14 @@
             <img src="/static/images/logo.png?v=2" alt="TeleFetchr Logo"
                 class="h-10 sm:h-14 w-10 sm:w-14 border-2 border-black shadow-[3px_3px_0px_#000] rounded-full object-cover"
                 style="clip-path: circle(50%);" />
-            <h1 class="text-lg sm:text-2xl font-bold tracking-tight header-gradient">TeleFetchr</h1>
+            <div class="flex flex-col">
+                <h1 class="text-lg sm:text-2xl font-bold tracking-tight header-gradient">TeleFetchr</h1>
+                <button onclick="showAbout()"
+                    class="text-[9px] sm:text-[10px] text-gray-500 hover:text-amber-400 font-mono tracking-wider transition-colors text-left cursor-pointer"
+                    title="Click to view changelog">
+                    <span id="appVersion">v1.2.5</span>
+                </button>
+            </div>
         </div>
 
         <div id="statusBadge" class="flex items-center gap-2 sm:gap-4">
@@ -738,6 +745,76 @@
                         class="px-6 py-2.5 rounded-xl bg-red-500/20 text-red-500 font-medium hover:bg-red-600 hover:text-white transition-all shadow-lg shadow-red-900/20 focus:outline-none">
                         Confirm
                     </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- About / Changelog Modal -->
+    <div id="aboutModal" class="fixed inset-0 z-[999999] hidden overflow-y-auto" role="dialog" aria-modal="true">
+        <div class="flex min-h-screen items-center justify-center p-4 text-center sm:p-0">
+            <div class="fixed inset-0 bg-gray-900/80 backdrop-blur-sm transition-opacity" onclick="closeAboutModal()">
+            </div>
+
+            <div
+                class="relative transform overflow-hidden glass-card p-0 text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-2xl animate-scale-in flex flex-col max-h-[85vh]">
+                <!-- Header -->
+                <div class="p-6 border-b border-black flex justify-between items-center bg-gray-900/50">
+                    <div class="flex items-center gap-3">
+                        <div
+                            class="bg-amber-500/20 p-2.5 rounded-xl text-amber-500 border border-black shadow-[2px_2px_0px_#000]">
+                            <i class="fa-solid fa-circle-info text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-bold text-white leading-tight">TeleFetchr <span
+                                    class="text-amber-500" id="aboutVersion">v1.2.5</span></h3>
+                            <p class="text-xs text-gray-500 font-medium uppercase tracking-widest mt-0.5">Application
+                                Information</p>
+                        </div>
+                    </div>
+                    <button onclick="closeAboutModal()"
+                        class="text-gray-500 hover:text-white transition-colors h-10 w-10 flex items-center justify-center rounded-xl hover:bg-white/10">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+
+                <!-- Content -->
+                <div class="p-6 overflow-y-auto custom-scrollbar flex-1">
+                    <div class="space-y-6">
+                        <!-- What's New Section -->
+                        <div>
+                            <h4
+                                class="text-sm font-bold text-amber-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                <i class="fa-solid fa-bolt text-xs"></i> Release Notes
+                            </h4>
+                            <div id="changelogContent" class="prose prose-invert prose-sm max-w-none text-gray-300">
+                                <div class="flex flex-col items-center justify-center py-12 opacity-30">
+                                    <i class="fa-solid fa-spinner fa-spin text-3xl mb-3"></i>
+                                    <p class="font-bold tracking-widest uppercase text-xs">Loading Changelog...</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Info Grid -->
+                        <div class="grid grid-cols-2 gap-4 border-t border-black/50 pt-6">
+                            <div class="p-4 bg-black/20 rounded-xl border border-black">
+                                <p class="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1">Developer
+                                </p>
+                                <p class="text-sm text-gray-300 font-semibold">Safiyu</p>
+                            </div>
+                            <div class="p-4 bg-black/20 rounded-xl border border-black">
+                                <p class="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1">License
+                                </p>
+                                <p class="text-sm text-gray-300 font-semibold">MIT License</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer -->
+                <div class="p-4 bg-gray-900/80 border-t border-black text-center">
+                    <p class="text-[10px] text-gray-600 font-medium italic">"Crafted by Safiyu — May the code be with
+                        you! ⚔️"</p>
                 </div>
             </div>
         </div>

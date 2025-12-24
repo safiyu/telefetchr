@@ -12,7 +12,6 @@ build
 .gitignore
 .vscode
 .idea
-*.md
 downloads/*
 sessions/*
 .env

@@ -2278,3 +2278,48 @@ window.debugRender = function () {
     };
     updateProgressUI(fakeData);
 };
+// About Modal Logic
+async function showAbout() {
+    const modal = document.getElementById('aboutModal');
+    const changelogContainer = document.getElementById('changelogContent');
+    
+    // Show modal first with loading state
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden'; // Prevent scroll
+    
+    try {
+        const response = await authFetch('/about');
+        if (!response) return;
+        const data = await response.json();
+        
+        // Update version if needed (already set in HTML but good for sync)
+        document.getElementById('aboutVersion').textContent = `v${data.version}`;
+        document.getElementById('appVersion').textContent = `v${data.version}`;
+        
+        // Parse markdown-ish changelog to HTML
+        const htmlContent = parseChangelog(data.changelog);
+        changelogContainer.innerHTML = htmlContent;
+        
+    } catch (error) {
+        console.error('Error fetching about info:', error);
+        changelogContainer.innerHTML = '<p class="text-red-400">Failed to load release notes.</p>';
+    }
+}
+
+function closeAboutModal() {
+    const modal = document.getElementById('aboutModal');
+    modal.classList.add('hidden');
+    document.body.style.overflow = ''; // Restore scroll
+}
+
+function parseChangelog(markdown) {
+    if (!markdown) return 'No release notes available.';
+    
+    // Very simple markdown to HTML parser for the changelog
+    return markdown
+        .replace(/### (.*)/g, '<h5 class="text-amber-500/80 font-bold text-xs uppercase tracking-widest mt-4 mb-2">$1</h5>')
+        .replace(/## \[(.*)\] - (.*)/g, '<div class="border-l-2 border-amber-500 pl-4 mb-6"><h4 class="text-white font-bold text-lg">Version $1</h4><p class="text-[10px] text-gray-500 font-mono uppercase">Released on $2</p></div>')
+        .replace(/^- (.*)/gm, '<div class="flex items-start gap-2 mb-1.5"><i class="fa-solid fa-caret-right text-amber-500/50 mt-1 text-[10px]"></i><p class="text-sm text-gray-300">$1</p></div>')
+        .replace(/#(.*)/g, '') // Hide main title
+        .trim();
+}

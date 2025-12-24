@@ -47,6 +47,7 @@ COPY --from=builder --chown=appuser:appuser /root/.local /home/appuser/.local
 # Copy application files with correct ownership
 COPY --chown=appuser:appuser main.py .
 COPY --chown=appuser:appuser app/ ./app/
+COPY --chown=appuser:appuser CHANGELOG.md .
 
 # Create necessary directories with correct ownership
 RUN mkdir -p sessions downloads && \

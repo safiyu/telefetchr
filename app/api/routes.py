@@ -577,3 +577,41 @@ async def clear_queue(current_user: str = Depends(get_current_user)):
         "status": "success",
         "message": "Queue cleared"
     }
+@router.get("/about")
+async def get_about(current_user: str = Depends(get_current_user)):
+    """Get information about the application including version and changelog"""
+    changelog_content = ""
+    changelog_path = "CHANGELOG.md"
+    
+    if os.path.exists(changelog_path):
+        try:
+            with open(changelog_path, 'r', encoding='utf-8') as f:
+                full_changelog = f.read()
+                
+            # Parse and extract only the last 10 releases
+            lines = full_changelog.split('\n')
+            filtered_lines = []
+            release_count = 0
+            max_releases = 5
+            
+            for line in lines:
+                # Check if this is a release header (e.g., "## [1.2.5] - 2024-12-24")
+                if line.startswith('## [') and '] -' in line:
+                    release_count += 1
+                    if release_count > max_releases:
+                        break
+                
+                filtered_lines.append(line)
+            
+            changelog_content = '\n'.join(filtered_lines)
+            
+        except Exception as e:
+            logger.error(f"Error reading changelog: {e}")
+            changelog_content = "Error loading changelog."
+    else:
+        changelog_content = "Changelog not found."
+
+    return {
+        "version": Config.VERSION,
+        "changelog": changelog_content
+    }
