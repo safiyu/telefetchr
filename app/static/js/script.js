@@ -861,17 +861,17 @@ function displayFiles(files) {
 
     let html = `
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
-            <h3 class="text-lg font-semibold text-white flex items-center gap-2">
-                <i class="fa-solid fa-folder-open text-indigo-400"></i> Files Found
+            <h3 class="text-lg font-bold text-white flex items-center gap-2 italic uppercase">
+                <i class="fa-solid fa-folder-open text-amber-400"></i> Files Found
             </h3>
             <div class="flex flex-wrap gap-2 w-full sm:w-auto">
-                <button onclick="selectAllFiles()" class="flex-1 sm:flex-none py-1.5 px-3 rounded-xl bg-gray-500/15 text-gray-400 text-[11px] font-medium hover:bg-gray-600 hover:text-white transition-all flex items-center justify-center gap-1.5 focus:outline-none">
+                <button onclick="selectAllFiles()" class="flex-1 sm:flex-none py-1.5 px-3 rounded-xl btn-orange-hover flex items-center justify-center gap-1.5 focus:outline-none">
                     <i class="fa-solid fa-check-double text-[10px]"></i> Select All
                 </button>
-                <button onclick="deselectAllFiles()" class="flex-1 sm:flex-none py-1.5 px-3 rounded-xl bg-gray-500/15 text-gray-400 text-[11px] font-medium hover:bg-gray-600 hover:text-white transition-all flex items-center justify-center gap-1.5 focus:outline-none">
+                <button onclick="deselectAllFiles()" class="flex-1 sm:flex-none py-1.5 px-3 rounded-xl btn-orange-hover flex items-center justify-center gap-1.5 focus:outline-none">
                     <i class="fa-solid fa-xmark text-[10px]"></i> Deselect
                 </button>
-                <button onclick="downloadSelected('${currentChannel}')" id="downloadSelectedBtn" class="flex-1 sm:flex-none py-1.5 px-3 rounded-xl bg-indigo-500/15 text-indigo-400 text-[11px] font-medium hover:bg-indigo-600 hover:text-white transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-indigo-900/10 focus:outline-none">
+                <button onclick="downloadSelected('${currentChannel}')" id="downloadSelectedBtn" class="flex-1 sm:flex-none py-1.5 px-3 rounded-xl btn-yellow-hover text-[11px] flex items-center justify-center gap-1.5 focus:outline-none">
                     <i class="fa-solid fa-download text-[10px]"></i> Download (<span id="selectedCount">0</span>)
                 </button>
             </div>
@@ -891,18 +891,18 @@ function displayFiles(files) {
 
         const isChecked = selectedFiles.has(file.file_id) ? "checked" : "";
 
-        // Dark theme styles for file item - Responsive layout
+        // Comic style file item: ink borders + hard shadow
         html += `
-            <div class="bg-gray-800 bg-opacity-50 rounded-lg border border-gray-700 border-opacity-50 flex items-center p-3 gap-2 sm:gap-4 hover:bg-gray-700 hover:bg-opacity-50 transition-colors group file-item" data-file-id="${file.file_id}">
+            <div class="bg-gray-800 bg-opacity-60 rounded-xl border-1.5 border-black flex items-center p-3 gap-2 sm:gap-4 hover:bg-yellow-500 hover:bg-opacity-10 hover:border-yellow-400 hover:shadow-[3px_3px_0px_rgba(0,0,0,1)] hover:-translate-y-0.5 shadow-[2px_2px_0px_rgba(0,0,0,0.5)] transition-all group file-item" data-file-id="${file.file_id}">
                 <div class="flex items-center">
                     <input type="checkbox"
                            id="file_${file.file_id}"
-                           class="file-checkbox w-5 h-5 rounded border-gray-600 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-gray-900 bg-gray-700 cursor-pointer"
+                           class="file-checkbox w-5 h-5 rounded border-black text-yellow-500 focus:ring-yellow-500 focus:ring-offset-gray-900 bg-gray-900 cursor-pointer"
                            onchange="toggleFileSelection(${file.file_id})"
                            ${isChecked}>
                 </div>
-                <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-indigo-500 bg-opacity-10 flex items-center justify-center flex-shrink-0">
-                    <i class="fa-solid ${icon} text-sm sm:text-lg text-indigo-400"></i>
+                <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-yellow-400 bg-opacity-10 flex items-center justify-center flex-shrink-0 border border-black shadow-[2px_2px_0px_rgba(0,0,0,0.2)]">
+                    <i class="fa-solid ${icon} text-sm sm:text-lg text-yellow-400"></i>
                 </div>
                 <div class="flex-1 min-w-0 overflow-hidden">
                     <div class="font-medium text-gray-200 line-clamp-2 text-sm sm:text-base" title="${file.file_name}">${file.file_name}</div>
@@ -914,7 +914,7 @@ function displayFiles(files) {
                     </div>
                 </div>
                 <button onclick="downloadSingle(${file.file_id}, '${currentChannel}')" 
-                    class="flex-shrink-0 p-2 sm:py-1.5 sm:px-3 rounded-xl bg-indigo-500/15 text-indigo-400 text-xs font-medium hover:bg-indigo-600 hover:text-white shadow-lg transition-all flex items-center gap-1.5 md:opacity-0 md:group-hover:opacity-100 md:translate-x-2 md:group-hover:translate-x-0 focus:outline-none">
+                    class="flex-shrink-0 p-2 sm:py-1.5 sm:px-4 rounded-xl btn-yellow-hover text-xs flex items-center gap-1.5 md:opacity-0 md:group-hover:opacity-100 md:translate-x-2 md:group-hover:translate-x-0 focus:outline-none">
                     <i class="fa-solid fa-download text-[10px]"></i> <span class="hidden sm:inline">Download</span>
                 </button>
             </div>
@@ -1056,7 +1056,7 @@ function createProgressBar(
     const etaText = eta > 0 ? `ETA: ${formatTime(eta)}` : '';
 
     if (retryAttempt && retryAttempt > 1) {
-        retryBadge = `<span class="text-xs px-2 py-1 rounded bg-yellow-500/20 text-yellow-300 ml-2 border border-yellow-500/30">Retry ${retryAttempt}/3</span>`;
+        retryBadge = `<span class="text-xs px-2 py-1 rounded bg-yellow-500 bg-opacity-20 text-yellow-300 ml-2 border border-black shadow-[2px_2px_0px_rgba(0,0,0,0.2)]">Retry ${retryAttempt}/3</span>`;
     }
 
     // Check if download appears stalled
@@ -1065,7 +1065,7 @@ function createProgressBar(
             const lastUpdateTime = new Date(lastUpdate);
             const timeSinceUpdate = (Date.now() - lastUpdateTime) / 1000; // seconds
             if (timeSinceUpdate > 10) {
-                stallWarning = `<span class="text-xs px-2 py-1 rounded bg-orange-500/20 text-orange-300 ml-2 border border-orange-500/30"><i class="fa-solid fa-triangle-exclamation"></i> Stalled ${Math.floor(timeSinceUpdate)}s</span>`;
+                stallWarning = `<span class="text-xs px-2 py-1 rounded bg-yellow-600 bg-opacity-20 text-yellow-600 ml-2 border border-black shadow-[2px_2px_0px_rgba(0,0,0,0.2)]"><i class="fa-solid fa-triangle-exclamation"></i> Stalled ${Math.floor(timeSinceUpdate)}s</span>`;
             }
         } catch (e) {
             console.error('Error checking stall status:', e);
@@ -1074,13 +1074,13 @@ function createProgressBar(
 
     let html = `
         <div id="${progressId}" class="file-progress-block relative overflow-hidden group">
-            <!-- Glass effect background -->
-            <div class="absolute inset-0 bg-gray-800/50 backdrop-blur-md border border-gray-700/50 rounded-xl"></div>
+            <!-- Comic Panel effect background -->
+            <div class="absolute inset-0 bg-gray-800 border-2 border-black rounded-xl shadow-[4px_4px_0px_rgba(0,0,0,0.4)]"></div>
             
-            <div class="relative p-4 z-10">
-                <div class="flex justify-between items-start mb-3">
-                    <div class="flex items-center gap-3 overflow-hidden">
-                        <div class="w-10 h-10 rounded-lg bg-indigo-500/20 flex items-center justify-center flex-shrink-0 text-indigo-400">
+            <div class="relative p-5 z-10">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="flex items-center gap-4 overflow-hidden">
+                        <div class="w-12 h-12 rounded-lg bg-yellow-400 bg-opacity-10 flex items-center justify-center flex-shrink-0 text-yellow-400 border-2 border-black shadow-[2px_2px_0px_rgba(0,0,0,0.2)]">
                              <i class="fa-solid fa-file-arrow-down text-xl"></i>
                         </div>
                         <div class="min-w-0">
@@ -1090,48 +1090,47 @@ function createProgressBar(
                             <div class="flex items-center gap-2 mt-0.5">
                                 ${retryBadge}
                                 ${stallWarning}
-                                ${isQueued ? `<span class="text-xs text-yellow-500/80 flex items-center gap-1"><i class="fa-solid fa-hourglass-start text-[10px]"></i> Waiting in queue...</span>` : ''}
-                                ${!isComplete && !isQueued && !retryBadge && !stallWarning ? `<span class="text-xs text-indigo-300 flex items-center gap-1"><i class="fa-solid fa-bolt text-[10px]"></i> ${speedText}</span>` : ''}
+                                ${isQueued ? `<span class="text-xs text-yellow-500 flex items-center gap-1 font-bold uppercase italic"><i class="fa-solid fa-hourglass-start text-[10px]"></i> Queued!</span>` : ''}
+                                ${!isComplete && !isQueued && !retryBadge && !stallWarning ? `<span class="text-xs text-yellow-300 font-bold flex items-center gap-1 uppercase"><i class="fa-solid fa-bolt text-[10px]"></i> ${speedText}</span>` : ''}
                             </div>
                         </div>
                     </div>
                     
                     ${isComplete ? `
-                        <button onclick="clearIndividualProgress('${fileId}')" class="w-7 h-7 flex items-center justify-center bg-gray-500/20 text-gray-400 hover:bg-red-500/20 hover:text-red-400 transition-all rounded-lg focus:outline-none" title="Clear History">
-                            <i class="fa-solid fa-xmark text-xs"></i>
+                        <button onclick="clearIndividualProgress('${fileId}')" class="w-8 h-8 flex items-center justify-center btn-red rounded-xl focus:outline-none" title="Clear History">
+                            <i class="fa-solid fa-xmark text-sm"></i>
                         </button>
                     ` : `
                         <div class="flex flex-col items-end gap-1">
                             <div class="flex items-center gap-2">
-                                <span class="text-lg font-bold text-white">${isQueued ? '0' : percentage}%</span>
+                                <span class="text-lg font-bold text-white header-gradient">${isQueued ? '0' : percentage}%</span>
                                 <button onclick="cancelIndividualDownload('${fileId}')" 
-                                    class="w-7 h-7 flex items-center justify-center ${isQueued ? 'bg-orange-500/10 text-orange-400 hover:bg-orange-600' : 'bg-red-500/10 text-red-400 hover:bg-red-600'} hover:text-white transition-all rounded-lg focus:outline-none" 
+                                    class="w-8 h-8 flex items-center justify-center ${isQueued ? 'btn-orange-hover' : 'btn-red'} rounded-xl focus:outline-none" 
                                     title="${isQueued ? 'Remove from Queue' : 'Cancel Download'}">
-                                    <i class="fa-solid ${isQueued ? 'fa-trash-can' : 'fa-stop'} text-[10px]"></i>
+                                    <i class="fa-solid ${isQueued ? 'fa-trash-can' : 'fa-stop'} text-xs"></i>
                                 </button>
                             </div>
-                            <div class="text-xs text-gray-400 font-mono">${etaText}</div>
+                            <div class="text-xs text-gray-400 font-medium tracking-wide">${etaText}</div>
                         </div>
                     `}
                 </div>
 
                 <!-- Progress Track -->
-                <div class="h-2 w-full bg-gray-700/50 rounded-full overflow-hidden mb-2">
-                    <div class="h-full rounded-full transition-all duration-300 ease-out relative ${isComplete ? 'bg-green-500' : 'bg-gradient-to-r from-indigo-500 to-purple-500'}" 
-                         style="width: ${percentage}%">
-                         ${!isComplete ? '<div class="absolute inset-0 bg-white/20 animate-pulse"></div>' : ''}
+                <div class="h-4 w-full bg-gray-900 border-2 border-black rounded-full overflow-hidden mb-3 relative shadow-[inset_2px_2px_4px_rgba(0,0,0,0.5)]">
+                    <div class="h-full transition-all duration-500 ease-out relative ${isComplete ? 'bg-green-500' : 'bg-yellow-400 progress-bar-glow'}" 
+                         style="width: ${percentage}%; background-color: ${isComplete ? '' : '#fbbf24'}; border-right: ${isComplete ? 'none' : '2px solid black'};">
                     </div>
                 </div>
 
                 <div class="flex justify-between items-center text-xs text-gray-400 font-medium">
-                    <span>${isQueued ? 'Awaiting start...' : `${formatBytes(current)} of ${formatBytes(total)}`}</span>
+                    <span>${isQueued ? 'Awaiting start...' : `${formatBytes(current)} <span class="opacity-50 mx-1">/</span> ${formatBytes(total)}`}</span>
                     ${isComplete
-            ? '<span class="text-green-400 flex items-center gap-1"><i class="fa-solid fa-check-circle"></i> Complete</span>'
+            ? '<span class="text-green-400 font-bold flex items-center gap-1.5"><i class="fa-solid fa-circle-check"></i> Complete</span>'
             : isQueued
-                ? '<span class="text-yellow-500/70 flex items-center gap-1"><i class="fa-solid fa-clock"></i> Queued</span>'
+                ? '<span class="text-yellow-400 text-opacity-70 font-medium flex items-center gap-1.5"><i class="fa-solid fa-clock"></i> Queued</span>'
                 : retryAttempt > 1
-                    ? '<span class="text-yellow-400 flex items-center gap-1"><i class="fa-solid fa-spinner fa-spin"></i> Retrying...</span>'
-                    : '<span class="text-indigo-400 flex items-center gap-1"><i class="fa-solid fa-spinner fa-spin"></i> Downloading</span>'
+                    ? '<span class="text-yellow-400 font-bold flex items-center gap-1.5"><i class="fa-solid fa-spinner fa-spin"></i> Retrying...</span>'
+                    : '<span class="text-blue-400 font-bold flex items-center gap-1.5"><i class="fa-solid fa-spinner fa-spin"></i> Downloading</span>'
         }
                 </div>
             </div>
@@ -1152,32 +1151,32 @@ function createCancelledProgressBar(
     let html = `
         <div id="${progressId}" class="relative overflow-hidden group opacity-80">
             <!-- Glass effect background with red tint -->
-            <div class="absolute inset-0 bg-red-900/10 backdrop-blur-sm border border-red-500/20 rounded-xl"></div>
+            <div class="absolute inset-0 bg-red-900 bg-opacity-10 backdrop-blur-sm border-2 border-red-500 border-opacity-20 rounded-xl shadow-[3px_3px_0px_rgba(0,0,0,0.2)]"></div>
             
             <div class="relative p-4 z-10">
                 <div class="flex justify-between items-start mb-3">
                     <div class="flex items-center gap-3 overflow-hidden">
-                        <div class="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center flex-shrink-0 text-red-400">
+                        <div class="w-10 h-10 rounded-lg bg-red-500 bg-opacity-10 flex items-center justify-center flex-shrink-0 text-red-400 border border-black shadow-[2px_2px_0px_rgba(0,0,0,0.2)]">
                              <i class="fa-solid fa-ban text-xl"></i>
                         </div>
                         <div class="min-w-0">
-                            <div class="file-name text-gray-300 font-medium line-clamp-2 line-through decoration-red-500/50" title="${fileName}">
+                            <div class="file-name text-gray-300 font-medium line-clamp-2 line-through decoration-red-500 decoration-opacity-50" title="${fileName}">
                                 ${fileName}
                             </div>
                             <div class="flex items-center gap-2 mt-0.5">
-                                <span class="text-xs text-red-400 flex items-center gap-1"><i class="fa-solid fa-circle-stop text-[10px]"></i> Cancelled</span>
+                                <span class="text-xs text-red-400 flex items-center gap-1 font-bold uppercase"><i class="fa-solid fa-circle-stop text-[10px]"></i> Cancelled</span>
                             </div>
                         </div>
                     </div>
                     
-                    <button onclick="clearIndividualProgress('${fileId}')" class="w-7 h-7 flex items-center justify-center bg-gray-500/20 text-gray-400 hover:bg-red-500/20 hover:text-red-400 transition-all rounded-lg focus:outline-none" title="Dismiss">
+                    <button onclick="clearIndividualProgress('${fileId}')" class="w-7 h-7 flex items-center justify-center btn-red rounded-xl focus:outline-none" title="Dismiss">
                         <i class="fa-solid fa-xmark text-xs"></i>
                     </button>
                 </div>
 
                 <!-- Progress Track -->
-                <div class="h-2 w-full bg-gray-700/50 rounded-full overflow-hidden mb-2">
-                    <div class="h-full rounded-full bg-red-500/50" style="width: ${percentage}%"></div>
+                <div class="h-2 w-full bg-gray-700 bg-opacity-50 border border-black rounded-full overflow-hidden mb-2">
+                    <div class="h-full rounded-full bg-red-500 bg-opacity-50" style="width: ${percentage}%; border-right: 1.5px solid black;"></div>
                 </div>
 
                 <div class="flex justify-between items-center text-xs text-gray-400 font-medium">
@@ -1583,39 +1582,39 @@ function showAlert(_elementId, message, type) {
     const toastContainer = document.getElementById("toastContainer");
     if (!toastContainer) return;
 
-    let borderClass = "border-indigo-500";
-    let icon = "fa-info-circle";
-    let iconColor = "text-indigo-400";
+    let borderClass = "border-black";
+    let typeClass = "toast-info";
+    let icon = "fa-circle-info";
+    let iconColor = "text-white";
     let title = "Info";
 
     if (type === "success") {
-        borderClass = "border-green-500";
+        typeClass = "toast-success";
         icon = "fa-circle-check";
-        iconColor = "text-green-400";
+        iconColor = "text-emerald-300";
         title = "Success";
     } else if (type === "error") {
-        borderClass = "border-red-500";
+        typeClass = "toast-error";
         icon = "fa-circle-xmark";
-        iconColor = "text-red-400";
+        iconColor = "text-rose-300";
         title = "Error";
     } else if (type === "warning") {
-        borderClass = "border-yellow-500";
+        typeClass = "toast-info";
         icon = "fa-triangle-exclamation";
-        iconColor = "text-yellow-400";
+        iconColor = "text-amber-300";
         title = "Warning";
-    } else if (type === "info") {
-        borderClass = "border-blue-500";
-        icon = "fa-circle-info";
-        iconColor = "text-blue-400";
-        title = "Info";
     }
 
     const isDesktop = window.innerWidth >= 640;
     const animationClass = isDesktop ? 'animate-fade-in-down' : 'animate-fade-in-up';
 
     const toast = document.createElement("div");
-    // Unified design: 70% opaqueness + blur for readability
-    toast.className = `flex flex-col px-5 py-4 rounded-2xl bg-gray-950/70 backdrop-blur-md border border-white/10 shadow-2xl text-white ${animationClass} pointer-events-auto w-[92vw] sm:w-[400px] sm:min-w-[400px] sm:max-w-[400px] relative mt-2 transition-all duration-300 transform ring-1 ring-white/5`;
+    // Comic Speech Bubble design: ink borders + hard shadow + kapow animation + color coding
+    toast.className = `flex flex-col px-5 py-4 comic-toast animate-kapow text-white ${typeClass} ${animationClass} pointer-events-auto mt-4 transition-all duration-300 transform z-[99999] flex-shrink-0 relative`;
+    toast.style.setProperty("width", "400px", "important");
+    toast.style.setProperty("min-width", "400px", "important");
+    toast.style.setProperty("max-width", "400px", "important");
+    toast.style.setProperty("margin-bottom", "15px", "important");
 
     toast.innerHTML = `
         <div class="flex items-start gap-4">
@@ -1949,11 +1948,11 @@ function switchTab(tab) {
         searchTab.classList.remove('hidden');
         queueTab.classList.add('hidden');
 
-        searchBtn.classList.add('border-indigo-500', 'text-white');
-        searchBtn.classList.remove('border-transparent', 'text-gray-400');
+        searchBtn.classList.add('btn-gradient');
+        searchBtn.classList.remove('text-gray-400', 'border-transparent');
 
-        queueBtn.classList.remove('border-indigo-500', 'text-white');
-        queueBtn.classList.add('border-transparent', 'text-gray-400');
+        queueBtn.classList.remove('btn-gradient');
+        queueBtn.classList.add('text-gray-400', 'border-transparent');
 
         // Stop queue polling
         if (queuePollInterval) {
@@ -1965,11 +1964,11 @@ function switchTab(tab) {
         searchTab.classList.add('hidden');
         queueTab.classList.remove('hidden');
 
-        queueBtn.classList.add('border-indigo-500', 'text-white');
-        queueBtn.classList.remove('border-transparent', 'text-gray-400');
+        queueBtn.classList.add('btn-gradient');
+        queueBtn.classList.remove('text-gray-400', 'border-transparent');
 
-        searchBtn.classList.remove('border-indigo-500', 'text-white');
-        searchBtn.classList.add('border-transparent', 'text-gray-400');
+        searchBtn.classList.remove('btn-gradient');
+        searchBtn.classList.add('text-gray-400', 'border-transparent');
 
         // Fetch queue immediately
         fetchQueue();

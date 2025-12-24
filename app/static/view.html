@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TeleFetchr</title>
     <!-- Favicon -->
-    <link rel="icon" type="image/png" href="/static/images/favicon.png" />
+    <link rel="icon" type="image/png" href="/static/images/favicon.png?v=2" />
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -18,65 +18,218 @@
         }
 
         body {
-            background-color: #0f172a;
-            color: #e2e8f0;
+            background-color: #131e32;
+            color: #f1f5f9;
+            background-image: url("https://www.transparenttextures.com/patterns/stardust.png");
+            /* Subtle paper grain */
         }
 
-        /* Glassmorphism Card */
+        /* Comic Panel Design */
         .glass-card {
-            background: rgba(30, 41, 59, 0.7);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            border-radius: 16px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            background: #1e293b;
+            border: 1.5px solid #000;
+            border-radius: 12px;
+            box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.4);
+            position: relative;
         }
 
         .header-gradient {
-            background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
-            -webkit-background-clip: text;
-            background-clip: text;
-            -webkit-text-fill-color: transparent;
+            color: #fcd34d;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 800;
+            text-shadow: 2px 2px 0px #000;
         }
 
         .btn-gradient {
-            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-            transition: all 0.3s ease;
+            background: #fcd34d;
+            border: 2px solid #000;
+            color: #000;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            box-shadow: 3px 3px 0px #000;
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
 
         .btn-gradient:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px -10px rgba(99, 102, 241, 0.6);
+            transform: translate(-1px, -1px);
+            box-shadow: 4px 4px 0px #000;
+            background: #fbbf24;
+        }
+
+        /* Comic Grey Button - Turns Yellow on Hover */
+        .btn-yellow-hover {
+            background: rgba(107, 114, 128, 0.15);
+            border: 1.5px solid #000;
+            color: #9ca3af;
+            font-weight: 700;
+            text-transform: uppercase;
+            box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.3);
+            transition: all 0.2s ease;
+        }
+
+        .btn-yellow-hover:hover {
+            background: #fcd34d;
+            color: #000;
+            border-color: #000;
+            transform: translate(-1.5px, -1.5px);
+            box-shadow: 3.5px 3.5px 0px #000;
+        }
+
+        /* Comic Grey Button - Turns Orange on Hover */
+        .btn-orange-hover {
+            background: rgba(107, 114, 128, 0.15);
+            border: 1.5px solid #000;
+            color: #9ca3af;
+            font-weight: 700;
+            text-transform: uppercase;
+            box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.3);
+            transition: all 0.2s ease;
+        }
+
+        .btn-orange-hover:hover {
+            background: #f97316;
+            color: #fff;
+            border-color: #000;
+            transform: translate(-1.5px, -1.5px);
+            box-shadow: 3.5px 3.5px 0px #000;
+        }
+
+        .btn-red {
+            background: rgba(239, 68, 68, 0.15);
+            border: 2px solid #000;
+            color: #ef4444;
+            font-weight: 800;
+            text-transform: uppercase;
+            box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.5);
+            transition: all 0.2s ease;
+        }
+
+        .btn-red:hover {
+            background: #ef4444;
+            color: #fff;
+            transform: translate(-2px, -2px);
+            box-shadow: 4px 4px 0px #000;
         }
 
         input,
         select {
-            background: #1e293b !important;
-            border-color: #334155 !important;
+            background: #0f172a !important;
+            border: 1.5px solid #000 !important;
             color: #f1f5f9 !important;
+            border-radius: 8px !important;
+            box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.2) !important;
         }
 
         input:focus,
         select:focus {
-            border-color: #818cf8 !important;
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2) !important;
+            border-color: #fcd34d !important;
+            box-shadow: 3px 3px 0px #000 !important;
+            outline: none !important;
         }
 
-        /* Custom Scrollbar */
+        /* Progress Bar Enhancements - Comic style */
+        .progress-bar-glow {
+            border-right: 1.5px solid #000;
+        }
+
+        /* Custom Scrollbar - Inky Comic Edition */
         ::-webkit-scrollbar {
-            width: 8px;
+            width: 10px;
         }
 
         ::-webkit-scrollbar-track {
-            background: #0f172a;
+            background: #131e32;
         }
 
         ::-webkit-scrollbar-thumb {
-            background: #334155;
-            border-radius: 4px;
+            background: #1e293b;
+            border: 2px solid #000;
+            border-radius: 0px;
         }
 
         ::-webkit-scrollbar-thumb:hover {
-            background: #475569;
+            background: #fcd34d;
+        }
+
+        /* Comic Toast Bubbles */
+        .comic-toast {
+            position: relative;
+            background: #1e293b;
+            border: 2px solid #000;
+            box-shadow: 4px 4px 0px #000;
+            border-radius: 12px;
+        }
+
+        .comic-toast::after {
+            content: '';
+            position: absolute;
+            bottom: -12px;
+            right: 20px;
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-top: 12px solid #000;
+        }
+
+        .comic-toast::before {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            right: 21px;
+            width: 0;
+            height: 0;
+            border-left: 9px solid transparent;
+            border-right: 9px solid transparent;
+            border-top: 10px solid #1e293b;
+            z-index: 10;
+        }
+
+        /* Color Coding for Comic Toasts */
+        .toast-success {
+            background: #065f46 !important;
+        }
+
+        .toast-success::before {
+            border-top-color: #065f46 !important;
+        }
+
+        .toast-error {
+            background: #991b1b !important;
+        }
+
+        .toast-error::before {
+            border-top-color: #991b1b !important;
+        }
+
+        .toast-info {
+            background: #1e3a8a !important;
+        }
+
+        .toast-info::before {
+            border-top-color: #1e3a8a !important;
+        }
+
+        @keyframes kapow {
+            0% {
+                transform: scale(0.8) rotate(-2deg);
+                opacity: 0;
+            }
+
+            50% {
+                transform: scale(1.1) rotate(2deg);
+            }
+
+            100% {
+                transform: scale(1) rotate(0deg);
+                opacity: 1;
+            }
+        }
+
+        .animate-kapow {
+            animation: kapow 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
         }
 
         .line-clamp-2 {
@@ -97,7 +250,9 @@
     <header
         class="glass-card m-2 sm:m-4 px-3 sm:px-6 py-3 sm:py-4 flex justify-between items-center sticky top-2 sm:top-4 z-40">
         <div class="flex items-center gap-2 sm:gap-4">
-            <img src="/static/images/logo.png" alt="TeleFetchr Logo" class="h-8 sm:h-12 w-auto drop-shadow-lg" />
+            <img src="/static/images/logo.png?v=2" alt="TeleFetchr Logo"
+                class="h-10 sm:h-14 w-10 sm:w-14 border-2 border-black shadow-[3px_3px_0px_#000] rounded-full object-cover"
+                style="clip-path: circle(50%);" />
             <h1 class="text-lg sm:text-2xl font-bold tracking-tight header-gradient">TeleFetchr</h1>
         </div>
 
@@ -117,12 +272,12 @@
             <div class="flex items-center gap-1 sm:gap-3 sm:pl-4 sm:border-l sm:border-gray-700" id="userInfoActions">
                 <span id="userInfo" class="text-sm font-medium text-gray-300 hidden md:inline-block"></span>
                 <button onclick="logoutSession()"
-                    class="bg-red-500/20 text-red-400 hover:bg-red-600 hover:text-white transition-all p-1.5 sm:p-2 rounded-xl focus:outline-none"
+                    class="bg-red-500/15 border border-black text-red-400 hover:bg-red-500 hover:text-white hover:-translate-y-0.5 hover:shadow-[2px_2px_0px_#000] transition-all p-1.5 sm:p-2 rounded-xl focus:outline-none"
                     title="Delete Session">
                     <i class="fa-solid fa-power-off text-sm sm:text-base"></i>
                 </button>
                 <button onclick="logout()"
-                    class="bg-gray-500/20 text-gray-400 hover:bg-gray-600 hover:text-white transition-all p-1.5 sm:p-2 rounded-xl focus:outline-none"
+                    class="bg-gray-500/15 border border-black text-gray-400 hover:bg-gray-600 hover:text-white hover:-translate-y-0.5 hover:shadow-[2px_2px_0px_#000] transition-all p-1.5 sm:p-2 rounded-xl focus:outline-none"
                     title="Logout">
                     <i class="fa-solid fa-sign-out-alt text-sm sm:text-base"></i>
                 </button>
@@ -134,19 +289,19 @@
 
         <!-- Login Form -->
         <div id="loginSection" class="w-full max-w-md hidden">
-            <div class="glass-card p-8 border-t-4 border-indigo-500">
+            <div class="glass-card p-8 border-t-4 border-amber-500">
                 <div class="text-center mb-8">
                     <h2 class="text-2xl font-bold text-white mb-2">Welcome Back</h2>
                     <p class="text-gray-400">Sign in to your Telegram account to start downloading.</p>
                 </div>
 
                 <div id="requestCodeBtn" class="space-y-4">
-                    <div class="bg-indigo-900/20 p-4 rounded-lg border border-indigo-500/20 mb-6">
-                        <p class="text-indigo-300 text-sm text-center"><i
+                    <div class="bg-amber-900/20 p-4 rounded-lg border border-amber-500/20 mb-6">
+                        <p class="text-amber-300 text-sm text-center"><i
                                 class="fa-solid fa-shield-halved mr-2"></i>Secure Login via Telegram API</p>
                     </div>
                     <button onclick="requestCode()"
-                        class="w-full bg-indigo-500/15 py-3.5 rounded-xl text-indigo-400 font-semibold shadow-lg shadow-indigo-500/10 flex items-center justify-center gap-2 group hover:bg-indigo-600 hover:text-white transition-all focus:outline-none">
+                        class="w-full bg-amber-500/15 py-3.5 rounded-xl text-amber-400 font-semibold shadow-lg shadow-amber-500/10 flex items-center justify-center gap-2 group hover:bg-amber-600 hover:text-white transition-all focus:outline-none">
                         <span>Send Verification Code</span>
                         <i class="fa-solid fa-arrow-right group-hover:translate-x-1 transition-transform"></i>
                     </button>
@@ -158,11 +313,11 @@
                             class="block text-gray-400 text-xs font-bold uppercase tracking-widest mb-1.5">Verification
                             Code</label>
                         <input type="text" id="verificationCode"
-                            class="w-full bg-gray-900/50 border border-gray-700 px-4 py-3 rounded-xl focus:ring-2 focus:ring-indigo-500/50 transition-all outline-none text-white text-center tracking-[0.5em] font-mono text-xl"
+                            class="w-full bg-gray-900/50 border border-gray-700 px-4 py-3 rounded-xl focus:ring-2 focus:ring-amber-500/50 transition-all outline-none text-white text-center tracking-[0.5em] font-mono text-xl"
                             placeholder="XXXXX" autocomplete="one-time-code">
                     </div>
                     <button onclick="verifyCode()"
-                        class="w-full bg-indigo-500/15 py-3 rounded-xl text-indigo-400 font-medium hover:bg-indigo-600 hover:text-white shadow-lg transition-all focus:outline-none">Verify
+                        class="w-full bg-amber-500/15 py-3 rounded-xl text-amber-400 font-medium hover:bg-amber-600 hover:text-white shadow-lg transition-all focus:outline-none">Verify
                         &
                         Login</button>
                 </div>
@@ -172,11 +327,11 @@
                         <label class="block text-gray-400 text-xs font-bold uppercase tracking-widest mb-1.5">2FA
                             Password</label>
                         <input type="password" id="password2fa"
-                            class="w-full bg-gray-900/50 border border-gray-700 px-4 py-3 rounded-xl focus:ring-2 focus:ring-indigo-500/50 transition-all outline-none text-white text-center"
+                            class="w-full bg-gray-900/50 border border-gray-700 px-4 py-3 rounded-xl focus:ring-2 focus:ring-amber-500/50 transition-all outline-none text-white text-center"
                             placeholder="••••••••">
                     </div>
                     <button onclick="verify2FA()"
-                        class="w-full bg-indigo-500/15 py-3 rounded-xl text-indigo-400 font-medium hover:bg-indigo-600 hover:text-white shadow-lg transition-all focus:outline-none">Unlock
+                        class="w-full bg-amber-500/15 py-3 rounded-xl text-amber-400 font-medium hover:bg-amber-600 hover:text-white shadow-lg transition-all focus:outline-none">Unlock
                         Account</button>
                 </div>
             </div>
@@ -196,7 +351,7 @@
                         <p class="text-gray-400 text-sm font-medium mb-1">Save Location</p>
                         <p id="savePathText" class="text-white font-mono text-sm break-all font-semibold">/downloads</p>
                     </div>
-                    <div class="bg-blue-500/20 p-2 rounded-lg text-blue-400">
+                    <div class="bg-yellow-500/20 p-2 rounded-lg text-yellow-400">
                         <i class="fa-solid fa-hard-drive"></i>
                     </div>
                 </div>
@@ -210,7 +365,7 @@
                             <span class="text-xs text-green-400 font-medium">Active</span>
                         </div>
                     </div>
-                    <div class="bg-purple-500/20 p-2 rounded-lg text-purple-400">
+                    <div class="bg-orange-500/20 p-2 rounded-lg text-orange-400">
                         <i class="fa-solid fa-network-wired"></i>
                     </div>
                 </div>
@@ -221,22 +376,22 @@
                         <p class="text-gray-400 text-sm font-medium mb-1">Session Duration</p>
                         <h3 class="text-2xl font-bold text-white" id="sessionTimer">00:00</h3>
                     </div>
-                    <div class="bg-indigo-500/20 p-2 rounded-lg text-indigo-400">
+                    <div class="bg-amber-500/20 p-2 rounded-lg text-amber-400">
                         <i class="fa-solid fa-clock"></i>
                     </div>
                 </div>
             </div>
 
             <!-- Tab Navigation -->
-            <div class="flex space-x-3 border-b border-gray-700/50 pb-2 mb-6">
+            <div class="flex space-x-3 border-b border-black pb-2 mb-6">
                 <button onclick="switchTab('search')" id="tab-search"
-                    class="px-6 py-2.5 rounded-xl text-white bg-indigo-500/20 font-medium transition-all flex items-center gap-2 shadow-lg shadow-indigo-500/5 focus:outline-none">
+                    class="btn-gradient px-6 py-2.5 rounded-xl font-medium transition-all flex items-center gap-2 focus:outline-none">
                     <i class="fa-solid fa-search text-xs opacity-70"></i> Search
                 </button>
                 <button onclick="switchTab('queue')" id="tab-queue"
-                    class="px-6 py-2.5 rounded-xl text-gray-400 hover:text-white hover:bg-gray-700/30 font-medium transition-all flex items-center gap-2 focus:outline-none">
+                    class="px-6 py-2.5 rounded-xl text-gray-400 hover:text-amber-400 font-medium transition-all flex items-center gap-2 border border-transparent hover:border-black hover:bg-amber-500/10 focus:outline-none">
                     <i class="fa-solid fa-list text-xs opacity-70"></i> Queue <span id="queueCountBadge"
-                        class="ml-1 bg-indigo-600/50 text-white text-[10px] px-1.5 py-0.5 rounded-full hidden">0</span>
+                        class="ml-1 bg-amber-600 text-white text-[10px] px-1.5 py-0.5 rounded-full hidden border border-black">0</span>
                 </button>
             </div>
 
@@ -253,7 +408,7 @@
                                 <i
                                     class="fa-brands fa-telegram absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
                                 <select id="channelUsername"
-                                    class="w-full pl-11 pr-4 py-3 rounded-lg appearance-none cursor-pointer focus:ring-2 focus:ring-indigo-500 transition-all outline-none border border-gray-700 bg-gray-900">
+                                    class="w-full pl-11 pr-4 py-3 rounded-lg appearance-none cursor-pointer focus:ring-2 focus:ring-amber-500 transition-all outline-none border border-gray-700 bg-gray-900">
                                     <option>Loading channels...</option>
                                 </select>
                                 <i
@@ -268,7 +423,7 @@
                                 <i
                                     class="fa-solid fa-list-ol absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
                                 <input type="number" id="fileLimit" value="10" min="1" max="1000"
-                                    class="w-full pl-11 pr-4 py-3 rounded-lg border border-gray-700 bg-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none transition-all">
+                                    class="w-full pl-11 pr-4 py-3 rounded-lg border border-gray-700 bg-gray-900 focus:ring-2 focus:ring-amber-500 outline-none transition-all">
                             </div>
                         </div>
 
@@ -279,7 +434,7 @@
                                 <i
                                     class="fa-solid fa-filter absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
                                 <select id="fileType"
-                                    class="w-full pl-11 pr-4 py-3 rounded-lg border border-gray-700 bg-gray-900 appearance-none cursor-pointer focus:ring-2 focus:ring-indigo-500 outline-none transition-all">
+                                    class="w-full pl-11 pr-4 py-3 rounded-lg border border-gray-700 bg-gray-900 appearance-none cursor-pointer focus:ring-2 focus:ring-amber-500 outline-none transition-all">
                                     <option value="">All Files</option>
                                     <option value="document">Documents</option>
                                     <option value="photo">Photos</option>
@@ -293,7 +448,7 @@
                     <!-- Advanced Filters Toggle -->
                     <div class="mb-4">
                         <button id="toggleFiltersBtn" onclick="toggleFilters()" type="button"
-                            class="px-3 py-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 text-xs font-medium hover:bg-indigo-500/20 hover:text-indigo-300 flex items-center gap-2 transition-all focus:outline-none">
+                            class="px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-400 text-xs font-medium hover:bg-amber-500/20 hover:text-amber-300 flex items-center gap-2 transition-all focus:outline-none">
                             <i class="fa-solid fa-sliders"></i> Show Advanced Filters
                         </button>
                     </div>
@@ -309,7 +464,7 @@
                                 <i
                                     class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
                                 <input type="text" id="searchQuery" placeholder="Filename contains..."
-                                    class="w-full pl-11 pr-4 py-3 rounded-lg border border-gray-700 bg-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none transition-all">
+                                    class="w-full pl-11 pr-4 py-3 rounded-lg border border-gray-700 bg-gray-900 focus:ring-2 focus:ring-amber-500 outline-none transition-all">
                             </div>
                         </div>
 
@@ -319,7 +474,7 @@
                             <div class="relative">
                                 <i class="fa-solid fa-file absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
                                 <input type="text" id="fileExtension" placeholder="e.g. .mp4"
-                                    class="w-full pl-11 pr-4 py-3 rounded-lg border border-gray-700 bg-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none transition-all">
+                                    class="w-full pl-11 pr-4 py-3 rounded-lg border border-gray-700 bg-gray-900 focus:ring-2 focus:ring-amber-500 outline-none transition-all">
                             </div>
                         </div>
 
@@ -331,7 +486,7 @@
                                 <i
                                     class="fa-solid fa-weight-hanging absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
                                 <input type="number" id="minSize" min="0" placeholder="0"
-                                    class="w-full pl-11 pr-4 py-3 rounded-lg border border-gray-700 bg-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none transition-all">
+                                    class="w-full pl-11 pr-4 py-3 rounded-lg border border-gray-700 bg-gray-900 focus:ring-2 focus:ring-amber-500 outline-none transition-all">
                             </div>
                         </div>
 
@@ -343,7 +498,7 @@
                                 <i
                                     class="fa-solid fa-weight-hanging absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
                                 <input type="number" id="maxSize" min="0" placeholder="0"
-                                    class="w-full pl-11 pr-4 py-3 rounded-lg border border-gray-700 bg-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none transition-all">
+                                    class="w-full pl-11 pr-4 py-3 rounded-lg border border-gray-700 bg-gray-900 focus:ring-2 focus:ring-amber-500 outline-none transition-all">
                             </div>
                         </div>
                     </div>
@@ -351,16 +506,16 @@
                     <!-- Action Buttons -->
                     <div class="flex flex-col sm:flex-row gap-3 border-t border-gray-700 pt-6">
                         <button onclick="listFiles()" id="scanBtn"
-                            class="flex-1 py-3 px-6 rounded-xl bg-indigo-500/20 text-indigo-400 font-medium hover:bg-indigo-600 hover:text-white transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none">
+                            class="flex-1 py-3 px-6 rounded-xl btn-yellow-hover flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none">
                             <i class="fa-solid fa-magnifying-glass"></i> <span>Scan Files</span>
                         </button>
                         <button onclick="downloadAll()" id="addAllBtn"
-                            class="flex-1 py-3 px-6 rounded-xl bg-purple-500/20 text-purple-400 font-medium hover:bg-purple-600 hover:text-white transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none">
+                            class="flex-1 py-3 px-6 rounded-xl btn-yellow-hover flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none">
                             <i class="fa-solid fa-cloud-arrow-down"></i> <span>Download All</span>
                         </button>
 
                         <button onclick="cancelDownload()" id="stopAllBtn"
-                            class="hidden flex-1 py-3 px-6 rounded-xl bg-red-500/20 text-red-500 font-medium hover:bg-red-500 hover:text-white transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none">
+                            class="hidden flex-1 py-3 px-6 rounded-xl btn-red flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none">
                             <i class="fa-solid fa-stop"></i> <span>Stop All</span>
                         </button>
                     </div>
@@ -372,7 +527,7 @@
                     <div id="activeSection" class="space-y-4 hidden">
                         <div class="flex justify-between items-end px-1">
                             <h3 id="activeTitle" class="text-lg font-semibold text-white flex items-center gap-2">
-                                <i id="activeIcon" class="fa-solid fa-circle-notch fa-spin text-indigo-500"></i>
+                                <i id="activeIcon" class="fa-solid fa-circle-notch fa-spin text-amber-500"></i>
                                 Active Download
                             </h3>
                         </div>
@@ -414,12 +569,12 @@
                         </div>
                         <div class="flex gap-2">
                             <button onclick="refreshQueue()"
-                                class="w-9 h-9 flex items-center justify-center bg-purple-500/20 text-purple-400 rounded-xl hover:bg-purple-600 hover:text-white transition-all focus:outline-none"
+                                class="w-9 h-9 flex items-center justify-center btn-orange-hover rounded-xl focus:outline-none"
                                 title="Refresh Queue">
                                 <i class="fa-solid fa-rotate text-sm"></i>
                             </button>
                             <button onclick="clearQueue()" id="clearQueueBtn"
-                                class="px-4 py-1.5 bg-red-500/20 text-red-400 text-sm font-normal rounded-xl hover:bg-red-600 hover:text-white transition-all shadow-lg shadow-red-900/10 focus:outline-none">
+                                class="px-4 py-1.5 btn-red rounded-xl focus:outline-none">
                                 <i class="fa-solid fa-trash-can mr-2 text-xs"></i> Clear Queue
                             </button>
                         </div>
@@ -443,16 +598,16 @@
                         </div>
                         <div class="flex gap-2">
                             <button onclick="changeQueuePage(-1)" id="prevPageBtn"
-                                class="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-800/50 border border-gray-700/50 text-gray-400 hover:bg-gray-700 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all focus:outline-none">
+                                class="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-800/50 border border-black text-gray-400 hover:bg-amber-500 hover:text-black hover:shadow-[2px_2px_0px_#000] hover:-translate-y-0.5 disabled:opacity-30 disabled:cursor-not-allowed transition-all focus:outline-none">
                                 <i class="fa-solid fa-chevron-left text-xs"></i>
                             </button>
                             <div
-                                class="flex items-center px-4 rounded-xl bg-gray-800/30 border border-gray-700/30 text-xs font-semibold text-indigo-400">
+                                class="flex items-center px-4 rounded-xl bg-gray-800/30 border border-gray-700/30 text-xs font-semibold text-amber-400">
                                 Page <span id="currentPageNum" class="mx-1">1</span> of <span id="totalPageNum"
                                     class="ml-1 text-gray-500">1</span>
                             </div>
                             <button onclick="changeQueuePage(1)" id="nextPageBtn"
-                                class="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-800/50 border border-gray-700/50 text-gray-400 hover:bg-gray-700 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all focus:outline-none">
+                                class="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-800/50 border border-black text-gray-400 hover:bg-amber-500 hover:text-black hover:shadow-[2px_2px_0px_#000] hover:-translate-y-0.5 disabled:opacity-30 disabled:cursor-not-allowed transition-all focus:outline-none">
                                 <i class="fa-solid fa-chevron-right text-xs"></i>
                             </button>
                         </div>
@@ -481,7 +636,7 @@
         </div>
     </main>
 
-    <script src="/static/js/script.js?v=12"></script>
+    <script src="/static/js/script.js?v=13"></script>
     <!-- Toast Container -->
     <div id="toastContainer"
         class="fixed bottom-8 left-4 right-4 sm:bottom-auto sm:top-6 sm:right-6 sm:left-auto flex flex-col items-center sm:items-end gap-3 pointer-events-none transition-all duration-300"
