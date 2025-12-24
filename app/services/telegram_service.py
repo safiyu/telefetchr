@@ -282,8 +282,55 @@ class TelegramService:
         if file_size == 0:
              return await self.download_media(message, file_path, progress_callback)
 
-        chunk_size = math.ceil(file_size / workers)
-        downloaded_bytes = 0
+        # === OPTIMIZATION: Dynamic worker scaling based on file size ===
+        # For small files (<50MB), use fewer workers to reduce overhead
+        # For medium files (50-200MB), use moderate workers
+        # For large files (>200MB), use full worker count
+        if file_size < 50 * 1024 * 1024:  # <50MB
+            effective_workers = min(2, workers)
+        elif file_size < 200 * 1024 * 1024:  # <200MB
+            effective_workers = min(4, workers)
+        else:
+            effective_workers = workers
+        
+        logger.info(f"Starting parallel download: {file_size / (1024*1024):.1f}MB with {effective_workers} workers")
+        
+        # === OPTIMIZATION: CDN Warmup Phase ===
+        # Fetch a tiny initial chunk to prime the CDN connection before spawning workers.
+        # This resolves datacenter/CDN negotiation upfront, reducing per-worker latency.
+        warmup_bytes = 0
+        warmup_chunk_size = 64 * 1024  # 64KB warmup chunk
+        
+        try:
+            logger.debug("CDN warmup: fetching initial chunk to prime connection...")
+            warmup_start = datetime.now()
+            
+            async for chunk in self.client.iter_download(
+                message.media,
+                offset=0,
+                limit=warmup_chunk_size,
+                request_size=warmup_chunk_size
+            ):
+                if chunk:
+                    warmup_bytes = len(chunk)
+                    # Write warmup chunk to part0
+                    async with aiofiles.open(f"{file_path}.part0", 'wb') as f:
+                        await f.write(chunk)
+                    break
+            
+            warmup_duration = (datetime.now() - warmup_start).total_seconds()
+            logger.debug(f"CDN warmup complete: {warmup_bytes} bytes in {warmup_duration:.2f}s")
+            
+            # Immediately report progress so UI shows activity
+            if progress_callback and warmup_bytes > 0:
+                progress_callback(warmup_bytes, file_size)
+                
+        except Exception as e:
+            logger.warning(f"CDN warmup failed (continuing anyway): {e}")
+            warmup_bytes = 0
+
+        chunk_size = math.ceil(file_size / effective_workers)
+        downloaded_bytes = warmup_bytes  # Start from warmup bytes
         lock = asyncio.Lock()
         
         last_callback_time = [datetime.now()]
@@ -340,14 +387,20 @@ class TelegramService:
                 raise
 
         tasks = []
-        for i in range(workers):
+        for i in range(effective_workers):
             start = i * chunk_size
+            # For worker 0, skip the warmup bytes we already downloaded
+            if i == 0 and warmup_bytes > 0:
+                start = warmup_bytes
             end = min((i + 1) * chunk_size, file_size)
             if start >= end:
                 break
-            # Clear any existing part file first
+            # Clear any existing part file first (except part0 if warmup succeeded)
             part_path = f"{file_path}.part{i}"
-            if os.path.exists(part_path):
+            if i == 0 and warmup_bytes > 0:
+                # Keep warmup data for part0
+                pass
+            elif os.path.exists(part_path):
                 try:
                     os.remove(part_path)
                 except:
@@ -362,7 +415,7 @@ class TelegramService:
         except Exception as e:
             logger.error(f"Parallel download failed: {e}")
             # Cleanup all parts
-            for i in range(workers):
+            for i in range(effective_workers):
                 part_path = f"{file_path}.part{i}"
                 if os.path.exists(part_path):
                     try:

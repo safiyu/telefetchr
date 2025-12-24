@@ -152,6 +152,38 @@ docker-compose up -d
 | `PYTHONUNBUFFERED` | ❌ | 0 | Set to 1 for real-time logging |
 | `PUID` | ❌ | 1000 | User ID for file permissions |
 | `PGID` | ❌ | 1000 | Group ID for file permissions |
+| `DOWNLOAD_WORKERS` | ❌ | 8 | Number of parallel workers per file |
+| `DOWNLOAD_CHUNK_SIZE` | ❌ | 4194304 | Chunk size in bytes (default 4MB) |
+
+## Performance Tuning
+
+### Download Speed Optimizations
+
+Telefetchr uses several techniques to maximize download speed:
+
+1. **CDN Warmup** - Before spawning parallel workers, a small initial chunk is fetched to prime Telegram's CDN connection. This reduces the initial delay when starting downloads.
+
+2. **Dynamic Worker Scaling** - Workers are automatically adjusted based on file size:
+   - Files < 50MB: 2 workers
+   - Files 50-200MB: 4 workers
+   - Files > 200MB: Full worker count (default 8)
+
+3. **Parallel Segmented Downloads** - Large files are split into segments downloaded simultaneously, then merged.
+
+### Tuning Download Performance
+
+Add these to your `docker-compose.yml` environment section:
+
+```yaml
+environment:
+  # ... other variables ...
+  - DOWNLOAD_WORKERS=8          # Increase for faster network, decrease for stability
+  - DOWNLOAD_CHUNK_SIZE=4194304 # 4MB chunks (increase for faster connections)
+```
+
+**Tips:**
+- On slow or unstable connections, reduce `DOWNLOAD_WORKERS` to 2-4
+- On fast connections (>100Mbps), you can try increasing `DOWNLOAD_CHUNK_SIZE` to 8388608 (8MB)
 
 ## Troubleshooting
 

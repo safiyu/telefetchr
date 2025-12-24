@@ -456,7 +456,7 @@ async function checkSavedState() {
                                 </button>
                             ` : ''}
                             <button onclick="viewCompletedDownloads()" class="flex-1 sm:flex-none py-2 px-4 rounded-xl bg-indigo-500 bg-opacity-20 text-indigo-400 font-medium hover:bg-indigo-600 hover:text-white transition-all flex items-center justify-center gap-2 text-xs sm:text-sm focus:outline-none border border-black" style="box-shadow: 2px 2px 0px rgba(0,0,0,0.2)">
-                                <i class="fa-solid fa-eye"></i> View${completedCount > 0 ? ` (${completedCount})` : ''}
+                                <i class="fa-solid fa-eye"></i> View Completed${completedCount > 0 ? ` (${completedCount})` : ''}
                             </button>
                             <button onclick="clearSavedState()" class="flex-1 sm:flex-none py-2 px-4 rounded-xl bg-gray-500 bg-opacity-20 text-gray-400 font-medium hover:bg-gray-600 hover:text-white transition-all flex items-center justify-center gap-2 text-xs sm:text-sm focus:outline-none border border-black" style="box-shadow: 2px 2px 0px rgba(0,0,0,0.2)">
                                 <i class="fa-solid fa-xmark"></i> Clear
@@ -1813,28 +1813,47 @@ function updateProgressUI(data) {
                 .sort((a, b) => new Date(b[1].completed_at) - new Date(a[1].completed_at))
                 .slice(0, 10);
 
-            // ALWAYS clear and re-render history to ensure correct sorted order (top 10)
-            historyContainer.innerHTML = '';
-            completedDownloads.clear();
+            // Surgical update: only add new items, don't wipe and re-render
+            const existingIds = new Set(
+                Array.from(historyContainer.querySelectorAll('.file-progress-block'))
+                    .map(el => el.id.replace('progress-', ''))
+            );
 
             for (const [fileId, fileData] of last10) {
                 completedDownloads.set(fileId, fileData.path);
+
+                // Skip if already rendered
+                if (existingIds.has(fileId)) {
+                    existingIds.delete(fileId); // Mark as still valid
+                    continue;
+                }
+
                 const percentage = fileData.percentage || 100;
                 const html = createProgressBar(fileId, fileData.name, true, percentage, fileData.size, fileData.size);
-                historyContainer.insertAdjacentHTML('beforeend', html);
+                historyContainer.insertAdjacentHTML('afterbegin', html);
             }
 
-            // Add all cancelled downloads
+            // Remove items that are no longer in the top 10 (but keep cancelled divider)
+            existingIds.forEach(staleId => {
+                const staleEl = document.getElementById(`progress-${staleId}`);
+                if (staleEl && !staleId.includes('cancelled')) {
+                    staleEl.remove();
+                }
+            });
+
+            // Add cancelled downloads if not already present
             if (data.cancelled_files) {
                 const cancelledEntries = Object.entries(data.cancelled_files);
                 if (cancelledEntries.length > 0) {
-                    // Add a divider if we also have completed ones in this same update
-                    if (last10.length > 0) {
+                    // Add divider if needed
+                    if (last10.length > 0 && !document.getElementById('cancelled-divider')) {
                         historyContainer.insertAdjacentHTML('beforeend',
                             '<div id="cancelled-divider" class="border-t border-gray-700/50 my-4 pt-2"><p class="text-xs text-red-400 font-semibold mb-2">Cancelled Files</p></div>');
                     }
 
                     for (const [fileId, fileData] of cancelledEntries) {
+                        if (document.getElementById(`progress-${fileId}`)) continue;
+
                         const percentage = fileData.percentage || 0;
                         const size = fileData.total || 0;
                         historyContainer.insertAdjacentHTML('beforeend',
@@ -1846,8 +1865,10 @@ function updateProgressUI(data) {
         } else if (data.cancelled_files && Object.keys(data.cancelled_files).length > 0) {
             // Only cancelled files
             historySection?.classList.remove('hidden');
-            historyContainer.innerHTML = '';
+
             for (const [fileId, fileData] of Object.entries(data.cancelled_files)) {
+                if (document.getElementById(`progress-${fileId}`)) continue;
+
                 const percentage = fileData.percentage || 0;
                 const size = fileData.total || 0;
                 historyContainer.insertAdjacentHTML('beforeend',
