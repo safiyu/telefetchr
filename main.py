@@ -57,21 +57,11 @@ async def lifespan(app: FastAPI):
         set_services(telegram_service, download_service, state_manager, auth_service)
 
         # Log saved state information
-        if state_manager.get_status().get(
-            "session_id"
-        ) and state_manager.get_status().get("completed_downloads"):
-            completed_count = len(
-                state_manager.get_status().get("completed_downloads", {})
-            )
-            total_count = state_manager.get_status().get("total", 0)
-            logger.info(
-                f"Resumable session found: {completed_count}/{total_count} files completed"
-            )
-            
-            # Auto-resume if active
-            if state_manager.get_status().get("active") and not state_manager.get_status().get("cancelled"):
-                logger.info("Resuming active download session")
-                download_service.start_queue_processor()
+        # Auto-resume if active and has a session ID
+        status = state_manager.get_status()
+        if status.get("session_id") and status.get("active") and not status.get("cancelled"):
+            logger.info("Auto-resuming active download session found at startup")
+            download_service.start_queue_processor()
         
     except Exception as e:
         logger.error(f"Startup error: {str(e)}")

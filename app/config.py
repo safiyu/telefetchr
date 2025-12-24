@@ -10,7 +10,7 @@ class Config:
     PHONE_NUMBER = f'+{os.getenv("PHONE_NUMBER")}'
 
     # Download Configuration
-    MAX_CONCURRENT_DOWNLOADS = int(os.getenv("MAX_CONCURRENT_DOWNLOADS", "10"))
+    MAX_CONCURRENT_DOWNLOADS = 1
     SAVE_PATH = os.path.abspath('downloads')
 
     # Telethon Download Configuration

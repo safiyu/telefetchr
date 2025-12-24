@@ -193,7 +193,7 @@ async def download_selected_files(request: DownloadSelectedRequest, background_t
         )
         return {
             "status": "started",
-            "message": f"Downloading {len(request.message_ids)} selected files with {Config.MAX_CONCURRENT_DOWNLOADS} parallel downloads.",
+            "message": f"Downloading {len(request.message_ids)} selected files via FIFO queue.",
             "session_id": session_id
         }
     except Exception as e:
@@ -215,7 +215,7 @@ async def download_all_files(request: DownloadRequest, background_tasks: Backgro
         )
         return {
             "status": "started",
-            "message": f"Download started with {Config.MAX_CONCURRENT_DOWNLOADS} files.",
+            "message": f"Download started. Files added to queue.",
             "session_id": session_id
         }
     except Exception as e:
@@ -535,10 +535,13 @@ async def reorder_queue(request: QueueReorderRequest, current_user: str = Depend
 @router.delete("/queue/{item_id}")
 async def remove_from_queue(item_id: str, current_user: str = Depends(get_current_user)):
     """Remove an item from the queue"""
-    state_manager.remove_from_queue(item_id)
+    result = await download_service.cancel_individual_download(item_id)
+    if result.get("status") == "error":
+        raise HTTPException(status_code=404, detail=result.get("message"))
+        
     return {
         "status": "success",
-        "message": f"Item {item_id} removed from queue",
+        "message": result.get("message"),
         "queue": state_manager.get_queue()
     }
 
@@ -546,8 +549,16 @@ async def remove_from_queue(item_id: str, current_user: str = Depends(get_curren
 async def clear_queue(current_user: str = Depends(get_current_user)):
     """Clear all items from the queue"""
     queue = state_manager.get_queue()
-    for item in queue:
-        state_manager.remove_from_queue(item["id"])
+    # Iterate over a copy to be safe
+    for item in list(queue):
+        file_id = item.get("id")
+        if file_id:
+            await download_service.cancel_individual_download(file_id)
+        else:
+            # If no ID, just force remove it from the list if possible
+            # (Fallback for corrupted items)
+            state_manager.download_status["queue"] = [i for i in state_manager.download_status.get("queue", []) if i != item]
+            state_manager.save_state()
     return {
         "status": "success",
         "message": "Queue cleared"

@@ -82,6 +82,7 @@
         .line-clamp-2 {
             display: -webkit-box;
             -webkit-line-clamp: 2;
+            line-clamp: 2;
             -webkit-box-orient: vertical;
             overflow: hidden;
         }
@@ -91,39 +92,6 @@
 <body class="min-h-screen flex flex-col antialiased">
 
 
-    <!-- Modals (kept hidden by default) -->
-    <div id="confirmModal" class="fixed inset-0 z-[100] hidden overflow-y-auto" aria-labelledby="modal-title"
-        role="dialog" aria-modal="true">
-        <div class="flex min-h-screen items-center justify-center p-4 text-center sm:p-0">
-            <div class="fixed inset-0 bg-gray-900/80 backdrop-blur-sm transition-opacity" onclick="closeConfirmModal()">
-            </div>
-
-            <div
-                class="relative transform overflow-hidden rounded-2xl bg-gray-800 border border-gray-700 p-6 text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-lg animate-scale-in">
-                <div id="modalIconContainer"
-                    class="mx-auto flex h-16 w-16 items-center justify-center rounded-full mb-4">
-                    <i id="modalIcon" class="fa-solid text-2xl"></i>
-                </div>
-                <h3 id="modalTitle" class="text-xl font-bold text-center text-white mb-2">Are you sure?</h3>
-                <p id="modalMessage" class="text-gray-400 text-center mb-6">This action cannot be undone.</p>
-
-                <div id="modalDetails" class="hidden bg-yellow-900/20 border border-yellow-700/50 rounded-lg p-3 mb-6">
-                    <p id="modalDetailsText" class="text-sm text-yellow-500 text-center"></p>
-                </div>
-
-                <div class="flex gap-3 justify-center">
-                    <button id="modalCancelBtn"
-                        class="px-6 py-2.5 rounded-xl bg-gray-500/20 text-gray-400 hover:bg-gray-700 hover:text-white font-medium transition-all focus:outline-none">
-                        Cancel
-                    </button>
-                    <button id="modalConfirmBtn"
-                        class="px-6 py-2.5 rounded-xl bg-red-500/20 text-red-500 font-medium hover:bg-red-600 hover:text-white transition-all shadow-lg shadow-red-900/20 focus:outline-none">
-                        Confirm
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <!-- Sidebar / Navigation (for larger layout) or Top Bar -->
     <header
@@ -388,30 +356,44 @@
                         </button>
                         <button onclick="downloadAll()" id="addAllBtn"
                             class="flex-1 py-3 px-6 rounded-xl bg-purple-500/20 text-purple-400 font-medium hover:bg-purple-600 hover:text-white transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none">
-                            <i class="fa-solid fa-cloud-arrow-down"></i> <span>Add All to Queue</span>
+                            <i class="fa-solid fa-cloud-arrow-down"></i> <span>Download All</span>
                         </button>
 
-                        <button onclick="cancelDownload()" id="cancelBtn"
+                        <button onclick="cancelDownload()" id="stopAllBtn"
                             class="hidden flex-1 py-3 px-6 rounded-xl bg-red-500/20 text-red-500 font-medium hover:bg-red-500 hover:text-white transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none">
-                            <i class="fa-solid fa-stop"></i> <span>Stop</span>
+                            <i class="fa-solid fa-stop"></i> <span>Stop All</span>
                         </button>
                     </div>
                 </div>
 
                 <!-- Active Download Progress -->
-                <div id="downloadProgress" class="hidden animate-fade-in space-y-4">
-                    <div class="flex justify-between items-end px-1">
-                        <h3 id="downloadProgressTitle" class="text-lg font-semibold text-white flex items-center gap-2">
-                            <i id="downloadProgressIcon" class="fa-solid fa-circle-notch fa-spin text-indigo-500"></i>
-                            Active Downloads
-                        </h3>
-                        <button id="clearProgressBtn" onclick="clearProgress()"
-                            class="px-2 py-1 rounded-md bg-red-500/10 text-[10px] uppercase tracking-tighter text-red-400/60 hover:bg-red-500/20 hover:text-red-400 transition-all font-medium focus:outline-none">Clear
-                            History</button>
+                <div id="downloadProgress" class="hidden animate-fade-in space-y-8">
+                    <!-- Active Section -->
+                    <div id="activeSection" class="space-y-4 hidden">
+                        <div class="flex justify-between items-end px-1">
+                            <h3 id="activeTitle" class="text-lg font-semibold text-white flex items-center gap-2">
+                                <i id="activeIcon" class="fa-solid fa-circle-notch fa-spin text-indigo-500"></i>
+                                Active Download
+                            </h3>
+                        </div>
+                        <div id="activeDownloadContainer" class="space-y-4"></div>
                     </div>
 
-                    <div id="progressBarsContainer" class="space-y-4">
-                        <!-- Dynamic Progress Bars will be inserted here -->
+
+
+                    <!-- History Section -->
+                    <div id="historySection" class="space-y-4 hidden">
+                        <div class="flex justify-between items-end px-1">
+                            <h3 class="text-lg font-semibold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-clock-rotate-left text-green-500"></i>
+                                History
+                            </h3>
+                            <button id="clearHistoryBtn" onclick="clearProgress()"
+                                class="px-2 py-1 rounded-md bg-gray-500/10 text-[10px] uppercase tracking-tighter text-gray-400/60 hover:bg-red-500/20 hover:text-red-400 transition-all font-medium focus:outline-none">Clear
+                                History</button>
+                        </div>
+                        <div id="historyContainer"
+                            class="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar"></div>
                     </div>
                 </div>
 
@@ -450,6 +432,31 @@
                             <p>Queue is empty</p>
                         </div>
                     </div>
+
+                    <!-- Pagination Controls -->
+                    <div id="queuePagination"
+                        class="mt-8 flex items-center justify-between border-t border-gray-700/50 pt-6 hidden">
+                        <div
+                            class="text-xs text-gray-500 bg-gray-800/50 px-3 py-1.5 rounded-lg border border-gray-700/30">
+                            Showing <span id="paginationRange" class="text-gray-300 font-medium">0 - 0</span> of <span
+                                id="paginationTotal" class="text-gray-300 font-medium">0</span>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="changeQueuePage(-1)" id="prevPageBtn"
+                                class="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-800/50 border border-gray-700/50 text-gray-400 hover:bg-gray-700 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all focus:outline-none">
+                                <i class="fa-solid fa-chevron-left text-xs"></i>
+                            </button>
+                            <div
+                                class="flex items-center px-4 rounded-xl bg-gray-800/30 border border-gray-700/30 text-xs font-semibold text-indigo-400">
+                                Page <span id="currentPageNum" class="mx-1">1</span> of <span id="totalPageNum"
+                                    class="ml-1 text-gray-500">1</span>
+                            </div>
+                            <button onclick="changeQueuePage(1)" id="nextPageBtn"
+                                class="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-800/50 border border-gray-700/50 text-gray-400 hover:bg-gray-700 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all focus:outline-none">
+                                <i class="fa-solid fa-chevron-right text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -479,6 +486,46 @@
     <div id="toastContainer"
         class="fixed bottom-8 left-4 right-4 sm:bottom-auto sm:top-6 sm:right-6 sm:left-auto flex flex-col items-center sm:items-end gap-3 pointer-events-none transition-all duration-300"
         style="z-index: 99999;">
+    </div>
+    <!-- Modals (Moved to bottom for better z-index stacking) -->
+    <div id="confirmModal" class="fixed inset-0 z-[999999] hidden overflow-y-auto" aria-labelledby="modal-title"
+        role="dialog" aria-modal="true">
+        <div class="flex min-h-screen items-center justify-center p-4 text-center sm:p-0">
+            <div class="fixed inset-0 bg-gray-900/80 backdrop-blur-sm transition-opacity" onclick="closeConfirmModal()">
+            </div>
+
+            <div
+                class="relative transform overflow-hidden rounded-2xl bg-gray-800 border border-gray-700 p-6 text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-lg animate-scale-in">
+
+                <!-- Close Button -->
+                <button onclick="closeConfirmModal()"
+                    class="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors focus:outline-none">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+
+                <div id="modalIconContainer"
+                    class="mx-auto flex h-16 w-16 items-center justify-center rounded-full mb-4">
+                    <i id="modalIcon" class="fa-solid text-2xl"></i>
+                </div>
+                <h3 id="modalTitle" class="text-xl font-bold text-center text-white mb-2">Are you sure?</h3>
+                <p id="modalMessage" class="text-gray-400 text-center mb-6">This action cannot be undone.</p>
+
+                <div id="modalDetails" class="hidden bg-yellow-900/20 border border-yellow-700/50 rounded-lg p-3 mb-6">
+                    <p id="modalDetailsText" class="text-sm text-yellow-500 text-center"></p>
+                </div>
+
+                <div class="flex gap-3 justify-center">
+                    <button id="modalCancelBtn"
+                        class="px-6 py-2.5 rounded-xl bg-gray-500/20 text-gray-400 hover:bg-gray-700 hover:text-white font-medium transition-all focus:outline-none">
+                        Cancel
+                    </button>
+                    <button id="modalConfirmBtn"
+                        class="px-6 py-2.5 rounded-xl bg-red-500/20 text-red-500 font-medium hover:bg-red-600 hover:text-white transition-all shadow-lg shadow-red-900/20 focus:outline-none">
+                        Confirm
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 </body>
 

@@ -31,7 +31,6 @@ class StateManager:
             "downloaded_bytes": 0,
             "concurrent_downloads": {},
             "completed_downloads": {},
-            "cancelled_files": {},
             "cancelled": False,
             "session_id": str(uuid.uuid4()),
             "started_at": None,
@@ -55,7 +54,6 @@ class StateManager:
                 "downloaded_bytes": self.download_status.get("downloaded_bytes", 0),
                 "concurrent_downloads": self.download_status.get("concurrent_downloads", {}),
                 "completed_downloads": self.download_status.get("completed_downloads", {}),
-                "cancelled_files": self.download_status.get("cancelled_files", {}),
                 "cancelled": self.download_status.get("cancelled", False),
                 "session_id": self.download_status.get("session_id"),
                 "started_at": self.download_status.get("started_at"),
@@ -95,8 +93,6 @@ class StateManager:
                             self.download_status["queue"] = []
                         if "concurrent_downloads" not in self.download_status:
                             self.download_status["concurrent_downloads"] = {}
-                        if "cancelled_files" not in self.download_status:
-                            self.download_status["cancelled_files"] = {}
 
                         logger.info(f"Loaded saved download state session {self.download_status.get('session_id')}: {len(self.download_status.get('completed_downloads', {}))} completed files")
                     else:
@@ -131,6 +127,7 @@ class StateManager:
 
             # Reset global state
             self.download_status.update(self._initialize_status())
+            self.save_state()
 
         except Exception as e:
             logger.error(f"Error clearing state: {e}")
@@ -159,22 +156,40 @@ class StateManager:
                     self.download_status["queue"] = []
                 
                 for file_id, data in list(concurrent.items()):
-                    # Add back to queue if not already there
+                    # Add back to queue if not already there and not already completed
+                    is_completed = file_id in self.download_status.get("completed_downloads", {})
                     already_queued = any(item.get("id") == file_id for item in self.download_status["queue"])
-                    if not already_queued:
+                    
+                    if not already_queued and not is_completed:
+                        logger.info(f"Moving stalled file {file_id} back to queue")
                         data["status"] = "queued"
+                        # Ensure ID is present even if it was missing from metadata
+                        if "id" not in data:
+                            data["id"] = file_id
+                        # Ensure we don't have nested status or other junk
+                        if "concurrent_downloads" in data: del data["concurrent_downloads"]
                         self.download_status["queue"].append(data)
                         cleaned_items.append(file_id)
+                    else:
+                        logger.info(f"Skipping cleanup for {file_id} (already queued or completed)")
                 
                 self.download_status["concurrent_downloads"] = {}
-                logger.info(f"Re-queued {len(cleaned_items)} interrupted downloads")
+                self.download_status["active"] = True # Set active to True so auto-resume kicks in
+                logger.info(f"Cleared concurrent_downloads. Re-queued {len(cleaned_items)} interrupted downloads")
 
-        # Reset session metrics if not active
-        if not self.download_status.get("active"):
+        # Reset session metrics if not active or if forced (new run)
+        if force or not self.download_status.get("active"):
             self.download_status["current_file"] = ""
             self.download_status["current_file_progress"] = 0
             self.download_status["current_file_size"] = 0
             self.download_status["downloaded_bytes"] = 0
+            # If forced cleanup at startup, ensure consistency
+            if force:
+                 # Check if we should actually be 'active'
+                 has_queue = len(self.download_status.get("queue", [])) > 0
+                 # We keep active status if there's a queue so auto-resume works
+                 if not has_queue:
+                     self.download_status["active"] = False
 
         self.save_state()
         return cleaned_items
@@ -317,13 +332,16 @@ class StateManager:
         ]
         
         if not queued_items:
+            # logger.debug("Refusing to pick next item: No items with status='queued'")
             return None
             
         # Sort by priority (desc) then added_at (asc)
         # Priority 10 comes before Priority 0
         queued_items.sort(key=lambda x: (-x.get("priority", 0), x.get("added_at", "")))
         
-        return queued_items[0]
+        next_item = queued_items[0]
+        logger.info(f"Picking next item from queue: {next_item.get('name')} (ID: {next_item.get('id')})")
+        return next_item
 
     def update_queue_item_status(self, queue_id: str, status: str):
         """Update status of a queue item"""
