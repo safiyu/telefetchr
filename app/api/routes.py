@@ -69,6 +69,17 @@ async def login(login_request: LoginRequest):
     return {"access_token": access_token, "token_type": "bearer"}
 
 
+@router.get("/auth/is-trusted")
+async def check_trusted_ip(request: Request):
+    """Check if the current request is from a trusted IP"""
+    client_ip = request.client.host
+    is_trusted = is_trusted_ip(client_ip)
+    return {
+        "is_trusted": is_trusted,
+        "client_ip": client_ip
+    }
+
+
 @router.get("/app", response_class=HTMLResponse)
 async def get_app():
     """Serve the main application (authentication by frontend)"""

@@ -44,6 +44,31 @@ function getAuthHeaders() {
 }
 
 async function logout() {
+    // Check if user is on a trusted subnet
+    try {
+        const response = await fetch('/auth/is-trusted');
+        if (response.ok) {
+            const data = await response.json();
+            if (data.is_trusted) {
+                // Show info modal for trusted IP users
+                await showConfirmModal({
+                    title: 'Logout Disabled',
+                    message: 'Logout is disabled because you are connected from a trusted subnet.',
+                    details: 'Authentication is automatically bypassed for trusted IPs configured in the system. To logout, connect from a different network or use "Delete Session" to remove your Telegram session.',
+                    icon: 'fa-info-circle',
+                    iconType: 'warning',
+                    confirmText: 'OK',
+                    cancelText: '',
+                    confirmClass: 'btn-primary'
+                });
+                return;
+            }
+        }
+    } catch (error) {
+        console.error('Error checking trusted IP:', error);
+        // Continue with logout if check fails
+    }
+
     // Show confirmation modal
     const confirmed = await showConfirmModal({
         title: 'Logout from TeleFetchr?',
@@ -95,6 +120,13 @@ function showConfirmModal(options) {
         // Set button text
         confirmBtn.innerHTML = `<i class="fa-solid fa-check mr-2"></i>${options.confirmText || 'Confirm'}`;
         cancelBtn.innerHTML = `<i class="fa-solid fa-xmark mr-2"></i>${options.cancelText || 'Cancel'}`;
+
+        // Hide cancel button if cancelText is empty
+        if (options.cancelText === '') {
+            cancelBtn.classList.add('hidden');
+        } else {
+            cancelBtn.classList.remove('hidden');
+        }
 
         // Set button style - only override if confirmClass is explicitly provided
         if (options.confirmClass) {
@@ -2039,23 +2071,23 @@ function renderQueue(queue) {
     list.innerHTML = paginatedItems.map((item, index) => {
         const globalIndex = startIndex + index;
         return `
-        <div class="bg-gray-800/50 hover:bg-gray-800 border border-gray-700 hover:border-gray-600 rounded-lg p-4 transition-all flex items-center gap-4 group">
-            <div class="text-gray-500 font-mono text-xs w-6 text-center">${globalIndex + 1}</div>
+        <div class="bg-gray-800/50 hover:bg-gray-800 border border-gray-700 hover:border-gray-600 rounded-lg p-3 sm:p-4 transition-all flex items-center gap-2 sm:gap-4 group">
+            <div class="text-gray-500 font-mono text-xs w-5 sm:w-6 text-center flex-shrink-0">${globalIndex + 1}</div>
             
-            <div class="flex-shrink-0 w-10 h-10 rounded bg-indigo-500/10 flex items-center justify-center text-indigo-400">
-                <i class="fa-solid fa-file"></i>
+            <div class="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded bg-indigo-500/10 flex items-center justify-center text-indigo-400">
+                <i class="fa-solid fa-file text-xs sm:text-sm"></i>
             </div>
             
             <div class="flex-grow min-w-0">
-                <div class="text-sm font-medium text-white line-clamp-2" title="${item.name}">${item.name}</div>
-                <div class="text-xs text-gray-400 flex items-center gap-2">
-                    <span class="bg-gray-700 px-1.5 rounded text-[10px]">${item.channel}</span>
-                    <span class="${getStatusColor(item.status)} capitalize">${item.status}</span>
+                <div class="text-xs sm:text-sm font-medium text-white line-clamp-2" title="${item.name}">${item.name}</div>
+                <div class="text-xs text-gray-400 flex items-center gap-2 mt-0.5">
+                    <span class="bg-gray-700 px-1.5 rounded text-[10px] truncate max-w-[100px]">${item.channel}</span>
+                    <span class="${getStatusColor(item.status)} capitalize text-[10px] sm:text-xs">${item.status}</span>
                 </div>
             </div>
             
-            <div class="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button onclick="removeFromQueue('${item.id}')" class="ml-1 w-8 h-8 flex items-center justify-center bg-red-500/20 text-red-400 hover:bg-red-600 hover:text-white rounded-lg transition-all focus:outline-none">
+            <div class="flex items-center gap-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex-shrink-0">
+                <button onclick="removeFromQueue('${item.id}')" class="w-8 h-8 flex items-center justify-center bg-red-500/20 text-red-400 hover:bg-red-600 hover:text-white rounded-lg transition-all focus:outline-none">
                     <i class="fa-solid fa-trash-can text-[10px]"></i>
                 </button>
             </div>
