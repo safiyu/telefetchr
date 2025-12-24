@@ -672,31 +672,28 @@ async function checkStatus() {
         const downloadSection = document.getElementById("downloadSection");
 
         if (data.status === "connected") {
-            connectionStatus.className =
-                "flex items-center gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full bg-green-500 bg-opacity-10 border border-green-500 border-opacity-20 text-green-400 text-[10px] sm:text-sm font-medium shadow-md";
+            connectionStatus.className = "comic-badge badge-green flex items-center gap-2 text-[10px] sm:text-xs";
             connectionStatus.innerHTML =
                 `<span class="relative flex h-1.5 w-1.5 sm:h-2 sm:w-2">
-                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                    <span class="relative inline-flex rounded-full h-1.5 w-1.5 sm:h-2 sm:w-2 bg-green-500"></span>
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-black opacity-40"></span>
+                    <span class="relative inline-flex rounded-full h-1.5 w-1.5 sm:h-2 sm:w-2 bg-black"></span>
                 </span>
-                <span class="hidden md:inline">Connected</span>`;
-            userInfo.innerHTML = `<p><strong>User:</strong> ${data.user.first_name
+                <span class="hidden md:inline">Connected</span><span class="md:hidden">Live</span>`;
+            userInfo.innerHTML = `<p><i class="fa-solid fa-user text-[10px] opacity-70 mr-1.5" title="Logged in user"></i> ${data.user.first_name
                 } (@${data.user.username || "N/A"})</p>`;
             loginSection.classList.add("hidden");
             downloadSection.classList.remove("hidden");
         } else if (data.status === "not_authenticated" || data.status === "disconnected") {
-            connectionStatus.className =
-                "flex items-center gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full bg-yellow-500 bg-opacity-10 border border-yellow-500 border-opacity-20 text-yellow-400 text-[10px] sm:text-sm font-medium shadow-md";
+            connectionStatus.className = "comic-badge badge-yellow flex items-center gap-2 text-[10px] sm:text-xs";
             connectionStatus.innerHTML =
-                '<i class="fa-solid fa-circle-exclamation mr-1 sm:mr-2 text-yellow-500 animate-pulse"></i><span class="hidden md:inline">Authentication Required</span><span class="md:hidden">Auth</span>';
+                '<i class="fa-solid fa-circle-exclamation mr-1 text-black"></i><span class="hidden md:inline">Authentication Required</span><span class="md:hidden">Auth</span>';
             userInfo.innerHTML = "";
             loginSection.classList.remove("hidden");
             downloadSection.classList.add("hidden");
         } else {
-            connectionStatus.className =
-                "flex items-center gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full bg-red-500 bg-opacity-10 border border-red-500 border-opacity-20 text-red-400 text-[10px] sm:text-sm font-medium shadow-md";
+            connectionStatus.className = "comic-badge badge-red flex items-center gap-2 text-[10px] sm:text-xs";
             connectionStatus.innerHTML =
-                '<i class="fa-solid fa-circle-xmark mr-1 sm:mr-2 text-red-500 animate-pulse"></i><span class="hidden md:inline">Error</span><span class="md:hidden">Err</span>';
+                '<i class="fa-solid fa-circle-xmark mr-1"></i><span class="hidden md:inline">Connection Error</span><span class="md:hidden">Offline</span>';
             userInfo.innerHTML = "";
             loginSection.classList.add("hidden");
             downloadSection.classList.add("hidden");

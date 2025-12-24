@@ -118,6 +118,33 @@
             box-shadow: 4px 4px 0px #000;
         }
 
+        /* Comic Badge Styles */
+        .comic-badge {
+            border: 2px solid #000;
+            box-shadow: 3px 3px 0px rgba(0, 0, 0, 0.4);
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 4px 12px;
+            border-radius: 10px;
+            transition: all 0.2s ease;
+        }
+
+        .badge-green {
+            background: #22c55e;
+            color: #000;
+        }
+
+        .badge-yellow {
+            background: #eab308;
+            color: #000;
+        }
+
+        .badge-red {
+            background: #ef4444;
+            color: #fff;
+        }
+
         input,
         select {
             background: #0f172a !important;
@@ -263,14 +290,13 @@
 
         <div id="statusBadge" class="flex items-center gap-2 sm:gap-4">
             <!-- Status Pill -->
-            <div id="connectionStatus"
-                class="flex items-center gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full bg-green-500 bg-opacity-10 border border-green-500 border-opacity-20 text-green-400 text-[10px] sm:text-sm font-medium">
+            <div id="connectionStatus" class="comic-badge badge-green flex items-center gap-2 text-[10px] sm:text-xs">
                 <span class="relative flex h-1.5 w-1.5 sm:h-2 sm:w-2">
                     <span
-                        class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                    <span class="relative inline-flex rounded-full h-1.5 w-1.5 sm:h-2 sm:w-2 bg-green-500"></span>
+                        class="animate-ping absolute inline-flex h-full w-full rounded-full bg-black opacity-40"></span>
+                    <span class="relative inline-flex rounded-full h-1.5 w-1.5 sm:h-2 sm:w-2 bg-black"></span>
                 </span>
-                <span class="hidden md:inline">Connected</span>
+                <span class="hidden md:inline">Connected</span><span class="md:hidden">Live</span>
             </div>
 
             <!-- Action Buttons -->
@@ -670,7 +696,7 @@
         </div>
     </main>
 
-    <script src="/static/js/script.js?v=34"></script>
+    <script src="/static/js/script.js?v=36"></script>
     <!-- Toast Container -->
     <div id="toastContainer"
         class="fixed bottom-8 left-4 right-4 sm:bottom-auto sm:top-6 sm:right-6 sm:left-auto flex flex-col items-center sm:items-end gap-3 pointer-events-none transition-all duration-300"

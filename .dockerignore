@@ -18,9 +18,4 @@ sessions/*
 .env
 *.log
 
-# Old files (no longer needed)
-launch.py
-view.html
-script.js
-logo.png
-favicon.png
+# Old files (no longer needed) - Removed to allow updates
