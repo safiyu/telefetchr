@@ -1056,7 +1056,7 @@ function createProgressBar(
     const etaText = eta > 0 ? `ETA: ${formatTime(eta)}` : '';
 
     if (retryAttempt && retryAttempt > 1) {
-        retryBadge = `<span class="text-xs px-2 py-1 rounded bg-yellow-500 bg-opacity-20 text-yellow-300 ml-2 border border-black shadow-[2px_2px_0px_rgba(0,0,0,0.2)]">Retry ${retryAttempt}/3</span>`;
+        retryBadge = `<span class="text-xs px-2 py-1 rounded bg-yellow-500 bg-opacity-20 text-yellow-300 ml-2 border border-black" style="box-shadow: 2px 2px 0px rgba(0,0,0,0.2)">Retry ${retryAttempt}/3</span>`;
     }
 
     // Check if download appears stalled
@@ -1065,7 +1065,7 @@ function createProgressBar(
             const lastUpdateTime = new Date(lastUpdate);
             const timeSinceUpdate = (Date.now() - lastUpdateTime) / 1000; // seconds
             if (timeSinceUpdate > 10) {
-                stallWarning = `<span class="text-xs px-2 py-1 rounded bg-yellow-600 bg-opacity-20 text-yellow-600 ml-2 border border-black shadow-[2px_2px_0px_rgba(0,0,0,0.2)]"><i class="fa-solid fa-triangle-exclamation"></i> Stalled ${Math.floor(timeSinceUpdate)}s</span>`;
+                stallWarning = `<span class="text-xs px-2 py-1 rounded bg-yellow-600 bg-opacity-20 text-yellow-600 ml-2 border border-black" style="box-shadow: 2px 2px 0px rgba(0,0,0,0.2)"><i class="fa-solid fa-triangle-exclamation"></i> Stalled ${Math.floor(timeSinceUpdate)}s</span>`;
             }
         } catch (e) {
             console.error('Error checking stall status:', e);
@@ -1075,12 +1075,12 @@ function createProgressBar(
     let html = `
         <div id="${progressId}" class="file-progress-block relative overflow-hidden group">
             <!-- Comic Panel effect background -->
-            <div class="absolute inset-0 bg-gray-800 border-2 border-black rounded-xl shadow-[4px_4px_0px_rgba(0,0,0,0.4)]"></div>
+            <div class="absolute inset-0 bg-gray-800 border-2 border-black rounded-xl" style="box-shadow: 4px 4px 0px rgba(0,0,0,0.4)"></div>
             
             <div class="relative p-5 z-10">
                 <div class="flex justify-between items-start mb-4">
                     <div class="flex items-center gap-4 overflow-hidden">
-                        <div class="w-12 h-12 rounded-lg bg-yellow-400 bg-opacity-10 flex items-center justify-center flex-shrink-0 text-yellow-400 border-2 border-black shadow-[2px_2px_0px_rgba(0,0,0,0.2)]">
+                        <div class="w-12 h-12 rounded-lg bg-yellow-400 bg-opacity-10 flex items-center justify-center flex-shrink-0 text-yellow-400 border-2 border-black" style="box-shadow: 2px 2px 0px rgba(0,0,0,0.2)">
                              <i class="fa-solid fa-file-arrow-down text-xl"></i>
                         </div>
                         <div class="min-w-0">
@@ -1116,7 +1116,7 @@ function createProgressBar(
                 </div>
 
                 <!-- Progress Track -->
-                <div class="h-4 w-full bg-gray-900 border-2 border-black rounded-full overflow-hidden mb-3 relative shadow-[inset_2px_2px_4px_rgba(0,0,0,0.5)]">
+                <div class="h-4 w-full bg-gray-900 border-2 border-black rounded-full overflow-hidden mb-3 relative" style="box-shadow: inset 2px 2px 4px rgba(0,0,0,0.5)">
                     <div class="h-full transition-all duration-500 ease-out relative ${isComplete ? 'bg-green-500' : 'bg-yellow-400 progress-bar-glow'}" 
                          style="width: ${percentage}%; background-color: ${isComplete ? '' : '#fbbf24'}; border-right: ${isComplete ? 'none' : '2px solid black'};">
                     </div>
@@ -1151,12 +1151,12 @@ function createCancelledProgressBar(
     let html = `
         <div id="${progressId}" class="relative overflow-hidden group opacity-80">
             <!-- Glass effect background with red tint -->
-            <div class="absolute inset-0 bg-red-900 bg-opacity-10 backdrop-blur-sm border-2 border-red-500 border-opacity-20 rounded-xl shadow-[3px_3px_0px_rgba(0,0,0,0.2)]"></div>
+            <div class="absolute inset-0 bg-red-900 bg-opacity-10 backdrop-blur-sm border-2 border-red-500 border-opacity-20 rounded-xl" style="box-shadow: 3px 3px 0px rgba(0,0,0,0.2)"></div>
             
             <div class="relative p-4 z-10">
                 <div class="flex justify-between items-start mb-3">
                     <div class="flex items-center gap-3 overflow-hidden">
-                        <div class="w-10 h-10 rounded-lg bg-red-500 bg-opacity-10 flex items-center justify-center flex-shrink-0 text-red-400 border border-black shadow-[2px_2px_0px_rgba(0,0,0,0.2)]">
+                        <div class="w-10 h-10 rounded-lg bg-red-500 bg-opacity-10 flex items-center justify-center flex-shrink-0 text-red-400 border border-black" style="box-shadow: 2px 2px 0px rgba(0,0,0,0.2)">
                              <i class="fa-solid fa-ban text-xl"></i>
                         </div>
                         <div class="min-w-0">
@@ -1888,7 +1888,7 @@ function updateProgressUI(data) {
                 activeSection?.classList.remove('hidden');
                 if (!document.getElementById('initializing-placeholder')) {
                     activeContainer.innerHTML = `
-                        <div id="initializing-placeholder" class="text-center py-8 animate-pulse bg-gray-800/20 rounded-2xl border border-gray-700/30">
+                        <div id="initializing-placeholder" class="text-center py-8 animate-pulse bg-gray-800 bg-opacity-20 rounded-2xl border border-gray-700 border-opacity-30">
                             <i class="fa-solid fa-circle-notch fa-spin text-indigo-400 text-3xl mb-3"></i>
                             <p class="text-white text-sm font-medium">Preparing next download...</p>
                         </div>
