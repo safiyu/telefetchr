@@ -58,6 +58,11 @@
             background: #fbbf24;
         }
 
+        /* Queue badge text color when tab is active */
+        .btn-gradient .queue-badge-text {
+            color: #000 !important;
+        }
+
         /* Comic Grey Button - Turns Yellow on Hover */
         .btn-yellow-hover {
             background: rgba(107, 114, 128, 0.15);
@@ -391,7 +396,7 @@
                 <button onclick="switchTab('queue')" id="tab-queue"
                     class="px-6 py-2.5 rounded-xl text-gray-400 hover:text-amber-400 font-medium transition-all flex items-center gap-2 border border-transparent hover:border-black hover:bg-amber-500/10 focus:outline-none">
                     <i class="fa-solid fa-list text-xs opacity-70"></i> Queue <span id="queueCountBadge"
-                        class="ml-1 bg-amber-600 text-white text-[10px] px-1.5 py-0.5 rounded-full hidden border border-black">0</span>
+                        class="ml-1 bg-amber-600 text-white text-[10px] px-1.5 py-0.5 rounded-full hidden border border-black queue-badge-text">0</span>
                 </button>
             </div>
 
@@ -521,6 +526,31 @@
                     </div>
                 </div>
 
+                <!-- Dedicated Scanning Indicator Container -->
+                <div id="scanningContainer" class="hidden mb-6 animate-pulse">
+                    <div
+                        class="p-6 bg-indigo-900 bg-opacity-20 rounded-2xl border-2 border-indigo-500/50 shadow-lg relative overflow-hidden">
+                        <div
+                            class="absolute inset-0 bg-gradient-to-r from-transparent via-indigo-500/10 to-transparent animate-shimmer">
+                        </div>
+                        <div class="relative z-10 flex flex-col items-center justify-center">
+                            <i
+                                class="fa-solid fa-magnifying-glass fa-spin text-indigo-400 text-3xl mb-3 filter drop-shadow-md"></i>
+                            <p class="text-indigo-200 text-xs font-bold uppercase tracking-[0.2em] mb-3">Scanning
+                                Channel...</p>
+                            <div
+                                class="w-64 max-w-full bg-gray-800/50 rounded-full h-2 border border-black/30 overflow-hidden shadow-inner">
+                                <div id="scanningProgressBar"
+                                    class="bg-gradient-to-r from-indigo-600 to-indigo-400 h-full transition-all duration-300 w-0 relative">
+                                    <div class="absolute inset-0 bg-white/20 animate-[shimmer_2s_infinite]"></div>
+                                </div>
+                            </div>
+                            <p id="scanningProgressText"
+                                class="text-indigo-300 text-[10px] mt-2 font-mono tracking-wider">0%</p>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Active Download Progress -->
                 <div id="downloadProgress" class="hidden animate-fade-in space-y-8">
                     <!-- Active Section -->
@@ -640,7 +670,7 @@
         </div>
     </main>
 
-    <script src="/static/js/script.js?v=16"></script>
+    <script src="/static/js/script.js?v=33"></script>
     <!-- Toast Container -->
     <div id="toastContainer"
         class="fixed bottom-8 left-4 right-4 sm:bottom-auto sm:top-6 sm:right-6 sm:left-auto flex flex-col items-center sm:items-end gap-3 pointer-events-none transition-all duration-300"

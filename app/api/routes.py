@@ -265,7 +265,10 @@ async def download_file(
 @router.get("/download-progress")
 async def get_download_progress(current_user: str = Depends(get_current_user)):
     """Get the current download progress"""
-    return state_manager.get_status()
+    # Use download_service to get status as it includes live transitioning items
+    status = download_service.get_status_as_dict()
+    logger.info(f"=== PROGRESS ENDPOINT: Returning status - scanning={status.get('scanning')}, active={status.get('active')}, transitioning={status.get('transitioning_count')} ===")
+    return status
 
 
 @router.post("/download/cancel")
@@ -300,13 +303,13 @@ async def resume_download(current_user: str = Depends(get_current_user)):
 async def get_download_state(current_user: str = Depends(get_current_user)):
     """Get the current saved download state"""
     status = state_manager.get_status()
-    # Only consider it a "saved state" if there's meaningful data
+    # Only consider it a "saved state" if there's meaningful data to resume.
+    # We EXCLUDE cancelled sessions from triggering the resume alert to avoid nagging the user.
     has_meaningful_state = bool(
-        status.get("session_id") and (
-            status.get("channel") or
-            status.get("completed_downloads") or
-            status.get("total", 0) > 0
-        )
+        status.get("session_id") and 
+        not status.get("cancelled") and # Don't alert if cancelled
+        status.get("total", 0) > 0 and 
+        status.get("total", 0) > status.get("progress", 0) # Only alert if something is left
     )
 
     return {

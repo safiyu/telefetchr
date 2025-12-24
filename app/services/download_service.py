@@ -21,6 +21,7 @@ class DownloadService:
         self.state_manager = state_manager
         logger.info(f"DownloadService initialized with StateManager ID: {id(state_manager)}")
         self.active_download_tasks = {}
+        self.transitioning_items = set() # Items being picked from queue but not yet active
         self.collection_tasks = set()
         self._queue_processing = False
         self._stop_queue = False 
@@ -123,11 +124,16 @@ class DownloadService:
                 
                 queue = self.state_manager.get_queue()
                 if not queue:
-                    # Check if we are truly done (no queue, no active tasks)
-                    if not self.active_download_tasks and status.get("active"):
+                    # Check if we are truly done (no queue, no active tasks, no transitioning items)
+                    # We MUST check transitioning_items to avoid closing the session while an item is being picked up
+                    no_active = not self.active_download_tasks
+                    no_transitioning = not self.transitioning_items
+                    
+                    if no_active and no_transitioning and status.get("active"):
                          # Verify consistency with state manager
-                         if not status.get("concurrent_downloads") and not status.get("queue"):
-                             logger.info("Queue empty and no active downloads. Session complete.")
+                         is_scanning = status.get("scanning", False)
+                         if not status.get("concurrent_downloads") and not status.get("queue") and not is_scanning:
+                             logger.info(f"[SESSION] Session termination check at loop top - active_tasks={len(self.active_download_tasks)}, transitioning={len(self.transitioning_items)}, queue={len(status.get('queue', []))}, scanning={is_scanning}")
                              self.state_manager.update_status({"active": False, "started_at": None})
                              break # Stop the processor as the session is done
 
@@ -154,13 +160,19 @@ class DownloadService:
                     
                 logger.info(f"Starting download for queued item {item['id']} ({item.get('name')})")
                 
-                # Remove from queue immediately as it's been picked up
-                self.state_manager.remove_from_queue(item['id'])
-                
-                # Track task BEFORE any await to prevent race condition
+                # Mark as transitioning before removing from queue to close the "limbo" gap
                 file_id = item['id']
+                self.transitioning_items.add(file_id)
+                
+                # Remove from queue immediately as it's been picked up
+                self.state_manager.remove_from_queue(file_id)
+                
+                # Track task
                 task = asyncio.create_task(self._download_queued_item(item))
                 self.active_download_tasks[file_id] = task
+                
+                # Remove from transitioning once safely in active tasks
+                self.transitioning_items.discard(file_id)
                 
                 # Small yield
                 await asyncio.sleep(0.1)
@@ -172,15 +184,18 @@ class DownloadService:
             
             # Check if we are truly done (no queue, no active tasks)
             # AND ensure we don't race with a new batch being added
-            if not self.active_download_tasks and status.get("active"):
+            no_tasks = not self.active_download_tasks
+            no_trans = not getattr(self, 'transitioning_items', set())
+            
+            if no_tasks and no_trans and status.get("active"):
                 # Verify consistency with state manager
                 current_status = self.state_manager.get_status()
-                if not current_status.get("concurrent_downloads") and not current_status.get("queue"):
+                if not current_status.get("concurrent_downloads") and not current_status.get("queue") and not current_status.get("scanning"):
                     # Add a double-check delay
                     await asyncio.sleep(0.5)
                     final_check = self.state_manager.get_status()
-                    if not final_check.get("queue") and not final_check.get("concurrent_downloads"):
-                        logger.info("Queue empty and no active downloads for >0.5s. Session complete.")
+                    if not final_check.get("queue") and not final_check.get("concurrent_downloads") and not final_check.get("scanning"):
+                        logger.info(f"[SESSION] Queue processor loop ended and nothing pending. Marking session inactive in finally block. ActiveTasks={len(self.active_download_tasks)}")
                         self.state_manager.update_status({"active": False, "started_at": None})
             
             logger.info("Queue processor loop stopped")
@@ -244,12 +259,19 @@ class DownloadService:
         
         async def collection_task():
             try:
+                # Scanning status is already set before task creation
+                logger.info("=== SCANNING: Collection task started ===")
+                
                 # Use bulk fetch for efficiency
                 message_list = await self.telegram_service.get_messages(channel_username, message_ids)
                 items_to_queue = []
                 skipped_count = 0
                 
-                for msg in message_list:
+                for idx, msg in enumerate(message_list):
+                    # Update scan progress
+                    scan_pct = int((idx + 1) / len(message_list) * 100)
+                    self.state_manager.update_status({"scan_progress": scan_pct})
+                    
                     if self.state_manager.is_file_active_or_queued(channel_username, msg.id):
                         logger.info(f"Skipping duplicate file: {self._get_file_name(msg)} (ID: {msg.id})")
                         skipped_count += 1
@@ -267,6 +289,9 @@ class DownloadService:
                         "retry_count": 0
                     })
 
+                # Clear scanning status
+                self.state_manager.update_status({"scanning": False, "scan_progress": 0})
+                
                 self.state_manager.add_to_queue(items_to_queue)
                 
                 # Adjust total if some were skipped (duplicates)
@@ -277,8 +302,14 @@ class DownloadService:
                 self.start_queue_processor()
                 logger.info(f"Successfully queued {len(items_to_queue)} selected files (skipped {skipped_count} duplicates)")
             except Exception as e:
+                # Clear scanning status on error
+                self.state_manager.update_status({"scanning": False, "scan_progress": 0})
                 logger.error(f"Background collection task for selected files failed: {e}")
 
+        # Set scanning status BEFORE starting background task so frontend sees it immediately
+        logger.info("=== SCANNING: Setting initial scanning status before background task ===")
+        self.state_manager.update_status({"scanning": True, "scan_progress": 0})
+        
         # Start background task and track it
         task = asyncio.create_task(collection_task())
         self.collection_tasks.add(task)
@@ -299,6 +330,9 @@ class DownloadService:
         
         async def collection_task():
             try:
+                # Scanning status is already set before task creation
+                logger.info("=== SCANNING: Collection task started (download all) ===")
+                
                 count = 0
                 chunk_size = 5 # Start with very small chunk for immediate feedback
                 current_chunk = []
@@ -331,6 +365,11 @@ class DownloadService:
                             })
                             count += 1
                             
+                            # Update scan progress
+                            if limit > 0:
+                                scan_pct = min(int(count / limit * 100), 99)  # Cap at 99% until complete
+                                self.state_manager.update_status({"scan_progress": scan_pct})
+                            
                             if len(current_chunk) >= chunk_size:
                                 logger.info(f"Queuing next {len(current_chunk)} items from {channel_username} scan...")
                                 self.state_manager.add_to_queue(current_chunk)
@@ -350,6 +389,9 @@ class DownloadService:
                     self.state_manager.update_status({"total": count})
                     self.start_queue_processor()
                 
+                # Clear scanning status
+                self.state_manager.update_status({"scanning": False, "scan_progress": 100})
+                
                 if count == 0:
                     logger.info(f"No matchable files found in {channel_username}")
                     self.state_manager.update_status({"active": False})
@@ -357,11 +399,19 @@ class DownloadService:
                     logger.info(f"Scan complete for {channel_username}. Total queued: {count}")
                     
             except asyncio.CancelledError:
+                # Clear scanning status on cancellation
+                self.state_manager.update_status({"scanning": False, "scan_progress": 0})
                 logger.info(f"Collection task for {channel_username} was cancelled")
             except Exception as e:
+                # Clear scanning status on error
+                self.state_manager.update_status({"scanning": False, "scan_progress": 0})
                 logger.error(f"Background collection task for all files failed: {e}")
                 self.state_manager.update_status({"active": False})
 
+        # Set scanning status BEFORE starting background task so frontend sees it immediately
+        logger.info("=== SCANNING: Setting initial scanning status before background task (download all) ===")
+        self.state_manager.update_status({"scanning": True, "scan_progress": 0})
+        
         # Start background task and track it
         task = asyncio.create_task(collection_task())
         self.collection_tasks.add(task)
@@ -749,9 +799,18 @@ class DownloadService:
             self.state_manager.save_state()
             
             # Check if session is now complete
-            if not self.active_download_tasks and not self.state_manager.get_queue():
-                logger.info("Last active task cancelled and queue empty. Marking session inactive.")
+            # We fetch a fresh status to be absolutely sure we have latest queue/active info
+            fresh_status = self.state_manager.get_status()
+            has_queue = len(fresh_status.get("queue", [])) > 0
+            has_active_tasks = len(self.active_download_tasks) > 0
+            has_trans = len(getattr(self, 'transitioning_items', set())) > 0
+            is_scanning = fresh_status.get("scanning", False)
+            
+            if not has_active_tasks and not has_queue and not has_trans and not is_scanning:
+                logger.info(f"[SESSION] Session cleanup in cancel_individual. marking inactive. Tasks={len(self.active_download_tasks)}, queue={len(fresh_status.get('queue', []))}, trans={has_trans}, scanning={is_scanning}")
                 self.state_manager.update_status({"active": False, "started_at": None})
+            else:
+                logger.debug(f"[SESSION] Staying active after cancel. tasks={len(self.active_download_tasks)}, queue={len(fresh_status.get('queue', []))}, trans={has_trans}, scanning={is_scanning}")
                 
             return {"status": "success", "message": f"Download for {data.get('name')} cancelled."}
         
@@ -766,13 +825,31 @@ class DownloadService:
                     self.state_manager.save_state()
                 
                 # Check if session is now complete
-                if not self.active_download_tasks and not self.state_manager.get_queue():
-                    logger.info("Last queued item removed and no active tasks. Marking session inactive.")
+                has_queue = len(self.state_manager.get_queue()) > 0
+                if not self.active_download_tasks and not has_queue and not self.transitioning_items:
+                    logger.info("Last queued item removed and nothing left. Marking session inactive.")
                     self.state_manager.update_status({"active": False, "started_at": None})
                     
                 return {"status": "success", "message": f"Item {item.get('name')} removed from queue."}
         
         return {"status": "error", "message": "Download not found or already finished."}
+
+    def get_status_as_dict(self) -> Dict[str, Any]:
+        """Get the current download status, augmented with live service info"""
+        status = self.state_manager.get_status().copy()
+        
+        # Add live info about transitioning items
+        transitioning_count = len(getattr(self, 'transitioning_items', set()))
+        active_task_count = len(getattr(self, 'active_download_tasks', {}))
+        
+        status["transitioning_count"] = transitioning_count
+        status["active_task_count"] = active_task_count
+        
+        # If we have transitioning items or active tasks, the session is definitely active
+        if transitioning_count > 0 or active_task_count > 0:
+            status["active"] = True
+            
+        return status
 
     def cleanup_tasks(self):
         """Cleanup active download tasks (not fully needed with queue but good for shutdown)"""

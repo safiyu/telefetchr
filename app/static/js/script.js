@@ -278,7 +278,6 @@ async function authFetch(url, options = {}) {
 
         // If unauthorized, handle silently for background requests
         if (response.status === 401) {
-            console.warn('Authentication token expired or invalid');
             // Only show alert and redirect if this is NOT a background progress check
             if (!url.includes('/download-progress')) {
                 showAlert('downloadAlert', 'Session expired. Login required.', 'warning');
@@ -289,7 +288,6 @@ async function authFetch(url, options = {}) {
                 }, 2000);
             } else {
                 // For progress checks, just log and return null silently
-                console.log('Progress check failed due to expired token - monitoring will stop');
             }
             return null;
         }
@@ -344,13 +342,11 @@ window.addEventListener('unhandledrejection', function (event) {
         if (message.includes('Server error') ||
             message.includes('Invalid response') ||
             message.includes('Unexpected token')) {
-            console.log('Suppressing error toast for:', message);
             return;
         }
     }
 
     // For other errors, you might want to log them but not necessarily show a toast
-    console.log('Non-JSON error caught:', event.reason);
 });
 
 // Check authentication on page load
@@ -394,12 +390,10 @@ async function loadChannels() {
 // Check for saved state on page load
 async function checkSavedState() {
     try {
-        console.log('Checking for saved state...');
         const response = await authFetch("/download/state");
         if (!response) return;
         const data = await safeJsonParse(response, 'Check saved state');
 
-        console.log('Saved state response:', data);
 
         if (data.has_saved_state && !data.active) {
             const completedCount = data.progress || 0;
@@ -407,7 +401,18 @@ async function checkSavedState() {
             const remainingCount = totalCount - completedCount;
             const wasCancelled = data.cancelled || false;
 
-            console.log(`Found saved state: ${completedCount}/${totalCount} completed, ${remainingCount} remaining, cancelled: ${wasCancelled}`);
+            // If it's cancelled, we don't want to alert the user about it on refresh
+            if (wasCancelled) {
+                return;
+            }
+
+            // If it's an empty session (0 total and no history), skip it
+            if (totalCount === 0 && completedCount === 0) {
+                return;
+            }
+
+            /*
+             */
 
             // Determine the status message and icon
             const statusIcon = wasCancelled ?
@@ -467,14 +472,11 @@ async function checkSavedState() {
             }
 
         } else if (!data.has_saved_state) {
-            console.log('No saved state found');
         } else if (data.active) {
-            console.log('Download is currently active');
         }
 
         // If download is active, restore progress monitoring
         if (data.active) {
-            console.log('Restoring active download monitoring...');
             document.getElementById("downloadProgress").classList.remove("hidden");
             document.getElementById("stopAllBtn").classList.remove("hidden");
             startProgressMonitoring();
@@ -516,7 +518,6 @@ async function refreshDebugInfo() {
             debugInfo.textContent = JSON.stringify(data, null, 2);
         }
 
-        console.log('Debug State:', data);
     } catch (error) {
         console.error('Error fetching debug info:', error);
         const debugInfo = document.getElementById('debugInfo');
@@ -1119,11 +1120,11 @@ function createProgressBar(
                             <div class="file-name text-white font-medium line-clamp-2" title="${fileName}">
                                 ${fileName}
                             </div>
-                            <div class="flex items-center gap-2 mt-0.5">
+                            <div class="progress-badges flex items-center gap-2 mt-0.5">
                                 ${retryBadge}
                                 ${stallWarning}
                                 ${isQueued ? `<span class="text-xs text-yellow-500 flex items-center gap-1 font-bold uppercase italic"><i class="fa-solid fa-hourglass-start text-[10px]"></i> Queued!</span>` : ''}
-                                ${!isComplete && !isQueued && !retryBadge && !stallWarning ? `<span class="text-xs text-yellow-300 font-bold flex items-center gap-1 uppercase"><i class="fa-solid fa-bolt text-[10px]"></i> ${speedText}</span>` : ''}
+                                ${!isComplete && !isQueued && !retryBadge && !stallWarning ? `<span class="text-xs text-yellow-300 font-bold flex items-center gap-1 uppercase"><i class="fa-solid fa-bolt text-[10px]"></i> <span class="speed-val">${speedText}</span></span>` : ''}
                             </div>
                         </div>
                     </div>
@@ -1135,27 +1136,28 @@ function createProgressBar(
                     ` : `
                         <div class="flex flex-col items-end gap-1">
                             <div class="flex items-center gap-2">
-                                <span class="text-lg font-bold text-white header-gradient">${isQueued ? '0' : percentage}%</span>
+                                <span class="progress-percentage text-lg font-bold text-white header-gradient">${isQueued ? '0' : percentage}%</span>
                                 <button onclick="cancelIndividualDownload('${fileId}')" 
                                     class="w-8 h-8 flex items-center justify-center ${isQueued ? 'btn-orange-hover' : 'btn-red'} rounded-xl focus:outline-none" 
                                     title="${isQueued ? 'Remove from Queue' : 'Cancel Download'}">
                                     <i class="fa-solid ${isQueued ? 'fa-trash-can' : 'fa-stop'} text-xs"></i>
                                 </button>
                             </div>
-                            <div class="text-xs text-gray-400 font-medium tracking-wide">${etaText}</div>
+                            <div class="progress-eta text-xs text-gray-400 font-medium tracking-wide">${etaText}</div>
                         </div>
                     `}
                 </div>
 
                 <!-- Progress Track -->
                 <div class="h-4 w-full bg-gray-900 border-2 border-black rounded-full overflow-hidden mb-3 relative" style="box-shadow: inset 2px 2px 4px rgba(0,0,0,0.5)">
-                    <div class="h-full transition-all duration-500 ease-out relative ${isComplete ? 'bg-green-500' : 'bg-yellow-400 progress-bar-glow'}" 
+                    <div class="progress-inner h-full transition-all duration-500 ease-out relative ${isComplete ? 'bg-green-500' : 'bg-yellow-400 progress-bar-glow'}" 
                          style="width: ${percentage}%; background-color: ${isComplete ? '' : '#fbbf24'}; border-right: ${isComplete ? 'none' : '2px solid black'};">
                     </div>
                 </div>
 
                 <div class="flex justify-between items-center text-xs text-gray-400 font-medium">
-                    <span>${isQueued ? 'Awaiting start...' : `${formatBytes(current)} <span class="opacity-50 mx-1">/</span> ${formatBytes(total)}`}</span>
+                    <span class="progress-size-text">${isQueued ? 'Awaiting start...' : `${formatBytes(current)} <span class="opacity-50 mx-1">/</span> ${formatBytes(total)}`}</span>
+                    <span class="progress-status">
                     ${isComplete
             ? '<span class="text-green-400 font-bold flex items-center gap-1.5"><i class="fa-solid fa-circle-check"></i> Complete</span>'
             : isQueued
@@ -1164,6 +1166,7 @@ function createProgressBar(
                     ? '<span class="text-yellow-400 font-bold flex items-center gap-1.5"><i class="fa-solid fa-spinner fa-spin"></i> Retrying...</span>'
                     : '<span class="text-blue-400 font-bold flex items-center gap-1.5"><i class="fa-solid fa-spinner fa-spin"></i> Downloading</span>'
         }
+                    </span>
                 </div>
             </div>
         </div>
@@ -1260,6 +1263,8 @@ async function downloadSelected(channel) {
         showAlert("downloadAlert", "Error: " + error.message, "error");
     } finally {
         setButtonLoading("downloadSelectedBtn", false);
+        // Reset selection AFTER button content is restored
+        deselectAllFiles();
     }
 }
 
@@ -1281,18 +1286,8 @@ async function cancelIndividualDownload(fileId) {
                 element.remove();
             }
 
-            // check if no more progress items
-            const activeContainer = document.getElementById("activeDownloadContainer");
-            const queueContainer = document.getElementById("queueContainer");
-            const historyContainer = document.getElementById("historyContainer");
-
-            const hasItems = (activeContainer?.children.length > 0) ||
-                (queueContainer?.children.length > 0) ||
-                (historyContainer?.children.length > 0);
-
-            if (!hasItems) {
-                document.getElementById("downloadProgress").classList.add("hidden");
-            }
+            // We used to hide the section here, but that causes issues during transitions.
+            // We'll trust updateProgressUI (which runs on a poll) to handle the global visibility.
         } else {
             showAlert("downloadAlert", data.detail || "Cancellation failed", "error");
         }
@@ -1372,9 +1367,6 @@ async function downloadAll() {
         if (response.ok) {
             showAlert("downloadAlert", data.message, "success");
 
-            document.getElementById("downloadProgress").classList.remove("hidden");
-            document.getElementById("stopAllBtn").classList.remove("hidden");
-
             startProgressMonitoring();
         } else {
             showAlert("downloadAlert", data.detail, "error");
@@ -1383,6 +1375,8 @@ async function downloadAll() {
         showAlert("downloadAlert", "Error: " + error.message, "error");
     } finally {
         setButtonLoading("addAllBtn", false);
+        // Reset selection AFTER button content is restored
+        deselectAllFiles();
     }
 }
 
@@ -1481,7 +1475,6 @@ async function cancelDownload() {
 
 function startProgressMonitoring() {
     if (progressMonitoringInterval) {
-        console.log('Clearing existing progress monitoring interval');
         clearInterval(progressMonitoringInterval);
         progressMonitoringInterval = null;
     }
@@ -1496,14 +1489,12 @@ function startProgressMonitoring() {
     let errorCount = 0;
     const maxErrors = 5;
 
-    console.log('Starting progress monitoring with 500ms interval');
     lastProgressUpdate = Date.now();
 
     // Start watchdog to detect stalled monitoring (check every 5 seconds)
     progressWatchdog = setInterval(() => {
         const timeSinceUpdate = Date.now() - lastProgressUpdate;
         if (timeSinceUpdate > 10000) { // 10 seconds without update
-            console.warn(`Progress monitoring appears stalled (${timeSinceUpdate}ms since last update)`);
 
             // Check if download is still active
             authFetch('/download-progress').then(response => {
@@ -1511,7 +1502,6 @@ function startProgressMonitoring() {
                 return response.json();
             }).then(data => {
                 if (data && data.active && !progressMonitoringInterval) {
-                    console.log('Watchdog: Restarting stalled progress monitoring');
                     startProgressMonitoring();
                 }
             }).catch(err => {
@@ -1577,9 +1567,16 @@ function startProgressMonitoring() {
             // Centralized UI update
             updateProgressUI(data);
 
-            // Stop monitoring if session is finished
-            if (!data.active && hasStarted) {
-                console.log('Download session finished, stopping monitor.');
+            // Resilient Stoppage: Only stop monitoring if:
+            // 1. Backend says active is false
+            // 2. We don't have pending queued items (safety)
+            // 3. We aren't currently scanning
+            // 4. We actually had a session going (hasStarted)
+            const isScanning = data.scanning || false;
+            const hasQueued = data.queue && data.queue.length > 0;
+            const concurrentCount = data.concurrent_downloads ? Object.keys(data.concurrent_downloads).length : 0;
+
+            if (!data.active && hasStarted && !isScanning && !hasQueued && concurrentCount === 0) {
                 clearInterval(progressMonitoringInterval);
                 progressMonitoringInterval = null;
                 if (progressWatchdog) {
@@ -1703,7 +1700,6 @@ document.head.appendChild(style);
 document.addEventListener('visibilitychange', async function () {
     if (!document.hidden) {
         // Page became visible again
-        console.log('Page became visible, checking download state...');
 
         try {
             const response = await authFetch('/download-progress');
@@ -1713,7 +1709,6 @@ document.addEventListener('visibilitychange', async function () {
 
             // If there's an active download and no monitoring is running
             if (data.active && !progressMonitoringInterval) {
-                console.log('Active download detected, restoring progress monitoring...');
 
                 // Show progress section and cancel button
                 document.getElementById('downloadProgress').classList.remove('hidden');
@@ -1726,11 +1721,8 @@ document.addEventListener('visibilitychange', async function () {
                 updateProgressUI(data);
             } else if (data.active && progressMonitoringInterval) {
                 // Monitoring is running, just refresh the UI
-                console.log('Active download and monitoring running, refreshing UI...');
-                updateProgressUI(data);
             } else if (!data.active && data.completed_downloads && Object.keys(data.completed_downloads).length > 0) {
                 // No active download but there are completed ones, show them
-                console.log('Restoring completed downloads view...');
                 document.getElementById('downloadProgress').classList.remove('hidden');
                 document.getElementById('clearProgressBtn')?.classList.remove('hidden');
                 updateProgressUI(data);
@@ -1740,22 +1732,14 @@ document.addEventListener('visibilitychange', async function () {
         }
     } else {
         // Page became hidden
-        console.log('Page became hidden, interval may be throttled by browser');
     }
 });
 
 // Helper function to update progress UI
 function updateProgressUI(data) {
     if (!data) {
-        console.warn('updateProgressUI: No data received');
         return;
     }
-    console.log('updateProgressUI: Updating with data', {
-        active: data.active,
-        session_id: data.session_id,
-        active_count: data.concurrent_downloads ? Object.keys(data.concurrent_downloads).length : 0,
-        history_count: (data.completed_downloads ? Object.keys(data.completed_downloads).length : 0) + (data.cancelled_files ? Object.keys(data.cancelled_files).length : 0)
-    });
 
     const activeContainer = document.getElementById('activeDownloadContainer');
     const queueList = document.getElementById('queueList'); // Replaced queueContainer
@@ -1766,11 +1750,15 @@ function updateProgressUI(data) {
     const historySection = document.getElementById('historySection');
     const progressSection = document.getElementById('downloadProgress');
 
+    const hasQueuedItems = data.queue && data.queue.length > 0;
+    const isFinished = data.total > 0 && data.progress >= data.total;
+    const isScanning = data.scanning || false;
+    const scanProgress = data.scan_progress || 0;
+
     // Removed early return to allow partial updates even if some containers are missing
 
     // 1. Check for session change
     if (data.session_id && data.session_id !== currentSessionId) {
-        console.log(`New session detected: ${data.session_id} (old: ${currentSessionId})`);
         currentSessionId = data.session_id;
 
         // Reset UI for new session
@@ -1782,16 +1770,31 @@ function updateProgressUI(data) {
         if (progressSection) progressSection.classList.remove('hidden');
     }
 
+    // [Diagnostic] Log transition state
+    const activeCount = data.concurrent_downloads ? Object.keys(data.concurrent_downloads).length : 0;
+    const isActuallyActive = data.active && !isFinished;
+    if (isActuallyActive) {
+    }
+
     // 2. Update Header / Visibility based on active status
     const hasActive = data.active && data.concurrent_downloads && Object.keys(data.concurrent_downloads).length > 0;
     const hasHistory = (data.completed_downloads && Object.keys(data.completed_downloads).length > 0) ||
         (data.cancelled_files && Object.keys(data.cancelled_files).length > 0);
 
-    if (hasActive || hasHistory || data.active) {
+    const hasVisibleContent = hasActive || hasHistory || (data.active && !isFinished) || isScanning;
+    if (hasVisibleContent) {
         if (progressSection) progressSection.classList.remove('hidden');
+    } else {
+        // Only hide if session is truly inactive or finished
+        if (!data.active || isFinished) {
+            if (progressSection) progressSection.classList.add('hidden');
+        }
     }
 
-    if (data.active) {
+    // 3. Update Stop All button visibility - only show if there is actually something to stop
+    // (Active downloads, Queued items, or Scanning)
+    const canStop = hasActive || hasQueuedItems || isScanning;
+    if (canStop && data.active) {
         document.getElementById('stopAllBtn')?.classList.remove('hidden');
         document.getElementById('activeIcon')?.classList.add('fa-spin');
     } else {
@@ -1856,81 +1859,91 @@ function updateProgressUI(data) {
         }
     }
 
-    // 5. Update active downloads
+    // 5. Update active downloads and Scanning Indicator
+    // (A) Scanning Indicator - Independent of active download count
+    const scanningContainer = document.getElementById('scanningContainer');
+    if (isScanning && scanningContainer) {
+        scanningContainer.classList.remove('hidden');
+        const progressBar = document.getElementById('scanningProgressBar');
+        const progressText = document.getElementById('scanningProgressText');
+        if (progressBar) progressBar.style.width = `${scanProgress}%`;
+        if (progressText) progressText.textContent = `${scanProgress}%`;
+    } else if (scanningContainer) {
+        scanningContainer.classList.add('hidden');
+    }
+
+    // (B) Active Download Items
     if (data.concurrent_downloads && activeContainer) {
         const activeIds = Object.keys(data.concurrent_downloads);
 
-        // Remove stale active downloads that are no longer in concurrent_downloads
+        // Remove stale active downloads
         const currentActiveBars = activeContainer.querySelectorAll('.file-progress-block');
         currentActiveBars.forEach(bar => {
             const id = bar.id.replace('progress-', '');
             if (!activeIds.includes(id)) {
-                console.log(`Removing stale active bar: ${id}`);
                 bar.remove();
             }
         });
 
         if (activeIds.length > 0) {
-            console.log(`Rendering ${activeIds.length} active downloads`);
+            // We have files actively downloading
             activeSection?.classList.remove('hidden');
+            document.getElementById('initializing-placeholder')?.remove();
 
             for (const [fileId, fileData] of Object.entries(data.concurrent_downloads)) {
-                // Skip if already in completed map
                 if (completedDownloads.has(fileId)) continue;
 
                 const percentage = fileData.percentage || 0;
                 const existingProgress = document.getElementById(`progress-${fileId}`);
                 const html = createProgressBar(
-                    fileId,
-                    fileData.name,
-                    false,
-                    percentage,
-                    fileData.progress,
-                    fileData.total,
-                    fileData.retry_attempt,
-                    fileData.last_update,
-                    fileData.speed,
-                    fileData.eta,
-                    false // isQueued
+                    fileId, fileData.name, false, percentage,
+                    fileData.progress, fileData.total, fileData.retry_attempt,
+                    fileData.last_update, fileData.speed, fileData.eta, false
                 );
 
                 if (existingProgress) {
-                    // Update only if changed to avoid unnecessary DOM thrashing
-                    if (existingProgress.outerHTML !== html) {
-                        existingProgress.outerHTML = html;
+                    // Surgical update to avoid flickering/missing clicks
+                    const pBar = existingProgress.querySelector('.progress-inner');
+                    const pPercent = existingProgress.querySelector('.progress-percentage');
+                    const pEta = existingProgress.querySelector('.progress-eta');
+                    const pSize = existingProgress.querySelector('.progress-size-text');
+                    const pSpeed = existingProgress.querySelector('.speed-val');
+
+                    if (pBar) pBar.style.width = `${percentage}%`;
+                    if (pPercent) pPercent.textContent = `${percentage}%`;
+                    if (pEta) pEta.textContent = fileData.eta > 0 ? `ETA: ${formatTime(fileData.eta)}` : '';
+                    if (pSize) {
+                        const currentStr = formatBytes(fileData.progress || 0);
+                        const totalStr = formatBytes(fileData.total || 0);
+                        pSize.innerHTML = `${currentStr} <span class="opacity-50 mx-1">/</span> ${totalStr}`;
                     }
+                    if (pSpeed) {
+                        pSpeed.textContent = fileData.speed > 0 ? `${formatBytes(fileData.speed)}/s` : '';
+                    }
+
+                    // For more complex state changes (like retry/stall badges), we could do more,
+                    // but the above covers 99% of updates and fixes the "blinking button" issue.
                 } else {
-                    console.log(`Adding new active bar: ${fileId}`);
                     activeContainer.insertAdjacentHTML('beforeend', html);
                 }
             }
-            // Remove initializing placeholder if it exists
-            const placeholder = document.getElementById('initializing-placeholder');
-            if (placeholder) {
-                console.log('Removing initializing placeholder');
-                placeholder.remove();
-            }
         } else {
-            // No items in concurrent_downloads
-            const hasQueuedItems = data.queue && data.queue.length > 0;
-            const isFinished = data.total > 0 && data.progress >= data.total;
-
-            if (data.active && !isFinished && hasQueuedItems) {
-                console.log('Session active but no concurrent downloads. Showing placeholder.');
+            // No concurrent downloads right now
+            if (data.active && !isFinished) {
+                // We are transitioning or preparing
                 activeSection?.classList.remove('hidden');
                 if (!document.getElementById('initializing-placeholder')) {
-                    activeContainer.innerHTML = `
+                    activeContainer.insertAdjacentHTML('beforeend', `
                         <div id="initializing-placeholder" class="text-center py-8 animate-pulse bg-gray-800 bg-opacity-20 rounded-2xl border border-gray-700 border-opacity-30">
                             <i class="fa-solid fa-circle-notch fa-spin text-indigo-400 text-3xl mb-3"></i>
                             <p class="text-white text-sm font-medium">Preparing next download...</p>
                         </div>
-                    `;
+                    `);
                 }
             } else {
-                if (data.active && isFinished) {
-                    console.log('Session is marked active but all files are finished. Hiding active section.');
-                }
+                // Truly inactive
                 activeSection?.classList.add('hidden');
+                document.getElementById('initializing-placeholder')?.remove();
             }
         }
     }
@@ -1947,21 +1960,15 @@ function updateProgressUI(data) {
 
 // On page load, check status and load channels if connected
 (async function () {
-    console.log('TeleFetchr initializing...');
-    console.log('Checking connection status...');
     await checkStatus();
 
     const connectionStatus = document.getElementById('connectionStatus');
     if (connectionStatus && connectionStatus.textContent.includes('Connected')) {
-        console.log('Connected to Telegram, loading channels...');
         await loadChannels();
-        console.log('Checking for saved download state...');
         await checkSavedState();
     } else {
-        console.log('Not connected to Telegram');
     }
 
-    console.log('TeleFetchr initialization complete');
 })();
 
 // --- Queue Management ---
@@ -2039,6 +2046,12 @@ function updateQueueBadge(count) {
 
     if (totalCount) {
         totalCount.textContent = `${count} items`;
+    }
+
+    // Also update pagination total if it exists
+    const pagTotal = document.getElementById('paginationTotal');
+    if (pagTotal) {
+        pagTotal.textContent = count;
     }
 }
 
@@ -2142,7 +2155,6 @@ function getStatusColor(status) {
 
 async function reorderQueue(index, direction) {
     // Reorder disabled as per user request to remove drag/drop & simplify
-    console.log("Reorder disabled");
 }
 
 async function removeFromQueue(id) {
@@ -2225,7 +2237,6 @@ function updateSessionTimer(startedAt) {
 
 // Debug helper
 window.debugRender = function () {
-    console.log('Running debug render...');
     const fakeData = {
         active: true,
         session_id: 'debug-session',

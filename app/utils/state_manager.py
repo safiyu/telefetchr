@@ -23,6 +23,8 @@ class StateManager:
         """Initialize default download status"""
         return {
             "active": False,
+            "scanning": False,
+            "scan_progress": 0,
             "progress": 0,
             "total": 0,
             "current_file": "",
@@ -46,6 +48,8 @@ class StateManager:
             # Create a copy to save
             state_to_save = {
                 "active": self.download_status.get("active", False),
+                "scanning": self.download_status.get("scanning", False),
+                "scan_progress": self.download_status.get("scan_progress", 0),
                 "progress": self.download_status.get("progress", 0),
                 "total": self.download_status.get("total", 0),
                 "current_file": self.download_status.get("current_file", ""),
@@ -200,6 +204,11 @@ class StateManager:
 
     def update_status(self, updates: Dict[str, Any]):
         """Update download status"""
+        if "active" in updates and updates["active"] != self.download_status.get("active"):
+            logger.info(f"[STATE] Active changed: {self.download_status.get('active')} -> {updates['active']}")
+        if "cancelled" in updates and updates["cancelled"] != self.download_status.get("cancelled"):
+            logger.info(f"[STATE] Cancelled changed: {self.download_status.get('cancelled')} -> {updates['cancelled']}")
+            
         self.download_status.update(updates)
         self.save_state()
 
