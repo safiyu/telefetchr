@@ -18,12 +18,12 @@ A modern Telegram file downloader with a sleek Comic-themed UI.
 
 ## Features
 
-- 🎨 **Modern Comic Theme UI** - Clean, playful design with black borders and vibrant colors
-- 📥 **Bulk Downloads** - Download multiple files from Telegram channels simultaneously
-- ⚡ **Fast & Efficient** - Parallel downloads with configurable workers
-- 💾 **Network Storage Support** - Direct downloads to NAS/network drives
-- 🔄 **Session Persistence** - Resume interrupted downloads automatically
-- 🔐 **Secure Authentication** - JWT-based auth with optional subnet bypass
+- **Modern Comic Theme UI** - Clean, playful design with black borders and vibrant colors
+- **Bulk Downloads** - Download multiple files from Telegram channels simultaneously
+- **Fast & Efficient** - Parallel downloads with configurable workers
+- **Network Storage Support** - Direct downloads to NAS/network drives
+- **Session Persistence** - Resume interrupted downloads automatically
+- **Secure Authentication** - JWT-based auth with optional subnet bypass
 
 ## Quick Start
 
