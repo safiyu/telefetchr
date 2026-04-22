@@ -1,6 +1,12 @@
 # Changelog
 
-All epic victories, spectacular fails, and mysterious bugs that somehow became features are here.
+All epic victories and mysterious bugs that somehow became features are here.
+
+## [1.4.0] - 2026-04-22
+### Added
+- UX Enhancement: Added dynamic Sorting Options (Newest, Oldest, Largest, Smallest, Alphabetical) directly above the scan results.
+- UX Enhancement: Added robust Pre-scan Filters ("Videos" and "Audio") using native Telethon API filtering to significantly boost scan speeds.
+- UX Enhancement: Exposed previously hidden Download Speed and ETA text directly into the progress bar UI.
 
 ## [1.3.0] - 2026-04-22
 ### Added

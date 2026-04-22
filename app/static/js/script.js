@@ -870,7 +870,16 @@ async function listFiles() {
         const data = await response.json();
 
         if (response.ok) {
-            displayFiles(data.files);
+            window.currentScannedFiles = data.files;
+            
+            // Apply sorting if a sort option is already selected
+            const sortOption = document.getElementById("sortOption");
+            if (sortOption && sortOption.value) {
+                sortFiles(window.currentScannedFiles, sortOption.value);
+            } else {
+                displayFiles(window.currentScannedFiles);
+            }
+            
             const filterMsg = (searchQuery || fileExtension || minSize || maxSize)
                 ? " (with filters applied)"
                 : "";
@@ -883,6 +892,45 @@ async function listFiles() {
     } finally {
         setButtonLoading("scanBtn", false);
     }
+}
+
+function handleSortChange() {
+    const sortOption = document.getElementById("sortOption");
+    if (sortOption && window.currentScannedFiles) {
+        sortFiles(window.currentScannedFiles, sortOption.value);
+    }
+}
+
+function sortFiles(files, option) {
+    if (!files || files.length === 0) return;
+    
+    // Sort array in place
+    files.sort((a, b) => {
+        switch (option) {
+            case 'oldest':
+                return new Date(a.date) - new Date(b.date);
+            case 'newest':
+                return new Date(b.date) - new Date(a.date);
+            case 'largest':
+                return b.file_size - a.file_size;
+            case 'smallest':
+                return a.file_size - b.file_size;
+            case 'alpha':
+                return a.file_name.localeCompare(b.file_name);
+            case 'alpha_rev':
+                return b.file_name.localeCompare(a.file_name);
+            default:
+                return 0; // maintain original order
+        }
+    });
+    
+    displayFiles(files);
+    
+    // Re-select the correct option in the newly rendered HTML
+    setTimeout(() => {
+        const select = document.getElementById("sortOption");
+        if (select) select.value = option;
+    }, 10);
 }
 
 function displayFiles(files) {
@@ -902,7 +950,18 @@ function displayFiles(files) {
             <h3 class="text-lg font-bold text-white flex items-center gap-2 italic uppercase">
                 <i class="fa-solid fa-folder-open text-amber-400"></i> Files Found
             </h3>
-            <div class="flex flex-wrap gap-2 w-full sm:w-auto">
+            <div class="flex flex-wrap gap-2 w-full sm:w-auto items-center">
+                <div class="relative mr-2">
+                    <select id="sortOption" onchange="handleSortChange()" class="appearance-none bg-gray-900 border border-gray-700 text-xs text-gray-300 py-1.5 pl-3 pr-8 rounded-xl focus:outline-none focus:border-amber-500 cursor-pointer">
+                        <option value="newest">Newest First</option>
+                        <option value="oldest">Oldest First</option>
+                        <option value="largest">Largest First</option>
+                        <option value="smallest">Smallest First</option>
+                        <option value="alpha">A-Z</option>
+                        <option value="alpha_rev">Z-A</option>
+                    </select>
+                    <i class="fa-solid fa-sort absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-500 pointer-events-none"></i>
+                </div>
                 <button onclick="selectAllFiles()" class="flex-1 sm:flex-none py-1.5 px-3 rounded-xl btn-orange-hover flex items-center justify-center gap-1.5 focus:outline-none">
                     <i class="fa-solid fa-check-double text-[10px]"></i> Select All
                 </button>
@@ -1659,7 +1718,7 @@ function showAlert(_elementId, message, type) {
                 <div class="flex items-center justify-between mb-0.5">
                     <span class="text-[10px] font-bold ${iconColor} uppercase tracking-[0.2em] opacity-80">${title}</span>
                 </div>
-                <p class="text-sm text-white/90 leading-relaxed font-medium">${message}</p>
+                <p class="text-sm text-white/90 leading-relaxed font-medium break-all">${message}</p>
             </div>
             <button class="flex-shrink-0 ml-2 p-1 text-white/20 hover:text-white transition-colors" onclick="this.closest('.relative').remove()">
                 <i class="fa-solid fa-xmark text-xs"></i>

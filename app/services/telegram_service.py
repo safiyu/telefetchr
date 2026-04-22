@@ -6,7 +6,7 @@ import os
 import asyncio
 import aiofiles
 from telethon import TelegramClient, utils
-from telethon.tl.types import MessageMediaDocument, MessageMediaPhoto, Channel, User
+from telethon.tl.types import MessageMediaDocument, MessageMediaPhoto, Channel, User, InputMessagesFilterVideo, InputMessagesFilterDocument, InputMessagesFilterPhotos, InputMessagesFilterMusic
 from telethon.network import ConnectionTcpMTProxyRandomizedIntermediate
 
 from app.config import Config
@@ -164,7 +164,18 @@ class TelegramService:
             except:
                 logger.warning(f"Invalid date_to format: {date_to}")
 
-        async for message in self.client.iter_messages(channel_username, limit=limit * 2):
+        api_filter = None
+        if filter_type:
+            if filter_type.lower() == 'video':
+                api_filter = InputMessagesFilterVideo
+            elif filter_type.lower() == 'document':
+                api_filter = InputMessagesFilterDocument
+            elif filter_type.lower() == 'photo':
+                api_filter = InputMessagesFilterPhotos
+            elif filter_type.lower() == 'audio':
+                api_filter = InputMessagesFilterMusic
+
+        async for message in self.client.iter_messages(channel_username, limit=limit * 2, filter=api_filter):
             if message.media:
                 file_info = None
 
@@ -173,24 +184,22 @@ class TelegramService:
                     file_name = next((attr.file_name for attr in doc.attributes
                                       if hasattr(attr, 'file_name')), f"document_{message.id}")
 
-                    if not filter_type or filter_type == 'document':
-                        file_info = FileInfo(
-                            file_id=message.id,
-                            file_name=file_name,
-                            file_size=doc.size,
-                            file_type="document",
-                            date=str(message.date)
-                        )
+                    file_info = FileInfo(
+                        file_id=message.id,
+                        file_name=file_name,
+                        file_size=doc.size,
+                        file_type="document",
+                        date=str(message.date)
+                    )
 
                 elif isinstance(message.media, MessageMediaPhoto):
-                    if not filter_type or filter_type == 'photo':
-                        file_info = FileInfo(
-                            file_id=message.id,
-                            file_name=f"photo_{message.id}.jpg",
-                            file_size=0,
-                            file_type="photo",
-                            date=str(message.date)
-                        )
+                    file_info = FileInfo(
+                        file_id=message.id,
+                        file_name=f"photo_{message.id}.jpg",
+                        file_size=0,
+                        file_type="photo",
+                        date=str(message.date)
+                    )
 
                 if file_info:
                     if search_query and search_query.lower() not in file_info.file_name.lower():
