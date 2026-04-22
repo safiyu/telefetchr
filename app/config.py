@@ -3,9 +3,7 @@ from pathlib import Path
 
 class Config:
     """Application configuration"""
-
-    VERSION = "1.2.5"
-
+    VERSION = "1.3.0"
     # Telegram API Configuration
     API_ID = os.getenv("API_ID")
     API_HASH = os.getenv("API_HASH")

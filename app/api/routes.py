@@ -1,6 +1,7 @@
 import os
 import logging
 from datetime import timedelta
+from typing import Optional
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends, Request, Query
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
@@ -49,7 +50,7 @@ async def get_ui(request: Request):
         
     html_path = os.path.join('app', 'static', 'login.html')
     with open(html_path, 'r', encoding='utf-8') as f:
-        return HTMLResponse(content=f.read())
+        return HTMLResponse(content=f.read(), headers=NO_CACHE_HEADERS)
 
 
 @router.post("/auth/login", response_model=Token)
@@ -80,12 +81,82 @@ async def check_trusted_ip(request: Request):
     }
 
 
+NO_CACHE_HEADERS = {"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache", "Expires": "0"}
+
+
 @router.get("/app", response_class=HTMLResponse)
 async def get_app():
     """Serve the main application (authentication by frontend)"""
     html_path = os.path.join('app', 'static', 'view.html')
     with open(html_path, 'r', encoding='utf-8') as f:
-        return HTMLResponse(content=f.read())
+        return HTMLResponse(content=f.read(), headers=NO_CACHE_HEADERS)
+
+
+@router.get("/logs", response_class=HTMLResponse)
+async def get_logs_page():
+    """Serve the logs viewer page (auth handled client-side)"""
+    html_path = os.path.join('app', 'static', 'logs.html')
+    with open(html_path, 'r', encoding='utf-8') as f:
+        return HTMLResponse(content=f.read(), headers=NO_CACHE_HEADERS)
+
+
+@router.get("/api/logs")
+async def get_logs(
+    level: Optional[str] = Query(None),
+    limit: int = Query(200, ge=1, le=1000),
+    search: Optional[str] = Query(None),
+    current_user: str = Depends(get_current_user)
+):
+    """Get parsed log entries"""
+    log_file = os.path.join(os.path.abspath('sessions'), 'app.log')
+
+    if not os.path.exists(log_file):
+        return {"logs": [], "total": 0}
+
+    entries = []
+    try:
+        with open(log_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                parts = line.split(' | ', 3)
+                if len(parts) < 4:
+                    continue
+                entry = {
+                    "timestamp": parts[0],
+                    "level": parts[1],
+                    "module": parts[2],
+                    "message": parts[3]
+                }
+                if level and entry["level"] != level:
+                    continue
+                if search and search.lower() not in entry["message"].lower():
+                    continue
+                entries.append(entry)
+    except Exception as e:
+        logger.error(f"Error reading log file: {e}")
+        return {"logs": [], "total": 0}
+
+    entries.reverse()
+    total = len(entries)
+    entries = entries[:limit]
+
+    return {"logs": entries, "total": total}
+
+
+@router.post("/api/logs/clear")
+async def clear_logs(current_user: str = Depends(get_current_user)):
+    """Clear the log file"""
+    log_file = os.path.join(os.path.abspath('sessions'), 'app.log')
+    try:
+        with open(log_file, 'w', encoding='utf-8') as f:
+            f.truncate(0)
+        logger.info("Logs cleared by user")
+        return {"status": "success", "message": "Logs cleared"}
+    except Exception as e:
+        logger.error(f"Error clearing logs: {e}")
+        raise HTTPException(status_code=500, detail="Failed to clear logs")
 
 
 @router.get("/status")
@@ -267,7 +338,6 @@ async def get_download_progress(current_user: str = Depends(get_current_user)):
     """Get the current download progress"""
     # Use download_service to get status as it includes live transitioning items
     status = download_service.get_status_as_dict()
-    logger.info(f"=== PROGRESS ENDPOINT: Returning status - scanning={status.get('scanning')}, active={status.get('active')}, transitioning={status.get('transitioning_count')} ===")
     return status
 
 

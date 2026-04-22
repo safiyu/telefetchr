@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TeleFetchr - Logs</title>
+    <link rel="icon" type="image/png" href="/static/images/favicon.png" />
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body {
+            background-color: #131e32;
+            color: #f1f5f9;
+            background-image: url("https://www.transparenttextures.com/patterns/stardust.png");
+        }
+
+        .glass-card {
+            background: #1e293b;
+            border: 1.5px solid #000;
+            border-radius: 12px;
+            box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.4);
+            position: relative;
+        }
+
+        .header-gradient {
+            color: #fcd34d;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 800;
+            text-shadow: 2px 2px 0px #000;
+        }
+
+        .btn-gradient {
+            background: #fcd34d;
+            border: 2px solid #000;
+            color: #000;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            box-shadow: 3px 3px 0px #000;
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .btn-gradient:hover {
+            transform: translate(-1px, -1px);
+            box-shadow: 4px 4px 0px #000;
+            background: #fbbf24;
+        }
+
+        .btn-red {
+            background: rgba(239, 68, 68, 0.15);
+            border: 2px solid #000;
+            color: #ef4444;
+            font-weight: 800;
+            text-transform: uppercase;
+            box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.5);
+            transition: all 0.2s ease;
+        }
+
+        .btn-red:hover {
+            background: #ef4444;
+            color: #fff;
+            transform: translate(-2px, -2px);
+            box-shadow: 4px 4px 0px #000;
+        }
+
+
+
+        .log-entry {
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            line-height: 1.4;
+            border-left: 3px solid transparent;
+            margin-bottom: 0.25rem;
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid rgba(0, 0, 0, 0.3);
+        }
+
+        .log-info {
+            color: #94a3b8;
+            border-left-color: #475569;
+        }
+
+        .log-warning {
+            background: rgba(251, 191, 36, 0.1);
+            color: #fcd34d;
+            border-left-color: #fbbf24;
+        }
+
+        .log-error {
+            background: rgba(239, 68, 68, 0.1);
+            color: #fca5a5;
+            border-left-color: #ef4444;
+        }
+
+        .log-container {
+            max-height: 65vh;
+            overflow-y: auto;
+        }
+
+        input,
+        select {
+            background: #0f172a !important;
+            border: 1.5px solid #000 !important;
+            color: #f1f5f9 !important;
+            border-radius: 8px !important;
+            box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.2) !important;
+        }
+
+        input:focus,
+        select:focus {
+            border-color: #fcd34d !important;
+            box-shadow: 3px 3px 0px #000 !important;
+            outline: none !important;
+        }
+
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #131e32;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #1e293b;
+            border: 2px solid #000;
+            border-radius: 0px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #fcd34d;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen flex flex-col antialiased">
+    <header class="glass-card m-4 px-6 py-4 flex justify-between items-center sticky top-4 z-40">
+        <div class="flex items-center gap-4">
+            <img src="/static/images/logo.png" alt="TeleFetchr Logo"
+                class="h-12 w-12 border-2 border-black shadow-[3px_3px_0px_#000] rounded-full object-cover"
+                style="clip-path: circle(50%);" />
+            <div class="flex flex-col">
+                <h1 class="text-xl font-bold tracking-tight header-gradient">TeleFetchr Logs</h1>
+                <span class="text-[10px] text-gray-500 font-mono tracking-wider">System Activity & Monitoring</span>
+            </div>
+        </div>
+
+    </header>
+
+    <main class="flex-1 max-w-6xl mx-auto w-full px-4 pb-12 pt-6">
+        <div class="space-y-6">
+            <!-- Filter Bar -->
+            <div class="glass-card p-6">
+                <div class="flex flex-wrap items-center gap-4">
+                    <div class="flex-1 min-w-[200px]">
+                        <label class="block text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-1.5 ml-1">Search Logs</label>
+                        <div class="relative">
+                            <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 text-sm"></i>
+                            <input type="text" id="searchFilter" class="w-full pl-10 pr-4 py-2.5 outline-none transition-all" placeholder="Search message content..."
+                                onkeyup="if(event.key==='Enter') fetchLogs()">
+                        </div>
+                    </div>
+                    
+                    <div class="w-40">
+                        <label class="block text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-1.5 ml-1">Log Level</label>
+                        <select id="levelFilter" class="w-full px-4 py-2.5 cursor-pointer outline-none transition-all" onchange="fetchLogs()">
+                            <option value="">All Levels</option>
+                            <option value="INFO">INFO</option>
+                            <option value="WARNING">WARNING</option>
+                            <option value="ERROR">ERROR</option>
+                        </select>
+                    </div>
+
+                    <div class="flex items-end h-full pt-6">
+                        <button onclick="fetchLogs()" class="btn-gradient px-6 py-2.5 rounded-xl transition-all flex items-center gap-2 focus:outline-none">
+                            <i class="fa-solid fa-sync-alt text-xs"></i> <span>Refresh</span>
+                        </button>
+                    </div>
+
+                    <div class="flex flex-col items-end ml-auto gap-1">
+                        <label class="flex items-center gap-2 text-xs text-gray-400 cursor-pointer hover:text-amber-400 transition-colors">
+                            <input type="checkbox" id="autoRefresh" onchange="toggleAutoRefresh()" class="cursor-pointer">
+                            <span>Auto-refresh (5s)</span>
+                        </label>
+                        <span id="logCount" class="text-[10px] font-mono text-gray-600 uppercase tracking-tighter">0 entries found</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Log Entries -->
+            <div class="glass-card p-4">
+                <div id="logContainer" class="log-container pr-2 custom-scrollbar">
+                    <div class="flex flex-col items-center justify-center py-20 opacity-30">
+                        <i class="fa-solid fa-spinner fa-spin text-4xl mb-4"></i>
+                        <p class="font-bold tracking-widest uppercase text-xs">Initializing Log Stream...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Danger Zone / Clear -->
+            <div class="flex justify-end pt-2">
+                <button onclick="clearLogs()" class="btn-red px-4 py-2 rounded-xl text-xs flex items-center gap-2 focus:outline-none">
+                    <i class="fa-solid fa-trash-can"></i>
+                    <span>Clear Log History</span>
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Confirm Modal -->
+    <div id="confirmModal" class="fixed inset-0 z-[999999] hidden overflow-y-auto" role="dialog" aria-modal="true">
+        <div class="flex min-h-screen items-center justify-center p-4 text-center sm:p-0">
+            <div class="fixed inset-0 bg-gray-900/80 backdrop-blur-sm transition-opacity" onclick="closeModal()"></div>
+            <div class="relative transform overflow-hidden rounded-2xl bg-gray-800 border border-gray-700 p-6 text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-lg" style="animation: scaleIn 0.2s ease-out;">
+                <button onclick="closeModal()" class="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors focus:outline-none">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+                <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full mb-4 bg-red-500/20">
+                    <i class="fa-solid fa-trash-can text-2xl text-red-500"></i>
+                </div>
+                <h3 class="text-xl font-bold text-center text-white mb-2">Clear Log History</h3>
+                <p class="text-gray-400 text-center mb-6">Are you sure you want to permanently clear all log entries? This action cannot be undone.</p>
+                <div class="flex gap-3 justify-center">
+                    <button onclick="closeModal()" class="px-6 py-2.5 rounded-xl bg-gray-500/20 text-gray-400 hover:bg-gray-700 hover:text-white font-medium transition-all focus:outline-none">Cancel</button>
+                    <button onclick="confirmClearLogs()" class="px-6 py-2.5 rounded-xl bg-red-500/20 text-red-500 font-medium hover:bg-red-600 hover:text-white transition-all shadow-lg shadow-red-900/20 focus:outline-none">Clear Logs</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('access_token');
+        let refreshInterval = null;
+
+        if (!token) {
+            window.location.href = '/';
+        }
+
+        function getHeaders() {
+            return {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            };
+        }
+
+        async function fetchLogs() {
+            const level = document.getElementById('levelFilter').value;
+            const search = document.getElementById('searchFilter').value;
+            const logCount = document.getElementById('logCount');
+
+            let url = '/api/logs?limit=500';
+            if (level) url += `&level=${encodeURIComponent(level)}`;
+            if (search) url += `&search=${encodeURIComponent(search)}`;
+
+            try {
+                const response = await fetch(url, { headers: getHeaders() });
+                if (response.status === 401) {
+                    window.location.href = '/';
+                    return;
+                }
+                const data = await response.json();
+                renderLogs(data.logs, data.total);
+            } catch (err) {
+                console.error('Fetch error:', err);
+                document.getElementById('logContainer').innerHTML =
+                    '<div class="text-red-400 text-center py-20 bg-red-900/10 rounded-xl border border-red-900/20"><i class="fa-solid fa-triangle-exclamation text-3xl mb-3"></i><p class="font-bold">CONNECTION ERROR</p><p class="text-xs opacity-60">Could not retrieve system logs</p></div>';
+            }
+        }
+
+        function renderLogs(logs, total) {
+            const container = document.getElementById('logContainer');
+            document.getElementById('logCount').textContent = `${logs.length} of ${total} entries`;
+
+            if (logs.length === 0) {
+                container.innerHTML = '<div class="text-gray-600 text-center py-20 italic"><i class="fa-solid fa-ghost text-4xl mb-4 opacity-10"></i><p>Log stream is currently empty</p></div>';
+                return;
+            }
+
+            container.innerHTML = logs.map(log => {
+                const levelClass = log.level === 'ERROR' ? 'log-error'
+                    : log.level === 'WARNING' ? 'log-warning'
+                    : 'log-info';
+                
+                const escapedMsg = log.message
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;');
+
+                return `<div class="log-entry ${levelClass}">
+                    <span class="text-gray-500 mr-2">${log.timestamp}</span>
+                    <span class="font-bold mr-2 tracking-tighter">[${log.level}]</span>
+                    <span class="text-amber-500/80 mr-2 font-semibold italic">${log.module}</span>
+                    <span class="text-gray-300">${escapedMsg}</span>
+                </div>`;
+            }).join('');
+        }
+
+        function toggleAutoRefresh() {
+            const checked = document.getElementById('autoRefresh').checked;
+            if (checked) {
+                refreshInterval = setInterval(fetchLogs, 5000);
+            } else {
+                clearInterval(refreshInterval);
+                refreshInterval = null;
+            }
+        }
+
+        function clearLogs() {
+            document.getElementById('confirmModal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('confirmModal').classList.add('hidden');
+        }
+
+        async function confirmClearLogs() {
+            closeModal();
+            try {
+                const response = await fetch('/api/logs/clear', {
+                    method: 'POST',
+                    headers: getHeaders()
+                });
+                if (response.ok) {
+                    fetchLogs();
+                }
+            } catch (err) {
+                console.error('Failed to clear logs:', err);
+            }
+        }
+
+        // Initial fetch
+        fetchLogs();
+    </script>
+</body>
+
+</html>

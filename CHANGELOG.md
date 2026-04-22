@@ -1,7 +1,18 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All epic victories, spectacular fails, and mysterious bugs that somehow became features are here.
 
+## [1.3.0] - 2026-04-22
+### Added
+- Comprehensive Log Viewer with "Comic Panel" theme.
+- Log filtering (search and level), auto-refresh, and clearing functionality.
+- Automated 30-day log rotation and cleanup logic.
+
+### Fixed
+- Fixed an issue causing MP4 file corruption during parallel downloads, restoring fast-forward/seeking support in local players.
+- Replaced native browser popups with custom themed modals (e.g. for clearing logs).
+- Added no-cache headers to prevent stale HTML pages on navigation.
+- Reduced noise in logs from Telethon and the progress endpoint.
 ## [1.2.5] - 2024-12-24
 ### Added
 - New "About" dialog with version information and changelog.

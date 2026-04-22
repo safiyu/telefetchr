@@ -51,10 +51,7 @@ async def get_current_user(
     # Check for trusted IP bypass
     client_ip = request.client.host
     if is_trusted_ip(client_ip):
-        logger.info(f"Auth bypass - TRUSTED IP: {client_ip}") 
         return Config.ADMIN_USERNAME
-    
-    logger.info(f"Auth required - UNTRUSTED IP: {client_ip}")
 
     # Standard token validation
     if not credentials:

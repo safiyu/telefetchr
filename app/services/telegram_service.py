@@ -295,42 +295,13 @@ class TelegramService:
         
         logger.info(f"Starting parallel download: {file_size / (1024*1024):.1f}MB with {effective_workers} workers")
         
-        # === OPTIMIZATION: CDN Warmup Phase ===
-        # Fetch a tiny initial chunk to prime the CDN connection before spawning workers.
-        # This resolves datacenter/CDN negotiation upfront, reducing per-worker latency.
-        warmup_bytes = 0
-        warmup_chunk_size = 64 * 1024  # 64KB warmup chunk
+        request_chunk_size = 1024 * 1024  # Force 1MB for reliability
         
-        try:
-            logger.debug("CDN warmup: fetching initial chunk to prime connection...")
-            warmup_start = datetime.now()
-            
-            async for chunk in self.client.iter_download(
-                message.media,
-                offset=0,
-                limit=warmup_chunk_size,
-                request_size=warmup_chunk_size
-            ):
-                if chunk:
-                    warmup_bytes = len(chunk)
-                    # Write warmup chunk to part0
-                    async with aiofiles.open(f"{file_path}.part0", 'wb') as f:
-                        await f.write(chunk)
-                    break
-            
-            warmup_duration = (datetime.now() - warmup_start).total_seconds()
-            logger.debug(f"CDN warmup complete: {warmup_bytes} bytes in {warmup_duration:.2f}s")
-            
-            # Immediately report progress so UI shows activity
-            if progress_callback and warmup_bytes > 0:
-                progress_callback(warmup_bytes, file_size)
-                
-        except Exception as e:
-            logger.warning(f"CDN warmup failed (continuing anyway): {e}")
-            warmup_bytes = 0
+        total_parts = math.ceil(file_size / request_chunk_size)
+        parts_per_worker = math.ceil(total_parts / effective_workers)
+        aligned_chunk_size = parts_per_worker * request_chunk_size
 
-        chunk_size = math.ceil(file_size / effective_workers)
-        downloaded_bytes = warmup_bytes  # Start from warmup bytes
+        downloaded_bytes = 0
         lock = asyncio.Lock()
         
         last_callback_time = [datetime.now()]
@@ -343,9 +314,6 @@ class TelegramService:
             current_offset = start_byte
             
             try:
-                # Use configured chunk size (default 4MB) for faster downloads
-                request_chunk_size = Config.DOWNLOAD_CHUNK_SIZE
-
                 async for chunk in self.client.iter_download(
                     message.media,
                     offset=start_byte,
@@ -388,19 +356,13 @@ class TelegramService:
 
         tasks = []
         for i in range(effective_workers):
-            start = i * chunk_size
-            # For worker 0, skip the warmup bytes we already downloaded
-            if i == 0 and warmup_bytes > 0:
-                start = warmup_bytes
-            end = min((i + 1) * chunk_size, file_size)
+            start = i * aligned_chunk_size
+            end = min((i + 1) * aligned_chunk_size, file_size)
             if start >= end:
                 break
-            # Clear any existing part file first (except part0 if warmup succeeded)
+            # Clear any existing part file first
             part_path = f"{file_path}.part{i}"
-            if i == 0 and warmup_bytes > 0:
-                # Keep warmup data for part0
-                pass
-            elif os.path.exists(part_path):
+            if os.path.exists(part_path):
                 try:
                     os.remove(part_path)
                 except:
