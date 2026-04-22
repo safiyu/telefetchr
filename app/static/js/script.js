@@ -355,7 +355,22 @@ window.addEventListener('DOMContentLoaded', () => {
     // Even if no token, we call checkStatus. 
     // If the server bypasses auth for this IP, checkStatus will work.
     checkStatus();
+    fetchVersion();
 });
+
+async function fetchVersion() {
+    try {
+        const response = await authFetch('/about');
+        if (!response) return;
+        const data = await response.json();
+        const versionText = `v${data.version}`;
+        const el = document.getElementById('appVersion');
+        if (el) el.textContent = versionText;
+    } catch (e) {
+        // silently fail — version is cosmetic
+    }
+}
+
 
 async function loadChannels() {
     try {
