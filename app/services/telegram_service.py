@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Callable
 import math
 import os
 import asyncio
@@ -278,149 +278,106 @@ class TelegramService:
             progress_callback=throttled_progress_callback if progress_callback else None
         )
 
-    async def download_media_parallel(self, message, file_path: str, progress_callback=None, workers: int = 4):
-        """Download media using parallel workers (segmented download)"""
+    async def download_media_parallel(
+        self, 
+        message, 
+        file_path: str, 
+        progress_callback: Optional[Callable[[int, int], None]] = None, 
+        workers: int = 4
+    ) -> str:
+        """Download Telegram media using sparse file pre-allocation and direct os.pwrite range requests."""
+        import os
+        import math
+        import asyncio
+        from app.config import Config
+
         # Determine file size
         file_size = 0
         if isinstance(message.media, MessageMediaDocument):
             file_size = message.media.document.size
         elif isinstance(message.media, MessageMediaPhoto):
-            # Photos are usually small, use standard download
             return await self.download_media(message, file_path, progress_callback)
         
         if file_size == 0:
-             return await self.download_media(message, file_path, progress_callback)
+            return await self.download_media(message, file_path, progress_callback)
 
-        # === OPTIMIZATION: Dynamic worker scaling based on file size ===
-        # For small files (<50MB), use fewer workers to reduce overhead
-        # For medium files (50-200MB), use moderate workers
-        # For large files (>200MB), use full worker count
-        if file_size < 50 * 1024 * 1024:  # <50MB
+        # Dynamic worker scaling based on file size thresholds
+        if file_size < 20 * 1024 * 1024:
+            effective_workers = 1
+        elif file_size < 100 * 1024 * 1024:
             effective_workers = min(2, workers)
-        elif file_size < 200 * 1024 * 1024:  # <200MB
+        elif file_size < 500 * 1024 * 1024:
             effective_workers = min(4, workers)
         else:
-            effective_workers = workers
-        
-        logger.info(f"Starting parallel download: {file_size / (1024*1024):.1f}MB with {effective_workers} workers")
-        
-        request_chunk_size = 1024 * 1024  # Force 1MB for reliability
-        
-        total_parts = math.ceil(file_size / request_chunk_size)
-        parts_per_worker = math.ceil(total_parts / effective_workers)
-        aligned_chunk_size = parts_per_worker * request_chunk_size
+            effective_workers = min(workers, Config.DOWNLOAD_WORKERS)
 
-        downloaded_bytes = 0
-        lock = asyncio.Lock()
-        
-        last_callback_time = [datetime.now()]
-        
-        async def worker(worker_id: int, start_byte: int, end_byte: int):
-            nonlocal downloaded_bytes
-            
-            # Using temporary part file for this worker
-            part_file_path = f"{file_path}.part{worker_id}"
-            current_offset = start_byte
-            
-            try:
-                async for chunk in self.client.iter_download(
-                    message.media,
-                    offset=start_byte,
-                    limit=end_byte - start_byte,
-                    chunk_size=None,
-                    request_size=request_chunk_size
-                ):
-                    if not chunk:
-                        break
-                        
-                    # Write sequentially to part file
-                    async with aiofiles.open(part_file_path, 'ab') as f:
-                        await f.write(chunk)
-                    
-                    chunk_len = len(chunk)
-                    current_offset += chunk_len
-                    
-                    async with lock:
-                        downloaded_bytes += chunk_len
-                        # Progress callback
-                        if progress_callback:
-                            now = datetime.now()
-                            elapsed = (now - last_callback_time[0]).total_seconds()
-                            if elapsed >= Config.DOWNLOAD_REQUEST_DELAY or downloaded_bytes == file_size:
-                                progress_callback(downloaded_bytes, file_size)
-                                last_callback_time[0] = now
-                                
-                    if current_offset >= end_byte:
-                        break
+        request_chunk_size = 1024 * 1024  # 1MB aligned chunks
+        part_size = math.ceil(file_size / effective_workers)
+        # Align part_size to 1MB chunk boundaries
+        aligned_part_size = math.ceil(part_size / request_chunk_size) * request_chunk_size
 
-            except Exception as e:
-                logger.error(f"Worker {worker_id} failed: {e}")
-                # Cleanup part file on failure
-                if os.path.exists(part_file_path):
-                    try:
-                        os.remove(part_file_path)
-                    except:
-                        pass
-                raise
-
-        tasks = []
-        for i in range(effective_workers):
-            start = i * aligned_chunk_size
-            end = min((i + 1) * aligned_chunk_size, file_size)
-            if start >= end:
-                break
-            # Clear any existing part file first
-            part_path = f"{file_path}.part{i}"
-            if os.path.exists(part_path):
-                try:
-                    os.remove(part_path)
-                except:
-                    pass
-            tasks.append(worker(i, start, end))
-
+        # Pre-allocate sparse target file using truncate
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        fd = os.open(file_path, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0o644)
         try:
-            await asyncio.gather(*tasks)
-            # Merge parts after successful download
-            await self.merge_parts(file_path, len(tasks))
-            
-        except Exception as e:
-            logger.error(f"Parallel download failed: {e}")
-            # Cleanup all parts
-            for i in range(effective_workers):
-                part_path = f"{file_path}.part{i}"
-                if os.path.exists(part_path):
-                    try:
-                        os.remove(part_path)
-                    except:
-                        pass
-            # Cleanup target file if it exists (incomplete merge)
+            os.ftruncate(fd, file_size)
+        except Exception:
+            os.close(fd)
             if os.path.exists(file_path):
                 os.remove(file_path)
             raise
 
-        return file_path
+        downloaded_bytes = 0
+        lock = asyncio.Lock()
+        loop = asyncio.get_running_loop()
+        last_callback_time = [datetime.now()]
 
-    async def merge_parts(self, file_path: str, num_parts: int):
-        """Merge download parts into final file"""
-        logger.info(f"Merging {num_parts} parts into {file_path}")
-        
-        # Use aiofiles for merging to allow event loop to run (though it's IO bound)
-        async with aiofiles.open(file_path, 'wb') as outfile:
-            for i in range(num_parts):
-                part_path = f"{file_path}.part{i}"
-                if os.path.exists(part_path):
-                    async with aiofiles.open(part_path, 'rb') as infile:
-                        while True:
-                            chunk = await infile.read(1024 * 1024)  # 1MB copy buffer
-                            if not chunk:
-                                break
-                            await outfile.write(chunk)
-                    
-                    # Remove part file after merging
-                    try:
-                        os.remove(part_path)
-                    except Exception as e:
-                        logger.warning(f"Failed to remove part file {part_path}: {e}")
-                else:
-                    logger.error(f"Missing part file: {part_path}")
-                    raise FileNotFoundError(f"Part file missing: {part_path}")
+        async def worker(worker_id: int, start_byte: int, end_byte: int) -> None:
+            nonlocal downloaded_bytes
+            current_offset = start_byte
+
+            async for chunk in self.client.iter_download(
+                message.media,
+                offset=start_byte,
+                limit=end_byte - start_byte,
+                request_size=request_chunk_size
+            ):
+                if not chunk:
+                    break
+                chunk_len = len(chunk)
+                
+                # Direct seek-free write at current offset using os.pwrite
+                await loop.run_in_executor(None, os.pwrite, fd, chunk, current_offset)
+                current_offset += chunk_len
+
+                async with lock:
+                    downloaded_bytes += chunk_len
+                    if progress_callback:
+                        now = datetime.now()
+                        elapsed = (now - last_callback_time[0]).total_seconds()
+                        if elapsed >= Config.DOWNLOAD_REQUEST_DELAY or downloaded_bytes == file_size:
+                            progress_callback(downloaded_bytes, file_size)
+                            last_callback_time[0] = now
+
+        tasks = []
+        for i in range(effective_workers):
+            start = i * aligned_part_size
+            end = min(start + aligned_part_size, file_size)
+            if start >= file_size:
+                break
+            tasks.append(worker(i, start, end))
+
+        try:
+            await asyncio.gather(*tasks)
+        except Exception as e:
+            logger.error(f"Parallel download failed for {file_path}: {e}")
+            if os.path.exists(file_path):
+                try:
+                    os.remove(file_path)
+                except OSError:
+                    pass
+            raise
+        finally:
+            os.close(fd)
+
+        return file_path

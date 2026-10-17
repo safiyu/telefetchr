@@ -2,7 +2,11 @@ services:
   telefetchr:
     build: .
     container_name: telefetchr
-    network_mode: "container:vpn"
+    ports:
+      - "9868:9868"
+    # To share a network with a VPN sidecar instead, replace `ports` above with:
+    #   network_mode: "container:vpn"
+    # and configure TRUSTED_PROXIES accordingly (e.g. the VPN container's IP).
     volumes:
       - ./sessions:/app/sessions
       - ./downloads:/app/downloads

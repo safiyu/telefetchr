@@ -158,5 +158,5 @@ if __name__ == "__main__":
         host=Config.HOST, 
         port=Config.PORT,
         proxy_headers=True,
-        forwarded_allow_ips="*"
+        forwarded_allow_ips=",".join(Config.TRUSTED_PROXIES)
     )

@@ -28,14 +28,20 @@ class DownloadService:
         self._queue_event = asyncio.Event()
 
     def _get_file_name(self, message) -> str:
-        """Extract file name from message"""
+        """Extract and sanitize document or photo filename."""
+        from app.utils.text_utils import sanitize_filename
+        
+        raw_name = "unknown"
         if isinstance(message.media, MessageMediaDocument):
             doc = message.media.document
-            return next((attr.file_name for attr in doc.attributes
-                        if hasattr(attr, 'file_name')), f"document_{message.id}")
+            raw_name = next(
+                (attr.file_name for attr in doc.attributes if hasattr(attr, "file_name")),
+                f"document_{message.id}"
+            )
         elif isinstance(message.media, MessageMediaPhoto):
-            return f"photo_{message.id}.jpg"
-        return "unknown"
+            raw_name = f"photo_{message.id}.jpg"
+
+        return sanitize_filename(raw_name)
 
     async def _download_queued_item(self, item: Dict[str, Any]):
         """Download a single item from the queue"""
@@ -419,15 +425,54 @@ class DownloadService:
         
         return session_id
 
-    async def download_single_file(self, message, target_dir: str, file_id: str, max_retries: int = 3, session_id: Optional[str] = None, channel_identifier: Optional[str] = None) -> Optional[str]:
-        """Download a single file with progress tracking and retry logic"""
+    async def download_single_file(
+        self, 
+        message, 
+        target_dir: str, 
+        file_id: str, 
+        max_retries: int = 3, 
+        session_id: Optional[str] = None, 
+        channel_identifier: Optional[str] = None
+    ) -> Optional[str]:
+        """Download file to .incomplete staging and atomically move to final path upon completion."""
+        os.makedirs(target_dir, exist_ok=True)
+        os.makedirs(Config.INCOMPLETE_PATH, exist_ok=True)
         file_name = self._get_file_name(message)
-        logger.info(f"Starting download: {file_name} (ID: {file_id})")
+        destination_path = os.path.join(target_dir, file_name)
+
+        # Duplicate resolution strategy check
+        if os.path.exists(destination_path):
+            strategy = Config.DUPLICATE_STRATEGY.lower()
+            expected_size = message.media.document.size if hasattr(message.media, "document") else 0
+            
+            if strategy == "skip":
+                if expected_size > 0 and os.path.getsize(destination_path) == expected_size:
+                    logger.info(f"Duplicate file found with identical size for {file_name}. Skipping download.")
+                    await self.state_manager.mark_file_completed(file_id, {
+                        "name": file_name,
+                        "path": destination_path,
+                        "size": expected_size,
+                        "percentage": 100,
+                        "completed_at": datetime.now().isoformat(),
+                        "session_id": session_id,
+                        "message_id": message.id,
+                        "channel": channel_identifier
+                    })
+                    return destination_path
+            elif strategy == "rename":
+                base, ext = os.path.splitext(file_name)
+                counter = 1
+                while os.path.exists(os.path.join(target_dir, f"{base} ({counter}){ext}")):
+                    counter += 1
+                file_name = f"{base} ({counter}){ext}"
+                destination_path = os.path.join(target_dir, file_name)
+
+        staging_path = os.path.join(Config.INCOMPLETE_PATH, f"{file_id}_{file_name}")
 
         for attempt in range(max_retries):
             try:
+                # Progress tracking updates
                 status = self.state_manager.get_status()
-                logger.info(f"Pre-update concurrent keys: {list(status.get('concurrent_downloads', {}).keys())}")
                 status["concurrent_downloads"][file_id] = {
                     "id": file_id,
                     "name": file_name,
@@ -438,7 +483,6 @@ class DownloadService:
                     "percentage": 0,
                     "retry_attempt": attempt + 1 if attempt > 0 else None
                 }
-                logger.info(f"Updated concurrent_downloads for {file_id}. StateManager ID: {id(self.state_manager)}")
                 self.state_manager.save_state()
 
                 last_progress_time = datetime.now()
@@ -479,27 +523,39 @@ class DownloadService:
                             item_status["last_update"] = now.isoformat()
                             self.state_manager.save_state()
 
-                expected_file_path = os.path.join(target_dir, file_name)
-                
-                # File overwrite protection: append (1), (2), etc. if file exists
-                if os.path.exists(expected_file_path):
-                    base, ext = os.path.splitext(file_name)
-                    counter = 1
-                    while os.path.exists(os.path.join(target_dir, f"{base} ({counter}){ext}")):
-                        counter += 1
-                    file_name = f"{base} ({counter}){ext}"
-                    expected_file_path = os.path.join(target_dir, file_name)
-                    logger.info(f"File already exists, renaming to: {file_name}")
-                
                 try:
                     # Use the parallel downloader for speed
-                    file_path = await self.telegram_service.download_media_parallel(
+                    downloaded_file = await self.telegram_service.download_media_parallel(
                         message,
-                        expected_file_path,
-                        progress_callback,
+                        staging_path,
+                        progress_callback=progress_callback,
                         workers=Config.DOWNLOAD_WORKERS
                     )
+
+                    if downloaded_file and os.path.exists(staging_path):
+                        # Atomic transition from staging to final directory
+                        os.replace(staging_path, destination_path)
+                        final_size = os.path.getsize(destination_path)
+                        
+                        file_data = {
+                            "name": file_name,
+                            "path": destination_path,
+                            "size": final_size,
+                            "percentage": 100,
+                            "completed_at": datetime.now().isoformat(),
+                            "session_id": session_id,
+                            "message_id": message.id,
+                            "channel": channel_identifier
+                        }
+                        await self.state_manager.mark_file_completed(file_id, file_data)
+                        return destination_path
+
                 except Exception as e:
+                    if os.path.exists(staging_path):
+                        try:
+                            os.remove(staging_path)
+                        except OSError:
+                            pass
                     if "cancelled" in str(e).lower():
                         raise
                     logger.error(f"Download attempt {attempt+1} failed for {file_name}: {e}")
@@ -507,24 +563,6 @@ class DownloadService:
                         await asyncio.sleep(2 ** attempt)
                         continue
                     raise
-
-                if file_path and os.path.exists(file_path):
-                    final_size = os.path.getsize(file_path)
-                    file_data = {
-                        "name": file_name,
-                        "path": file_path,
-                        "size": final_size,
-                        "percentage": 100,
-                        "completed_at": datetime.now().isoformat(),
-                        "session_id": session_id,
-                        "message_id": message.id,
-                        "channel": channel_identifier or (message.peer_id.channel_id if hasattr(message.peer_id, 'channel_id') else str(message.peer_id))
-                    }
-                    # mark_file_completed handles adding to history, removing from concurrent, 
-                    # updating progress counter, and saving state.
-                    await self.state_manager.mark_file_completed(file_id, file_data)
-                    return file_path
-                return None
 
             except Exception as e:
                 error_msg = str(e)

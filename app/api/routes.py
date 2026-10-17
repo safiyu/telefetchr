@@ -1,7 +1,8 @@
 import os
 import logging
 from datetime import timedelta
-from typing import Optional
+from pathlib import Path
+from typing import Optional, Dict, Any
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends, Request, Query
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
@@ -17,7 +18,7 @@ from app.services.telegram_service import TelegramService
 from app.services.download_service import DownloadService
 from app.services.auth_service import AuthService
 from app.utils.state_manager import StateManager
-from app.utils.auth_dependencies import get_current_user, is_trusted_ip
+from app.utils.auth_dependencies import get_current_user, get_client_ip, is_trusted_ip
 from app.config import Config
 
 logger = logging.getLogger(__name__)
@@ -44,7 +45,7 @@ def set_services(tg_service: TelegramService, dl_service: DownloadService, st_ma
 @router.get("/", response_class=HTMLResponse)
 async def get_ui(request: Request):
     """Serve the login page or redirect if trusted"""
-    client_ip = request.client.host
+    client_ip = get_client_ip(request)
     if is_trusted_ip(client_ip):
         return RedirectResponse(url="/app")
         
@@ -73,7 +74,7 @@ async def login(login_request: LoginRequest):
 @router.get("/auth/is-trusted")
 async def check_trusted_ip(request: Request):
     """Check if the current request is from a trusted IP"""
-    client_ip = request.client.host
+    client_ip = get_client_ip(request)
     is_trusted = is_trusted_ip(client_ip)
     return {
         "is_trusted": is_trusted,
@@ -464,14 +465,31 @@ async def list_downloaded_files(current_user: str = Depends(get_current_user)):
 
 
 @router.get("/files/serve/{filename}")
-async def serve_file(filename: str, current_user: str = Depends(get_current_user)):
-    """Serve a downloaded file"""
-    file_path = os.path.join(Config.SAVE_PATH, filename)
+async def serve_file(
+    filename: str, 
+    current_user: str = Depends(get_current_user)
+) -> FileResponse:
+    """Serve downloaded file strictly jailed to Config.SAVE_PATH."""
+    # Strip any directory components (e.g. "../../etc/passwd" -> "passwd")
+    safe_filename = os.path.basename(filename)
 
-    if not os.path.exists(file_path):
+    # Canonical path resolution to defeat symlink/traversal escapes
+    base_dir = Path(Config.SAVE_PATH).resolve()
+    target_path = (base_dir / safe_filename).resolve()
+
+    if not target_path.is_relative_to(base_dir):
+        raise HTTPException(status_code=403, detail="Access to this path is forbidden")
+
+    if not target_path.is_file():
         raise HTTPException(status_code=404, detail="File not found")
 
-    return FileResponse(file_path)
+    return FileResponse(str(target_path))
+
+
+@router.get("/api/health")
+async def healthcheck() -> Dict[str, Any]:
+    """Unauthenticated service liveness probe."""
+    return {"status": "healthy", "version": Config.VERSION}
 
 
 @router.get("/debug/state")
