@@ -509,39 +509,6 @@ async function checkSavedState() {
     }
 }
 
-// Debug Panel Logic
-function toggleDebugPanel() {
-    const panel = document.getElementById('debugPanel');
-    if (panel) {
-        if (panel.classList.contains('hidden')) {
-            panel.classList.remove('hidden');
-            refreshDebugInfo();
-        } else {
-            panel.classList.add('hidden');
-        }
-    }
-}
-
-async function refreshDebugInfo() {
-    try {
-        const response = await authFetch('/debug/state');
-        if (!response) return;
-        const data = await response.json();
-
-        const debugInfo = document.getElementById('debugInfo');
-        if (debugInfo) {
-            debugInfo.textContent = JSON.stringify(data, null, 2);
-        }
-
-    } catch (error) {
-        console.error('Error fetching debug info:', error);
-        const debugInfo = document.getElementById('debugInfo');
-        if (debugInfo) {
-            debugInfo.textContent = 'Error: ' + error.message;
-        }
-    }
-}
-
 async function viewCompletedDownloads() {
     try {
         const progressResponse = await authFetch("/download-progress");

@@ -2,6 +2,22 @@
 
 All epic victories and mysterious bugs that somehow became features are here.
 
+## [2.0.0] - 2026-10-20
+### Added
+- Zero-merge download engine: sparse-file preallocation with parallel range workers (`os.pwrite`), eliminating multi-gigabyte merge phases.
+- Security hardening: anti-spoofing client IP resolution, strict path jail for file serving, and safe reverse proxy subnet allowlisting.
+- Incomplete staging (`.incomplete/`) with atomic rename promotion upon file completion.
+- Configurable duplicate resolution strategies (`skip`, `rename`, `overwrite`).
+- Automatic state corruption recovery from backups with backup file rotation.
+
+### Fixed
+- State Manager: Implemented atomic persistence with unique temp files, thread-safe snapshotting, and disk write throttling.
+- State Manager: Fixed session progress counter for single-file downloads.
+- State Manager: Added zombie active state reconciliation and immediate queue event notifications.
+
+### Removed
+- Removed debug console from the dashboard.
+
 ## [1.4.0] - 2026-04-22
 ### Added
 - UX Enhancement: Added dynamic Sorting Options (Newest, Oldest, Largest, Smallest, Alphabetical) directly above the scan results.

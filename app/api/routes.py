@@ -400,18 +400,13 @@ async def get_download_state(current_user: str = Depends(get_current_user)):
 @router.post("/download/clear-completed")
 async def clear_completed_downloads(current_user: str = Depends(get_current_user)):
     """Clear completed downloads from state"""
-    status = state_manager.get_status()
-    status["completed_downloads"] = {}
-
-    # Check if there's an active download
-    if status.get("active"):
-        # Only clear completed downloads, keep the active session
-        status["completed_downloads"] = {}
-        status["progress"] = 0  # Reset progress since we're clearing completed
-        state_manager.save_state()
+    if hasattr(state_manager, "clear_completed"):
+        state_manager.clear_completed()
     else:
-        # No active download, clear everything
-        state_manager.clear_state()
+        status = state_manager.get_status()
+        status["completed_downloads"] = {}
+        status["progress"] = 0
+        state_manager.save_state()
     
     return {
         "status": "success",
@@ -421,21 +416,21 @@ async def clear_completed_downloads(current_user: str = Depends(get_current_user
 @router.delete("/download/completed/{file_id}")
 async def clear_individual_download(file_id: str, current_user: str = Depends(get_current_user)):
     """Clear a single completed download from state"""
-    status = state_manager.get_status()
-    found = False
-
-    if file_id in status.get("completed_downloads", {}):
-        del status["completed_downloads"][file_id]
-        # Update progress counter
-        status["progress"] = len(status["completed_downloads"])
-        found = True
-    
-    if not found and file_id in status.get("cancelled_files", {}):
-        del status["cancelled_files"][file_id]
-        found = True
+    if hasattr(state_manager, "remove_completed"):
+        found = state_manager.remove_completed(file_id)
+    else:
+        status = state_manager.get_status()
+        found = False
+        if file_id in status.get("completed_downloads", {}):
+            del status["completed_downloads"][file_id]
+            found = True
+        if not found and file_id in status.get("cancelled_files", {}):
+            del status["cancelled_files"][file_id]
+            found = True
+        if found:
+            state_manager.save_state()
 
     if found:
-        state_manager.save_state()
         return {
             "status": "success",
             "message": f"Record for {file_id} cleared"
@@ -651,16 +646,15 @@ async def remove_from_queue(item_id: str, current_user: str = Depends(get_curren
 async def clear_queue(current_user: str = Depends(get_current_user)):
     """Clear all items from the queue"""
     queue = state_manager.get_queue()
-    # Iterate over a copy to be safe
     for item in list(queue):
         file_id = item.get("id")
-        if file_id:
+        if file_id and file_id in getattr(download_service, "active_download_tasks", {}):
             await download_service.cancel_individual_download(file_id)
-        else:
-            # If no ID, just force remove it from the list if possible
-            # (Fallback for corrupted items)
-            state_manager.download_status["queue"] = [i for i in state_manager.download_status.get("queue", []) if i != item]
-            state_manager.save_state()
+    if hasattr(state_manager, "clear_queue"):
+        state_manager.clear_queue()
+    else:
+        state_manager.download_status["queue"] = []
+        state_manager.save_state()
     return {
         "status": "success",
         "message": "Queue cleared"

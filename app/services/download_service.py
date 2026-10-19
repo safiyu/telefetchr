@@ -106,6 +106,11 @@ class DownloadService:
             # Task cleanup is handled in the spawning point or here
             if file_id in self.active_download_tasks:
                 del self.active_download_tasks[file_id]
+            # Ensure concurrent_downloads doesn't leak file_id if task died/errored
+            concurrent = self.state_manager.get_status().get("concurrent_downloads", {})
+            if file_id in concurrent:
+                del concurrent[file_id]
+            self._queue_event.set()
 
     async def process_queue(self):
         """Main loop to process downloads from queue"""
@@ -193,9 +198,9 @@ class DownloadService:
             no_tasks = not self.active_download_tasks
             no_trans = not getattr(self, 'transitioning_items', set())
             
-            if no_tasks and no_trans and status.get("active"):
+            current_status = self.state_manager.get_status()
+            if no_tasks and no_trans and current_status.get("active"):
                 # Verify consistency with state manager
-                current_status = self.state_manager.get_status()
                 if not current_status.get("concurrent_downloads") and not current_status.get("queue") and not current_status.get("scanning"):
                     # Add a double-check delay
                     await asyncio.sleep(0.5)
@@ -221,10 +226,14 @@ class DownloadService:
             logger.info(f"Cancelling orphaned task {fid} from previous session")
             task.cancel()
         self.active_download_tasks.clear()
+        self.transitioning_items.clear()
         
         # Clear ANY existing queue items when starting a new session
         # This prevents orphaned items from previous sessions/errors from blocking or joining the new session
-        self.state_manager.download_status["queue"] = []
+        if hasattr(self.state_manager, "clear_queue"):
+            self.state_manager.clear_queue()
+        else:
+            self.state_manager.download_status["queue"] = []
         
         self.state_manager.update_status({
             "active": True,
@@ -520,8 +529,10 @@ class DownloadService:
                             item_status["percentage"] = int((current / total * 100)) if total > 0 else 0
                             item_status["speed"] = speed
                             item_status["eta"] = eta
-                            item_status["last_update"] = now.isoformat()
-                            self.state_manager.save_state()
+                            try:
+                                self.state_manager.save_state(force=False)
+                            except TypeError:
+                                self.state_manager.save_state()
 
                 try:
                     # Use the parallel downloader for speed
@@ -597,6 +608,7 @@ class DownloadService:
             logger.info(f"Cancelling task for {fid}")
             task.cancel()
         self.active_download_tasks.clear()
+        self.transitioning_items.clear()
 
         # Cancel all background collection tasks (scans)
         if self.collection_tasks:
@@ -607,28 +619,25 @@ class DownloadService:
         
         # Clear queue contents
         queue = self.state_manager.get_queue()
-        queue_ids = [item["id"] for item in queue]
-        for qid in queue_ids:
-            self.state_manager.remove_from_queue(qid)
+        queue_count = len(queue)
+        if hasattr(self.state_manager, "clear_queue"):
+            self.state_manager.clear_queue()
+        else:
+            for qid in [item["id"] for item in queue]:
+                self.state_manager.remove_from_queue(qid)
         
-        # Get current status to move active items to cancelled_files
-        status = self.state_manager.get_status()
-        concurrent = status.get("concurrent_downloads", {})
-        
-        for fid, data in list(concurrent.items()):
-            # Just remove them, don't store in cancelled_files
-            pass
-        
-        status["cancelled"] = True
-        status["active"] = False
-        status["concurrent_downloads"] = {}
-        self.state_manager.save_state()
+        # Update state cleanly
+        self.state_manager.update_status({
+            "cancelled": True,
+            "active": False,
+            "concurrent_downloads": {}
+        })
         
         # Brief delay to allow tasks to catch the cancellation
         await asyncio.sleep(0.5)
         self._stop_queue = False
         
-        return {"status": "success", "message": f"Download cancelled. Stopped {len(queue_ids)} items."}
+        return {"status": "success", "message": f"Download cancelled. Stopped {queue_count} items."}
 
     async def resume_download(self) -> Dict:
         """Resume interrupted download by re-queueing missing files"""
@@ -813,6 +822,7 @@ class DownloadService:
     async def cancel_individual_download(self, file_id: str) -> Dict:
         """Cancel an individual active download"""
         logger.info(f"Cancel individual download requested for: {file_id}")
+        self.transitioning_items.discard(file_id)
         
         # Check if task is active
         if file_id in self.active_download_tasks:
@@ -886,6 +896,15 @@ class DownloadService:
         # If we have transitioning items or active tasks, the session is definitely active
         if transitioning_count > 0 or active_task_count > 0:
             status["active"] = True
+        elif status.get("active") and not self._queue_processing:
+            # Reconcile zombie active state: marked active but processor not running and nothing pending
+            has_queue = len(status.get("queue", [])) > 0
+            is_scanning = status.get("scanning", False)
+            if not has_queue and not is_scanning:
+                logger.info("[SESSION] Auto-reconciling zombie active state to inactive")
+                self.state_manager.update_status({"active": False, "started_at": None})
+                status["active"] = False
+                status["started_at"] = None
             
         return status
 
