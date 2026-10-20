@@ -18,6 +18,13 @@ All epic victories and mysterious bugs that somehow became features are here.
 ### Removed
 - Removed debug console from the dashboard.
 
+## [2.0.1] - 2026-10-20
+### Added
+- Non-blocking state persistence: `save_state_async` offloads fsync to the worker thread pool, and a new thread-safe `schedule_progress_save` entry point keeps the event loop responsive during parallel MTProto chunk streaming.
+
+### Fixed
+- State Manager: Progress-callback disk flushes no longer spawn unbounded fire-and-forget tasks; redundant flushes within the 1.5s throttle window are debounced, and the async write lock now rebinds safely when the owning event loop is replaced (tests/reloads).
+
 ## [1.4.0] - 2026-04-22
 ### Added
 - UX Enhancement: Added dynamic Sorting Options (Newest, Oldest, Largest, Smallest, Alphabetical) directly above the scan results.

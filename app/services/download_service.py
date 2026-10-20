@@ -529,10 +529,14 @@ class DownloadService:
                             item_status["percentage"] = int((current / total * 100)) if total > 0 else 0
                             item_status["speed"] = speed
                             item_status["eta"] = eta
-                            try:
-                                self.state_manager.save_state(force=False)
-                            except TypeError:
-                                self.state_manager.save_state()
+                            # Offload the disk flush to the worker thread pool so the
+                            # event loop is never stalled by os.fsync() while
+                            # parallel MTProto chunk streaming is active.
+                            # schedule_progress_save is loop/thread-safe and
+                            # degrades to a synchronous write when no event loop
+                            # is available; redundant force=False flushes within
+                            # the 1.5s throttle window are dropped, not queued.
+                            self.state_manager.schedule_progress_save(force=False)
 
                 try:
                     # Use the parallel downloader for speed

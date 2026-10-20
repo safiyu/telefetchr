@@ -124,6 +124,9 @@ class FakeStateManager:
     def save_state(self):
         pass
 
+    def schedule_progress_save(self, force=False):
+        pass
+
     async def mark_file_completed(self, file_id: str, file_data: dict):
         self.completed[file_id] = file_data
 

@@ -22,6 +22,16 @@ class StateManager:
         self.state_file = Config.STATE_FILE
         self._thread_lock = threading.RLock()
         self._async_lock = asyncio.Lock()
+        # Lazily bound on the active event loop on first save_state_async call.
+        # Serializes in-flight async disk flushes so redundant force=False
+        # flushes are dropped and temp files are never interleaved.
+        self._async_write_lock: Optional[asyncio.Lock] = None
+        # The event loop the async write lock is bound to. Re-bound when that
+        # loop closes (e.g. tests spinning up fresh loops, uvicorn reloads).
+        self._bound_loop: Optional[asyncio.AbstractEventLoop] = None
+        # Strong references to fire-and-forget flush tasks so the event loop
+        # cannot garbage-collect them mid-flight.
+        self._background_tasks: set = set()
         self._last_save_time: float = 0.0
         self.download_status = self._initialize_status()
 
@@ -66,12 +76,73 @@ class StateManager:
         except Exception as e:
             logger.warning(f"Error while pruning backups ({pattern}): {e}")
 
+    def _create_snapshot(self) -> Dict[str, Any]:
+        """
+        Acquire the thread lock and return an immutable, validated deep-copy of
+        the in-memory state.
+
+        Isolating the snapshot under the lock guarantees that concurrent
+        coroutines/threads cannot mutate the dictionaries mid-serialization
+        (prevents 'dictionary changed size during iteration'). The returned dict
+        is safe to hand to a background worker thread.
+        """
+        with self._thread_lock:
+            return {
+                "active": bool(self.download_status.get("active", False)),
+                "scanning": bool(self.download_status.get("scanning", False)),
+                "scan_progress": int(self.download_status.get("scan_progress", 0)),
+                "progress": int(self.download_status.get("progress", 0)),
+                "total": int(self.download_status.get("total", 0)),
+                "current_file": str(self.download_status.get("current_file", "") or ""),
+                "current_file_progress": int(self.download_status.get("current_file_progress", 0)),
+                "current_file_size": int(self.download_status.get("current_file_size", 0)),
+                "downloaded_bytes": int(self.download_status.get("downloaded_bytes", 0)),
+                "concurrent_downloads": copy.deepcopy(self.download_status.get("concurrent_downloads", {})),
+                "completed_downloads": copy.deepcopy(self.download_status.get("completed_downloads", {})),
+                "cancelled_files": copy.deepcopy(self.download_status.get("cancelled_files", {})),
+                "cancelled": bool(self.download_status.get("cancelled", False)),
+                "session_id": self.download_status.get("session_id"),
+                "started_at": self.download_status.get("started_at"),
+                "channel": self.download_status.get("channel"),
+                "queue": copy.deepcopy(self.download_status.get("queue", []))
+            }
+
+    def _sync_write_to_disk(self, state_to_save: Dict[str, Any], temp_file: str) -> None:
+        """
+        Write a pre-taken state snapshot to ``temp_file`` and atomically publish
+        it as ``self.state_file``.
+
+        This performs the genuinely blocking work (json.dump + flush + os.fsync
+        + os.replace) and is designed to run on the default worker thread pool.
+        A unique per-call temp file prevents parallel writers from colliding or
+        truncating each other; it is cleaned up in a finally block on error.
+        """
+        os.makedirs(Config.SESSION_DIR, exist_ok=True)
+        try:
+            with open(temp_file, 'w', encoding='utf-8') as f:
+                json.dump(state_to_save, f, default=str, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
+
+            # Atomic POSIX rename replaces state_file safely
+            os.replace(temp_file, self.state_file)
+        finally:
+            # os.replace already moved the temp file on success; only clean up
+            # the leftover temp file if something failed mid-write.
+            if os.path.exists(temp_file):
+                try:
+                    os.remove(temp_file)
+                except OSError:
+                    pass
+
     def save_state(self, force: bool = True):
         """
-        Save current download state to disk.
-        
-        Uses an isolated thread-safe snapshot, a unique temporary file,
-        explicit fsync, and atomic rename (os.replace).
+        Save current download state to disk synchronously.
+
+        Delegates to _create_snapshot + _sync_write_to_disk so that synchronous
+        callers, CLI shutdown hooks, and synchronous unit tests retain 100%
+        backward compatibility. Uses an isolated thread-safe snapshot, a unique
+        temporary file, explicit fsync, and atomic rename (os.replace).
         Throttles high-frequency writes unless force=True.
         """
         now = time.time()
@@ -79,52 +150,111 @@ class StateManager:
         if not force and (now - self._last_save_time < 1.5):
             return
 
-        with self._thread_lock:
+        try:
+            state_to_save = self._create_snapshot()
+            temp_file = f"{self.state_file}.tmp.{os.getpid()}.{uuid.uuid4().hex}"
+            self._sync_write_to_disk(state_to_save, temp_file)
+            self._last_save_time = now
+        except Exception as e:
+            logger.error(f"Error saving state to {self.state_file}: {e}")
+
+    async def save_state_async(self, force: bool = True) -> None:
+        """
+        Non-blocking variant of save_state for hot async call sites (e.g. the
+        MTProto progress callback).
+
+        The blocking snapshot + fsync work is offloaded to the default worker
+        thread pool via asyncio.to_thread, so the event loop is never stalled
+        by os.fsync(). Writes are serialized by an asyncio.Lock bound to the
+        active loop; redundant force=False flushes issued while one is already
+        in flight are dropped (debounced) instead of queuing up redundant
+        fsyncs, and the 1.5s throttle window is preserved.
+        """
+        loop = asyncio.get_running_loop()
+        # Lazily bind the write lock to the running loop so the manager can be
+        # constructed outside of (or before) any loop. Re-bind whenever the
+        # running loop differs from the bound one (fresh loops in tests or
+        # after a uvicorn reload): a lock created under a closed loop must
+        # never be touched again, including .locked().
+        if self._async_write_lock is None or self._bound_loop is not loop:
+            self._async_write_lock = asyncio.Lock()
+            self._bound_loop = loop
+
+        now = time.time()
+        # Fast path: drop redundant flushes before paying the lock cost.
+        if not force and (now - self._last_save_time < 1.5 or self._async_write_lock.locked()):
+            return
+
+        async with self._async_write_lock:
+            # Re-check under the lock: a concurrent call may have written since
+            # our fast path check.
+            if not force and (time.time() - self._last_save_time < 1.5):
+                return
+
+            state_to_save = self._create_snapshot()
+            temp_file = f"{self.state_file}.tmp.{os.getpid()}.{uuid.uuid4().hex}"
+            self._last_save_time = time.time()
+
             try:
-                os.makedirs(Config.SESSION_DIR, exist_ok=True)
-
-                # Snapshot the state under lock so concurrent coroutines/threads cannot mutate
-                # dictionaries during json serialization (prevents 'dictionary changed size during iteration')
-                state_to_save = {
-                    "active": bool(self.download_status.get("active", False)),
-                    "scanning": bool(self.download_status.get("scanning", False)),
-                    "scan_progress": int(self.download_status.get("scan_progress", 0)),
-                    "progress": int(self.download_status.get("progress", 0)),
-                    "total": int(self.download_status.get("total", 0)),
-                    "current_file": str(self.download_status.get("current_file", "") or ""),
-                    "current_file_progress": int(self.download_status.get("current_file_progress", 0)),
-                    "current_file_size": int(self.download_status.get("current_file_size", 0)),
-                    "downloaded_bytes": int(self.download_status.get("downloaded_bytes", 0)),
-                    "concurrent_downloads": copy.deepcopy(self.download_status.get("concurrent_downloads", {})),
-                    "completed_downloads": copy.deepcopy(self.download_status.get("completed_downloads", {})),
-                    "cancelled_files": copy.deepcopy(self.download_status.get("cancelled_files", {})),
-                    "cancelled": bool(self.download_status.get("cancelled", False)),
-                    "session_id": self.download_status.get("session_id"),
-                    "started_at": self.download_status.get("started_at"),
-                    "channel": self.download_status.get("channel"),
-                    "queue": copy.deepcopy(self.download_status.get("queue", []))
-                }
-
-                # Unique temporary file prevents parallel writers from colliding or truncating
-                temp_file = f"{self.state_file}.tmp.{os.getpid()}.{uuid.uuid4().hex}"
-                try:
-                    with open(temp_file, 'w', encoding='utf-8') as f:
-                        json.dump(state_to_save, f, default=str, indent=2)
-                        f.flush()
-                        os.fsync(f.fileno())
-
-                    # Atomic POSIX rename replaces state_file safely
-                    os.replace(temp_file, self.state_file)
-                    self._last_save_time = now
-                finally:
-                    if os.path.exists(temp_file):
-                        try:
-                            os.remove(temp_file)
-                        except OSError:
-                            pass
-
+                await asyncio.to_thread(self._sync_write_to_disk, state_to_save, temp_file)
             except Exception as e:
-                logger.error(f"Error saving state to {self.state_file}: {e}")
+                logger.error(f"Error saving state (async) to {self.state_file}: {e}")
+
+    def schedule_progress_save(self, force: bool = False) -> None:
+        """
+        Loop-safe, thread-safe entry point for hot progress callbacks.
+
+        Progress callbacks (e.g. MTProto chunk streaming) are synchronous and may
+        be invoked from any thread. This method:
+          * on the event-loop thread: schedules the non-blocking async flush;
+          * from a foreign thread: hops onto the bound loop via
+            call_soon_threadsafe so the write still lands in the worker pool;
+          * when no event loop is available (tests, CLI, shutdown): falls back
+            to the fully synchronous path, which is thread-safe via the
+            internal RLock.
+
+        It never raises and never blocks the caller.
+        """
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # No event loop on this thread: degrade to the synchronous writer.
+            self.save_state(force=force)
+            return
+
+        bound = self._bound_loop
+        if bound is None or bound is loop or bound.is_closed():
+            # Unbound (will self-bind on first await), already on the owning
+            # loop, or the bound loop is gone: schedule on this running loop.
+            task = loop.create_task(self.save_state_async(force=force))
+            self._background_tasks.add(task)
+            task.add_done_callback(self._background_tasks.discard)
+        else:
+            # A live loop owns the write lock: hop onto it thread-safely so
+            # the flush serializes with in-flight writes.
+            self._schedule_save_on_loop(force)
+
+    def _schedule_save_on_loop(self, force: bool) -> None:
+        """Thread-safe hop onto the bound event loop to run an async flush."""
+        loop = self._bound_loop
+        if loop is None or loop.is_closed():
+            self.save_state(force=force)
+            return
+        try:
+            loop.call_soon_threadsafe(self._spawn_save_task, force)
+        except RuntimeError:
+            self.save_state(force=force)
+
+    def _spawn_save_task(self, force: bool) -> None:
+        """Runs ON the bound loop: spawns and tracks the async flush task."""
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            self.save_state(force=force)
+            return
+        task = loop.create_task(self.save_state_async(force=force))
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
 
     def load_state(self):
         """
