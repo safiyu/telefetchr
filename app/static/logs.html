@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'">
     <title>TeleFetchr - Logs</title>
     <link rel="icon" type="image/png" href="/static/images/favicon.png" />
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
@@ -291,17 +292,22 @@
                 const levelClass = log.level === 'ERROR' ? 'log-error'
                     : log.level === 'WARNING' ? 'log-warning'
                     : 'log-info';
-                
-                const escapedMsg = log.message
+
+                // Escape every interpolated field (timestamp, level, module,
+                // message) so a crafted log line cannot inject HTML. The level
+                // also selects a CSS class, so its raw value must be sanitized
+                // for display while the class choice is made from a fixed set.
+                const esc = v => String(v ?? '')
                     .replace(/&/g, '&amp;')
                     .replace(/</g, '&lt;')
-                    .replace(/>/g, '&gt;');
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;');
 
                 return `<div class="log-entry ${levelClass}">
-                    <span class="text-gray-500 mr-2">${log.timestamp}</span>
-                    <span class="font-bold mr-2 tracking-tighter">[${log.level}]</span>
-                    <span class="text-amber-500/80 mr-2 font-semibold italic">${log.module}</span>
-                    <span class="text-gray-300">${escapedMsg}</span>
+                    <span class="text-gray-500 mr-2">${esc(log.timestamp)}</span>
+                    <span class="font-bold mr-2 tracking-tighter">[${esc(log.level)}]</span>
+                    <span class="text-amber-500/80 mr-2 font-semibold italic">${esc(log.module)}</span>
+                    <span class="text-gray-300">${esc(log.message)}</span>
                 </div>`;
             }).join('');
         }

@@ -15,12 +15,27 @@ services:
       - API_ID=1234567
       - API_HASH=yourapihash
       - PHONE_NUMBER=1234567890
-      # Authentication (IMPORTANT: Change these in production!)
-      - SECRET_KEY=telefetchr-secure-dev-key-12345
-      - ADMIN_USERNAME=admin
-      - ADMIN_PASSWORD=admin123
+      # Authentication (IMPORTANT):
+      # - ADMIN_PASSWORD is required. The app refuses to start with a default
+      #   or weak value. Copy .env.example to .env and set it there.
+      # - SECRET_KEY is optional: when unset, the app generates a random key
+      #   and persists it to the sessions volume (sessions/.secret_key), so
+      #   tokens survive container restarts without a secret living in this
+      #   file. Set it explicitly if you prefer to manage it yourself.
       - ACCESS_TOKEN_EXPIRE_MINUTES=1440
       - PUID=1000
       - PGID=1000
+      # Comma-separated CIDRs for trusted-subnet auth bypass. Keep this as
+      # narrow as possible (e.g. your own /24); a broad range turns every
+      # device in that subnet into an admin.
       - TRUSTED_SUBNETS=192.168.1.0/24
+      # Optional: only the reverse proxy that sits directly in front of the
+      # app (e.g. a local nginx). Defaults to 127.0.0.1,::1 inside the
+      # container.
+      # - TRUSTED_PROXIES=172.18.0.1
+      # Optional: extra CORS origins (comma-separated). Empty = same-origin
+      # only, which is what this app needs by default.
+      # - ALLOWED_ORIGINS=https://tele.example.com
+    env_file:
+      - .env
     restart: unless-stopped

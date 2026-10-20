@@ -43,6 +43,49 @@ function getAuthHeaders() {
     return token ? { 'Authorization': `Bearer ${token}` } : {};
 }
 
+// --- XSS escaping helpers -------------------------------------------------
+// Untrusted values (Telegram file names, channel names, user display names)
+// must never be interpolated raw into HTML or inline event handlers. Use
+// escapeHtml() for HTML text / attribute content and jsStr() for values that
+// appear inside a single-quoted JavaScript string in an inline handler.
+
+// Escape a value for safe use as HTML text content or inside an attribute.
+function escapeHtml(value) {
+    if (value === null || value === undefined) return "";
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+// Build a safe single-quoted JavaScript string literal (quotes included) from
+// an untrusted value, for use inside an inline HTML event handler such as
+// onclick="...". The HTML parser decodes the attribute before evaluating the
+// JS, so we encode HTML metacharacters as JS unicode escapes (backslash
+// first) which survive HTML decoding and stay literal in JS.
+function jsStr(value) {
+    const s = String(value === null || value === undefined ? "" : value);
+    return "'" + s
+        .replace(/\\/g, "\\\\")
+        .replace(/&/g, "\\u0026")
+        .replace(/</g, "\\u003c")
+        .replace(/>/g, "\\u003e")
+        .replace(/"/g, "\\u0022")
+        .replace(/'/g, "\\u0027") + "'";
+}
+
+// Build the DOM id for a file's progress element. fileId can carry hostile
+// characters (it derives from Telegram data), so it is restricted to a safe
+// identifier character set. Every lookup of these elements MUST go through
+// this same function (with the same prefix) or the lookup will miss the
+// rendered node. Pass "cancelled" as prefix for the cancelled-progress bar.
+function progressElId(fileId, prefix = "") {
+    const safe = String(fileId).replace(/[^a-zA-Z0-9_-]/g, "_");
+    return `progress${prefix ? `-${prefix}` : ""}-${safe}`;
+}
+
 async function logout() {
     // Check if user is on a trusted subnet
     try {
@@ -457,10 +500,10 @@ async function checkSavedState() {
                             <div class="min-w-0">
                                 <p class="text-sm font-bold uppercase tracking-wider ${textClasses} break-words" style="text-shadow: 1px 1px 0px rgba(0,0,0,0.5)">${statusTitle}</p>
                                 <div class="text-xs ${subTextClasses} mt-1 space-y-0.5">
-                                    <p class="truncate"><span class="opacity-70">Channel:</span> ${data.channel || 'Unknown'}</p>
+                                    <p class="truncate"><span class="opacity-70">Channel:</span> ${escapeHtml(data.channel || 'Unknown')}</p>
                                     <p><span class="opacity-70">Progress:</span> ${completedCount}/${totalCount} files ${remainingCount > 0 ? `(${remainingCount} left)` : ''}</p>
                                     ${wasCancelled ? '<p class="text-red-300"><i class="fa-solid fa-ban text-[10px] mr-1"></i>Cancelled by user</p>' : ''}
-                                    <p class="text-xs opacity-50 font-mono mt-1">ID: ${data.session_id || 'N/A'}</p>
+                                    <p class="text-xs opacity-50 font-mono mt-1">ID: ${escapeHtml(data.session_id || 'N/A')}</p>
                                 </div>
                             </div>
                         </div>
@@ -661,8 +704,7 @@ async function checkStatus() {
                     <span class="relative inline-flex rounded-full h-3 w-3 sm:h-4 sm:w-4 bg-green-500"></span>
                 </span>
                 <span class="hidden md:inline ml-2 text-xs font-medium text-green-400">Connected</span>`;
-            userInfo.innerHTML = `<p><i class="fa-solid fa-user text-[10px] opacity-70 mr-1.5" title="Logged in user"></i> ${data.user.first_name
-                } (@${data.user.username || "N/A"})</p>`;
+            userInfo.innerHTML = `<p><i class="fa-solid fa-user text-[10px] opacity-70 mr-1.5" title="Logged in user"></i> ${escapeHtml(data.user.first_name)} (@${escapeHtml(data.user.username || "N/A")})</p>`;
             loginSection.classList.add("hidden");
             downloadSection.classList.remove("hidden");
         } else if (data.status === "not_authenticated" || data.status === "disconnected") {
@@ -950,7 +992,7 @@ function displayFiles(files) {
                 <button onclick="deselectAllFiles()" class="flex-1 sm:flex-none py-1.5 px-3 rounded-xl btn-orange-hover flex items-center justify-center gap-1.5 focus:outline-none">
                     <i class="fa-solid fa-xmark text-[10px]"></i> Deselect
                 </button>
-                <button onclick="downloadSelected('${currentChannel}')" id="downloadSelectedBtn" class="flex-1 sm:flex-none py-1.5 px-3 rounded-xl btn-yellow-hover text-[11px] flex items-center justify-center gap-1.5 focus:outline-none">
+                <button onclick="downloadSelected(${jsStr(currentChannel)})" id="downloadSelectedBtn" class="flex-1 sm:flex-none py-1.5 px-3 rounded-xl btn-yellow-hover text-[11px] flex items-center justify-center gap-1.5 focus:outline-none">
                     <i class="fa-solid fa-download text-[10px]"></i> Download (<span id="selectedCount">0</span>)
                 </button>
             </div>
@@ -984,15 +1026,15 @@ function displayFiles(files) {
                     <i class="fa-solid ${icon} text-sm sm:text-lg text-yellow-400"></i>
                 </div>
                 <div class="flex-1 min-w-0 overflow-hidden">
-                    <div class="font-medium text-gray-200 line-clamp-2 text-sm sm:text-base" title="${file.file_name}">${file.file_name}</div>
+                    <div class="font-medium text-gray-200 line-clamp-2 text-sm sm:text-base" title="${escapeHtml(file.file_name)}">${escapeHtml(file.file_name)}</div>
                     <div class="text-[10px] sm:text-xs text-gray-500 mt-0.5 flex items-center flex-wrap gap-x-2 gap-y-1">
-                        <span class="bg-gray-700 bg-opacity-80 px-1 sm:px-1.5 rounded uppercase tracking-wide">${file.file_type}</span>
+                        <span class="bg-gray-700 bg-opacity-80 px-1 sm:px-1.5 rounded uppercase tracking-wide">${escapeHtml(file.file_type)}</span>
                         <span>${size}</span>
                         <span class="hidden sm:inline">•</span>
                         <span>${new Date(file.date).toLocaleDateString()}</span>
                     </div>
                 </div>
-                <button onclick="downloadSingle(${file.file_id}, '${currentChannel}')" 
+                <button onclick="downloadSingle(${file.file_id}, ${jsStr(currentChannel)})" 
                     class="flex-shrink-0 p-2 sm:py-1.5 sm:px-4 rounded-xl btn-yellow-hover text-xs flex items-center gap-1.5 md:opacity-0 md:group-hover:opacity-100 md:translate-x-2 md:group-hover:translate-x-0 focus:outline-none">
                     <i class="fa-solid fa-download text-[10px]"></i> <span class="hidden sm:inline">Download</span>
                 </button>
@@ -1043,20 +1085,20 @@ function updateSelectedCount() {
 async function clearIndividualProgress(fileId) {
     try {
         // Clear from backend state
-        const response = await authFetch(`/download/completed/${fileId}`, {
+        const response = await authFetch(`/download/completed/${encodeURIComponent(fileId)}`, {
             method: "DELETE",
         });
 
         if (response && response.ok) {
             // Clear from frontend
             completedDownloads.delete(fileId);
-            const element = document.getElementById(`progress-${fileId}`);
+            const element = document.getElementById(progressElId(fileId));
             if (element) {
                 element.remove();
             }
 
             // Also try removing the cancelled variant if it exists
-            const cancelledElement = document.getElementById(`progress-cancelled-${fileId}`);
+            const cancelledElement = document.getElementById(progressElId(fileId, "cancelled"));
             if (cancelledElement) {
                 cancelledElement.remove();
             }
@@ -1126,7 +1168,10 @@ function createProgressBar(
     eta = 0,
     isQueued = false
 ) {
-    const progressId = `progress-${fileId}`;
+    // fileId is interpolated into an id attribute below; progressElId()
+    // strips characters that are not legal in an HTML identifier so it cannot
+    // break out of the attribute or inject markup.
+    const progressId = progressElId(fileId);
     let retryBadge = '';
     let stallWarning = '';
 
@@ -1163,8 +1208,8 @@ function createProgressBar(
                              <i class="fa-solid fa-file-arrow-down text-xl"></i>
                         </div>
                         <div class="min-w-0">
-                            <div class="file-name text-white font-medium line-clamp-2" title="${fileName}">
-                                ${fileName}
+                            <div class="file-name text-white font-medium line-clamp-2" title="${escapeHtml(fileName)}">
+                                ${escapeHtml(fileName)}
                             </div>
                             <div class="progress-badges flex items-center gap-2 mt-0.5">
                                 ${retryBadge}
@@ -1176,14 +1221,14 @@ function createProgressBar(
                     </div>
                     
                     ${isComplete ? `
-                        <button onclick="clearIndividualProgress('${fileId}')" class="w-8 h-8 flex items-center justify-center btn-red rounded-xl focus:outline-none" title="Clear History">
+                        <button onclick="clearIndividualProgress(${jsStr(fileId)})" class="w-8 h-8 flex items-center justify-center btn-red rounded-xl focus:outline-none" title="Clear History">
                             <i class="fa-solid fa-xmark text-sm"></i>
                         </button>
                     ` : `
                         <div class="flex flex-col items-end gap-1">
                             <div class="flex items-center gap-2">
                                 <span class="progress-percentage text-lg font-bold text-white header-gradient">${isQueued ? '0' : percentage}%</span>
-                                <button onclick="cancelIndividualDownload('${fileId}')" 
+                                <button onclick="cancelIndividualDownload(${jsStr(fileId)})" 
                                     class="w-8 h-8 flex items-center justify-center ${isQueued ? 'btn-orange-hover' : 'btn-red'} rounded-xl focus:outline-none" 
                                     title="${isQueued ? 'Remove from Queue' : 'Cancel Download'}">
                                     <i class="fa-solid ${isQueued ? 'fa-trash-can' : 'fa-stop'} text-xs"></i>
@@ -1227,7 +1272,7 @@ function createCancelledProgressBar(
     current = 0,
     total = 0
 ) {
-    const progressId = `progress-cancelled-${fileId}`;
+    const progressId = progressElId(fileId, "cancelled");
 
     let html = `
         <div id="${progressId}" class="relative overflow-hidden group opacity-80">
@@ -1241,8 +1286,8 @@ function createCancelledProgressBar(
                              <i class="fa-solid fa-ban text-xl"></i>
                         </div>
                         <div class="min-w-0">
-                            <div class="file-name text-gray-300 font-medium line-clamp-2 line-through decoration-red-500 decoration-opacity-50" title="${fileName}">
-                                ${fileName}
+                            <div class="file-name text-gray-300 font-medium line-clamp-2 line-through decoration-red-500 decoration-opacity-50" title="${escapeHtml(fileName)}">
+                                ${escapeHtml(fileName)}
                             </div>
                             <div class="flex items-center gap-2 mt-0.5">
                                 <span class="text-xs text-red-400 flex items-center gap-1 font-bold uppercase"><i class="fa-solid fa-circle-stop text-[10px]"></i> Cancelled</span>
@@ -1250,7 +1295,7 @@ function createCancelledProgressBar(
                         </div>
                     </div>
                     
-                    <button onclick="clearIndividualProgress('${fileId}')" class="w-7 h-7 flex items-center justify-center btn-red rounded-xl focus:outline-none" title="Dismiss">
+                    <button onclick="clearIndividualProgress(${jsStr(fileId)})" class="w-7 h-7 flex items-center justify-center btn-red rounded-xl focus:outline-none" title="Dismiss">
                         <i class="fa-solid fa-xmark text-xs"></i>
                     </button>
                 </div>
@@ -1316,7 +1361,7 @@ async function downloadSelected(channel) {
 
 async function cancelIndividualDownload(fileId) {
     try {
-        const response = await authFetch(`/download/cancel/${fileId}`, {
+        const response = await authFetch(`/download/cancel/${encodeURIComponent(fileId)}`, {
             method: "POST",
         });
 
@@ -1327,7 +1372,7 @@ async function cancelIndividualDownload(fileId) {
             showAlert("downloadAlert", data.message, "info");
 
             // Removing the element immediately for better UX
-            const element = document.getElementById(`progress-${fileId}`);
+            const element = document.getElementById(progressElId(fileId));
             if (element) {
                 element.remove();
             }
@@ -1700,13 +1745,16 @@ function showAlert(_elementId, message, type) {
                 <div class="flex items-center justify-between mb-0.5">
                     <span class="text-[10px] font-bold ${iconColor} uppercase tracking-[0.2em] opacity-80">${title}</span>
                 </div>
-                <p class="text-sm text-white/90 leading-relaxed font-medium break-all">${message}</p>
+                <p class="toast-message text-sm text-white/90 leading-relaxed font-medium break-all"></p>
             </div>
             <button class="flex-shrink-0 ml-2 p-1 text-white/20 hover:text-white transition-colors" onclick="this.closest('.relative').remove()">
                 <i class="fa-solid fa-xmark text-xs"></i>
             </button>
         </div>
     `;
+    // Message text may contain untrusted server/error data — set it as text,
+    // not HTML.
+    toast.querySelector(".toast-message").textContent = message;
 
     toastContainer.appendChild(toast);
 
@@ -1881,7 +1929,7 @@ function updateProgressUI(data) {
 
             // Remove items that are no longer in the top 10 (but keep cancelled divider)
             existingIds.forEach(staleId => {
-                const staleEl = document.getElementById(`progress-${staleId}`);
+                const staleEl = document.getElementById(progressElId(staleId));
                 if (staleEl && !staleId.includes('cancelled')) {
                     staleEl.remove();
                 }
@@ -1898,7 +1946,7 @@ function updateProgressUI(data) {
                     }
 
                     for (const [fileId, fileData] of cancelledEntries) {
-                        if (document.getElementById(`progress-${fileId}`)) continue;
+                        if (document.getElementById(progressElId(fileId, "cancelled"))) continue;
 
                         const percentage = fileData.percentage || 0;
                         const size = fileData.total || 0;
@@ -1913,7 +1961,7 @@ function updateProgressUI(data) {
             historySection?.classList.remove('hidden');
 
             for (const [fileId, fileData] of Object.entries(data.cancelled_files)) {
-                if (document.getElementById(`progress-${fileId}`)) continue;
+                if (document.getElementById(progressElId(fileId, "cancelled"))) continue;
 
                 const percentage = fileData.percentage || 0;
                 const size = fileData.total || 0;
@@ -1961,7 +2009,7 @@ function updateProgressUI(data) {
                 if (completedDownloads.has(fileId)) continue;
 
                 const percentage = fileData.percentage || 0;
-                const existingProgress = document.getElementById(`progress-${fileId}`);
+                const existingProgress = document.getElementById(progressElId(fileId));
                 const html = createProgressBar(
                     fileId, fileData.name, false, percentage,
                     fileData.progress, fileData.total, fileData.retry_attempt,
@@ -2159,15 +2207,15 @@ function renderQueue(queue) {
             </div>
             
             <div class="flex-grow min-w-0">
-                <div class="text-xs sm:text-sm font-medium text-white line-clamp-2" title="${item.name}">${item.name}</div>
+                <div class="text-xs sm:text-sm font-medium text-white line-clamp-2" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</div>
                 <div class="text-xs text-gray-400 flex items-center gap-2 mt-0.5">
-                    <span class="bg-gray-700 px-1.5 rounded text-[10px] truncate max-w-[100px]">${item.channel}</span>
-                    <span class="${getStatusColor(item.status)} capitalize text-[10px] sm:text-xs">${item.status}</span>
+                    <span class="bg-gray-700 px-1.5 rounded text-[10px] truncate max-w-[100px]">${escapeHtml(item.channel)}</span>
+                    <span class="${getStatusColor(item.status)} capitalize text-[10px] sm:text-xs">${escapeHtml(item.status)}</span>
                 </div>
             </div>
             
             <div class="flex items-center gap-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex-shrink-0">
-                <button onclick="removeFromQueue('${item.id}')" class="w-8 h-8 flex items-center justify-center bg-red-500/20 text-red-400 hover:bg-red-600 hover:text-white rounded-lg transition-all focus:outline-none">
+                <button onclick="removeFromQueue(${jsStr(item.id)})" class="w-8 h-8 flex items-center justify-center bg-red-500/20 text-red-400 hover:bg-red-600 hover:text-white rounded-lg transition-all focus:outline-none">
                     <i class="fa-solid fa-trash-can text-[10px]"></i>
                 </button>
             </div>
@@ -2364,8 +2412,9 @@ function closeAboutModal() {
 function parseChangelog(markdown) {
     if (!markdown) return 'No release notes available.';
 
-    // Very simple markdown to HTML parser for the changelog
-    return markdown
+    // Very simple markdown to HTML parser for the changelog. Escape the source
+    // text first so any literal HTML in the file is rendered as text.
+    return escapeHtml(markdown)
         .replace(/### (.*)/g, '<h5 class="text-amber-500/80 font-bold text-xs uppercase tracking-widest mt-4 mb-2">$1</h5>')
         .replace(/## \[(.*)\] - (.*)/g, '<div class="border-l-2 border-amber-500 pl-4 mb-6"><h4 class="text-white font-bold text-lg">Version $1</h4><p class="text-[10px] text-gray-500 font-mono uppercase">Released on $2</p></div>')
         .replace(/^- (.*)/gm, '<div class="flex items-start gap-2 mb-1.5"><i class="fa-solid fa-caret-right text-amber-500/50 mt-1 text-[10px]"></i><p class="text-sm text-gray-300">$1</p></div>')

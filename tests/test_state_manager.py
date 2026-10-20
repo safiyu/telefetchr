@@ -20,6 +20,8 @@ os.environ.setdefault("SECRET_KEY", "telefetchr-test-key-12345")
 os.environ.setdefault("API_ID", "12345")
 os.environ.setdefault("API_HASH", "test-hash")
 os.environ.setdefault("PHONE_NUMBER", "1234567890")
+# Config now refuses to boot without a non-default admin password.
+os.environ.setdefault("ADMIN_PASSWORD", "telefetchr-test-password-xyz")
 
 import pytest
 from app.config import Config

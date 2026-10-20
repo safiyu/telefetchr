@@ -25,6 +25,8 @@ os.environ.setdefault("SECRET_KEY", "telefetchr-test-key-12345")
 os.environ.setdefault("API_ID", "12345")
 os.environ.setdefault("API_HASH", "test-hash")
 os.environ.setdefault("PHONE_NUMBER", "1234567890")
+# Config now refuses to boot without a non-default admin password.
+os.environ.setdefault("ADMIN_PASSWORD", "telefetchr-test-password-xyz")
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
@@ -215,11 +217,14 @@ def test_sanitize_filename_byte_truncation() -> None:
 # ---------------------------------------------------------------------------
 
 def test_get_client_ip_anti_spoofing() -> None:
-    # Sanity: default trusted proxy list is safe (loopback + RFC1918 only)
+    # Sanity: the default trusted-proxy list is the strictest safe baseline -
+    # loopback only. Broad RFC1918 ranges must NOT be trusted by default
+    # because Docker bridge / NAT peers fall in those ranges and would let
+    # any host-local client spoof X-Forwarded-For.
     assert "127.0.0.1" in Config.TRUSTED_PROXIES
-    assert "172.16.0.0/12" in Config.TRUSTED_PROXIES
-    assert "10.0.0.0/8" in Config.TRUSTED_PROXIES
-    assert "192.168.0.0/16" in Config.TRUSTED_PROXIES
+    assert "172.16.0.0/12" not in Config.TRUSTED_PROXIES
+    assert "10.0.0.0/8" not in Config.TRUSTED_PROXIES
+    assert "192.168.0.0/16" not in Config.TRUSTED_PROXIES
 
     # 1. Untrusted peer spoofs X-Forwarded-For with a trusted subnet IP ->
     #    the spoof is ignored and the real peer IP is used.
@@ -238,10 +243,20 @@ def test_get_client_ip_anti_spoofing() -> None:
 
     # 4. Chained proxies: trusted hops are skipped right-to-left, so the
     #    right-most UNTRUSTED hop is the true client.
-    chained = _make_request("172.16.5.10", xff="203.0.113.99, 10.0.0.9")
-    assert get_client_ip(chained) == "203.0.113.99"
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(Config, "TRUSTED_PROXIES", ["172.16.5.10", "10.0.0.9"])
+        chained = _make_request("172.16.5.10", xff="203.0.113.99, 10.0.0.9")
+        assert get_client_ip(chained) == "203.0.113.99"
 
-    # 5. Trusted proxy with no headers -> falls back to the peer IP.
+        # 5. Every hop is a trusted proxy: the LEFT-most entry (original
+        #    client as recorded by the first proxy) is returned. Returning the
+        #    right-most hop would let an attacker pin a trusted-subnet IP and
+        #    trigger the trusted-subnet auth bypass.
+        mp.setattr(Config, "TRUSTED_PROXIES", ["127.0.0.1", "10.0.0.9", "192.168.1.50"])
+        all_trusted = _make_request("127.0.0.1", xff="192.168.1.50, 10.0.0.9")
+        assert get_client_ip(all_trusted) == "192.168.1.50"
+
+    # 6. Trusted proxy with no headers -> falls back to the peer IP.
     bare = _make_request("127.0.0.1")
     assert get_client_ip(bare) == "127.0.0.1"
 

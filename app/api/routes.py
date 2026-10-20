@@ -1,5 +1,6 @@
 import os
 import logging
+import urllib.parse
 from datetime import timedelta
 from pathlib import Path
 from typing import Optional, Dict, Any
@@ -19,6 +20,7 @@ from app.services.download_service import DownloadService
 from app.services.auth_service import AuthService
 from app.utils.state_manager import StateManager
 from app.utils.auth_dependencies import get_current_user, get_client_ip, is_trusted_ip
+from app.utils.rate_limiter import login_limiter, code_request_limiter, code_verify_limiter
 from app.config import Config
 
 logger = logging.getLogger(__name__)
@@ -55,9 +57,25 @@ async def get_ui(request: Request):
 
 
 @router.post("/auth/login", response_model=Token)
-async def login(login_request: LoginRequest):
-    """Login endpoint - returns JWT token"""
+async def login(login_request: LoginRequest, request: Request):
+    """Login endpoint - returns JWT token (rate-limited per client IP)."""
+    client_ip = get_client_ip(request)
+
+    # Sliding window: max 5 FAILED attempts per 15 minutes per client IP.
+    # Successful logins are not counted, so legitimate users who mistype a
+    # password once or twice are not locked out.
+    allowed, retry_after = login_limiter.check(client_ip, count_success=False)
+    if not allowed:
+        logger.warning(f"Login rate limit exceeded for client {client_ip}")
+        raise HTTPException(
+            status_code=429,
+            detail="Too many login attempts. Try again later.",
+            headers={"Retry-After": str(retry_after)},
+        )
+
     if not auth_service.authenticate_user(login_request.username, login_request.password):
+        login_limiter.commit(client_ip)
+        logger.warning(f"Failed login attempt for client {client_ip}")
         raise HTTPException(
             status_code=401,
             detail="Incorrect username or password"
@@ -184,8 +202,17 @@ async def check_status(current_user: str = Depends(get_current_user)):
 
 
 @router.post("/login/request-code")
-async def request_code(current_user: str = Depends(get_current_user)):
-    """Request verification code"""
+async def request_code(request: Request, current_user: str = Depends(get_current_user)):
+    """Request verification code (rate-limited per client IP)."""
+    client_ip = get_client_ip(request)
+    allowed, retry_after = code_request_limiter.check(client_ip, count_success=True)
+    if not allowed:
+        logger.warning(f"Telegram login rate limit exceeded for client {client_ip}")
+        raise HTTPException(
+            status_code=429,
+            detail="Too many login attempts. Try again later.",
+            headers={"Retry-After": str(retry_after)},
+        )
     try:
         message = await telegram_service.request_code()
         return {"status": "success", "message": message}
@@ -195,8 +222,17 @@ async def request_code(current_user: str = Depends(get_current_user)):
 
 
 @router.post("/login/verify")
-async def verify_login(request: CodeRequest, current_user: str = Depends(get_current_user)):
-    """Verify the login code"""
+async def verify_login(request: CodeRequest, http_request: Request, current_user: str = Depends(get_current_user)):
+    """Verify the login code (rate-limited per client IP)."""
+    client_ip = get_client_ip(http_request)
+    allowed, retry_after = code_verify_limiter.check(client_ip, count_success=False)
+    if not allowed:
+        logger.warning(f"Telegram login rate limit exceeded for client {client_ip}")
+        raise HTTPException(
+            status_code=429,
+            detail="Too many login attempts. Try again later.",
+            headers={"Retry-After": str(retry_after)},
+        )
     try:
         user = await telegram_service.verify_code(request.code)
         return {
@@ -207,6 +243,7 @@ async def verify_login(request: CodeRequest, current_user: str = Depends(get_cur
     except Exception as e:
         error_str = str(e)
         logger.error(f"Login verify error: {error_str}")
+        code_verify_limiter.commit(client_ip)
 
         if "password" in error_str.lower() or "2fa" in error_str.lower():
             raise HTTPException(status_code=400, detail="2FA password required. Use /login/password endpoint.")
@@ -215,8 +252,17 @@ async def verify_login(request: CodeRequest, current_user: str = Depends(get_cur
 
 
 @router.post("/login/password")
-async def verify_password(request: PasswordRequest, current_user: str = Depends(get_current_user)):
-    """Verify 2FA password"""
+async def verify_password(request: PasswordRequest, http_request: Request, current_user: str = Depends(get_current_user)):
+    """Verify 2FA password (rate-limited per client IP)."""
+    client_ip = get_client_ip(http_request)
+    allowed, retry_after = code_verify_limiter.check(client_ip, count_success=False)
+    if not allowed:
+        logger.warning(f"Telegram login rate limit exceeded for client {client_ip}")
+        raise HTTPException(
+            status_code=429,
+            detail="Too many login attempts. Try again later.",
+            headers={"Retry-After": str(retry_after)},
+        )
     try:
         user = await telegram_service.verify_password(request.password)
         return {
@@ -226,6 +272,7 @@ async def verify_password(request: PasswordRequest, current_user: str = Depends(
         }
     except Exception as e:
         logger.error(f"Password verify error: {str(e)}")
+        code_verify_limiter.commit(client_ip)
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -478,7 +525,17 @@ async def serve_file(
     if not target_path.is_file():
         raise HTTPException(status_code=404, detail="File not found")
 
-    return FileResponse(str(target_path))
+    # Force a download and disable MIME sniffing. Telegram-controlled names
+    # (e.g. "evil.html" or "a\"><script>alert(1)</script>.png") must never be
+    # rendered by the browser: the name is RFC 5987 percent-encoded, so it
+    # cannot escape the header or switch the response into inline HTML.
+    quoted = urllib.parse.quote(safe_filename)
+    ascii_fallback = safe_filename.encode("ascii", "ignore").decode("ascii") or "download"
+    headers = {
+        "Content-Disposition": f"attachment; filename=\"{ascii_fallback}\"; filename*=UTF-8''{quoted}",
+        "X-Content-Type-Options": "nosniff",
+    }
+    return FileResponse(str(target_path), headers=headers)
 
 
 @router.get("/api/health")

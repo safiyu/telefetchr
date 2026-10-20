@@ -134,14 +134,38 @@ async def lifespan(app: FastAPI):
 # Create FastAPI app
 app = FastAPI(title="Telefetchr", lifespan=lifespan)
 
-# Add CORS middleware
+# Add CORS middleware.
+# Origins are explicitly allowlisted via the ALLOWED_ORIGINS env var
+# (comma-separated). The default is empty, which means only same-origin
+# requests are permitted (the app serves its own UI, so cross-origin access
+# is not required by default). Do NOT use "*" with allow_credentials=True:
+# the browser reflects the caller's origin and any site could then make
+# credentialed cross-origin requests with an authenticated session.
+_allowed_origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
 )
+
+
+# Defense-in-depth response headers applied to EVERY response (HTML, static
+# assets, and served files). X-Content-Type-Options in particular is ignored
+# by browsers when set as a <meta> tag, so it must come from here. This pairs
+# with the CSP meta tag on the pages and the nosniff/attachment headers on the
+# file-serve endpoint to ensure a hostile filename can never be rendered.
+@app.middleware("http")
+async def security_headers(request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    # Framing policy is handled by the CSP meta tag (frame-ancestors 'self');
+    # adding X-Frame-Options here would conflict with it, since browsers give
+    # the CSP precedence when both are present.
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    return response
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="app/static"), name="static")

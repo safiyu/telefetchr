@@ -105,12 +105,22 @@ def get_client_ip(request: Request) -> str:
             if not _matches_proxy_list(hop, Config.TRUSTED_PROXIES):
                 return hop
         if hops:
-            return hops[-1]
+            # Every hop is a trusted proxy. The left-most entry is the original
+            # client as recorded by the first trusted proxy in the chain, which
+            # is the most reliable client identity available. Returning the
+            # right-most hop here would let an attacker pin a trusted-subnet IP
+            # and trigger the trusted-subnet auth bypass.
+            return hops[0]
 
-        # No forwarded chain: fall back to X-Real-IP, then peer.
-        real_ip = request.headers.get("X-Real-IP", "").strip()
+        # No forwarded chain: fall back to X-Real-IP (only if it is a single
+        # well-formed IP), then the peer.
+        real_ip = request.headers.get("X-Real-IP", "").split(",")[0].strip()
         if real_ip:
-            return real_ip
+            try:
+                ipaddress.ip_address(real_ip)
+                return real_ip
+            except ValueError:
+                logger.warning(f"Ignoring malformed X-Real-IP header: {real_ip!r}")
         return peer_ip
 
     # Untrusted peer: ignore all proxy headers entirely.
