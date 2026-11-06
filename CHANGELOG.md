@@ -18,6 +18,15 @@ All epic victories and mysterious bugs that somehow became features are here.
 ### Removed
 - Removed debug console from the dashboard.
 
+## [2.0.2] - 2026-11-06
+### Fixed
+- Download Engine: Enforce strict partition boundary guards and straddling chunk slicing across parallel range workers, preventing downloads from overshooting past 100%.
+- State Manager: Defensively clamp progress and percentage calculations so UI never displays values > 100%.
+- Security: Added `frame-ancestors 'self'` and `X-Frame-Options: SAMEORIGIN` HTTP response headers, bundled texture assets locally, and cleaned CSP meta tags.
+
+### Changed
+- Dependencies: Upgraded Telethon to `1.45.0`.
+
 ## [2.0.1] - 2026-10-20
 ### Added
 - Non-blocking state persistence: `save_state_async` offloads fsync to the worker thread pool, and a new thread-safe `schedule_progress_save` entry point keeps the event loop responsive during parallel MTProto chunk streaming.
