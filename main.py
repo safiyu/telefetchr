@@ -161,9 +161,12 @@ async def security_headers(request, call_next):
     response = await call_next(request)
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("Referrer-Policy", "no-referrer")
-    # Framing policy is handled by the CSP meta tag (frame-ancestors 'self');
-    # adding X-Frame-Options here would conflict with it, since browsers give
-    # the CSP precedence when both are present.
+    # Framing protection: frame-ancestors is ignored when delivered via a <meta>
+    # tag per W3C CSP spec, so it must be delivered via HTTP headers. We set both
+    # Content-Security-Policy: frame-ancestors 'self' and X-Frame-Options: SAMEORIGIN
+    # for defense-in-depth across modern and legacy browsers.
+    response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+    response.headers.setdefault("Content-Security-Policy", "frame-ancestors 'self'")
     response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
     return response
 

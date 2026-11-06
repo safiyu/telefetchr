@@ -524,11 +524,11 @@ class DownloadService:
 
                         if file_id in status["concurrent_downloads"]:
                             item_status = status["concurrent_downloads"][file_id]
-                            item_status["progress"] = current
+                            item_status["progress"] = min(current, total) if total > 0 else current
                             item_status["total"] = total
-                            item_status["percentage"] = int((current / total * 100)) if total > 0 else 0
+                            item_status["percentage"] = min(100, int((current / total * 100))) if total > 0 else 0
                             item_status["speed"] = speed
-                            item_status["eta"] = eta
+                            item_status["eta"] = max(0, eta)
                             # Offload the disk flush to the worker thread pool so the
                             # event loop is never stalled by os.fsync() while
                             # parallel MTProto chunk streaming is active.

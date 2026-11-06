@@ -344,8 +344,21 @@ class TelegramService:
             ):
                 if not chunk:
                     break
+
+                # Boundary guard: if this worker already filled its byte range, exit immediately
+                if current_offset >= end_byte:
+                    break
+
+                # Slicing guard: truncate any chunk that crosses this worker's upper boundary
+                remaining = end_byte - current_offset
                 chunk_len = len(chunk)
-                
+                if chunk_len > remaining:
+                    chunk = chunk[:remaining]
+                    chunk_len = remaining
+
+                if chunk_len == 0:
+                    break
+
                 # Direct seek-free write at current offset using os.pwrite
                 await loop.run_in_executor(None, os.pwrite, fd, chunk, current_offset)
                 current_offset += chunk_len
@@ -355,9 +368,12 @@ class TelegramService:
                     if progress_callback:
                         now = datetime.now()
                         elapsed = (now - last_callback_time[0]).total_seconds()
-                        if elapsed >= Config.DOWNLOAD_REQUEST_DELAY or downloaded_bytes == file_size:
-                            progress_callback(downloaded_bytes, file_size)
+                        if elapsed >= Config.DOWNLOAD_REQUEST_DELAY or downloaded_bytes >= file_size:
+                            progress_callback(min(downloaded_bytes, file_size), file_size)
                             last_callback_time[0] = now
+
+                if current_offset >= end_byte:
+                    break
 
         tasks = []
         for i in range(effective_workers):
@@ -369,6 +385,8 @@ class TelegramService:
 
         try:
             await asyncio.gather(*tasks)
+            if progress_callback:
+                progress_callback(file_size, file_size)
         except Exception as e:
             logger.error(f"Parallel download failed for {file_path}: {e}")
             if os.path.exists(file_path):

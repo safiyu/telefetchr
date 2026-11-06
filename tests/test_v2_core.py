@@ -408,6 +408,36 @@ def test_sparse_pwrite_zero_merge_simulation(tmp_path: Path) -> None:
     # Partial sparse file must have been cleaned up
     assert not target2.exists()
 
+    # Overshoot guard: real Telethon iter_download yields chunks past worker
+    # partitions if workers do not strictly enforce their end boundary, leading to
+    # >100% (e.g. 400%) progress and file corruption from overlapping writes.
+    class TelethonLikeOvershootingClient(FakeParallelClient):
+        async def iter_download(self, media, offset, limit, request_size=65536):
+            if offset not in self.start_offsets:
+                self.start_offsets.append(offset)
+            # Yields past assigned partition all the way to EOF of file
+            while offset < len(self.payload):
+                yield self.payload[offset:offset + min(request_size, len(self.payload) - offset)]
+                offset += request_size
+
+    tg3 = TelegramService()
+    tg3.client = TelethonLikeOvershootingClient(payload)
+    target3 = tmp_path / "out3" / "overshoot_protected.mp4"
+    target3.parent.mkdir(parents=True, exist_ok=True)
+
+    progress3: List = []
+    res3 = asyncio.run(tg3.download_media_parallel(
+        _fake_message(size),
+        str(target3),
+        progress_callback=lambda c, t: progress3.append((c, t)),
+        workers=4,
+    ))
+    assert res3 == str(target3)
+    assert target3.read_bytes() == payload
+    # Progress must never exceed 100%
+    assert all(c <= t for c, t in progress3)
+    assert progress3[-1] == (size, size)
+
 
 # ---------------------------------------------------------------------------
 # Test 6: duplicate strategy resolution (skip / rename / overwrite)
@@ -472,3 +502,41 @@ def test_duplicate_strategy_resolution(tmp_path: Path) -> None:
 
         # Staging directory is clean after all promotions (os.replace is atomic)
         assert not any(incomplete.iterdir())
+
+
+# ---------------------------------------------------------------------------
+# Test 7: security headers middleware and CSP configuration
+# ---------------------------------------------------------------------------
+
+def test_security_headers_and_csp() -> None:
+    import httpx
+    from main import app
+
+    async def _check():
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as ac:
+            return await ac.get("/api/health")
+
+    resp = asyncio.run(_check())
+    assert resp.status_code == 200
+    assert resp.headers["x-content-type-options"] == "nosniff"
+    assert resp.headers["referrer-policy"] == "no-referrer"
+    assert resp.headers["x-frame-options"] == "SAMEORIGIN"
+    assert "frame-ancestors 'self'" in resp.headers["content-security-policy"]
+
+    # Verify static HTML pages do not include frame-ancestors in <meta>
+    # and correctly allow Font Awesome and background pattern domains
+    html_files = [
+        REPO_ROOT / "app" / "static" / "login.html",
+        REPO_ROOT / "app" / "static" / "view.html",
+        REPO_ROOT / "app" / "static" / "logs.html",
+    ]
+    for path in html_files:
+        content = path.read_text(encoding="utf-8")
+        assert "frame-ancestors" not in content, f"frame-ancestors should not be in meta tag in {path.name}"
+        assert "https://cdnjs.cloudflare.com" in content
+        assert "https://www.transparenttextures.com" in content
+        assert "/static/images/stardust.png" in content
+
+    assert (REPO_ROOT / "app" / "static" / "images" / "stardust.png").exists()
+
