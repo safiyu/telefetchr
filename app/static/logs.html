@@ -241,18 +241,39 @@
     </div>
 
     <script>
-        const token = localStorage.getItem('access_token');
+        let token = localStorage.getItem('access_token');
         let refreshInterval = null;
 
-        if (!token) {
-            window.location.href = '/';
-        }
-
         function getHeaders() {
-            return {
-                'Authorization': `Bearer ${token}`,
+            const headers = {
                 'Content-Type': 'application/json'
             };
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+            return headers;
+        }
+
+        async function initAuthAndLogs() {
+            if (!token) {
+                try {
+                    const res = await fetch('/auth/is-trusted');
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (!data.is_trusted) {
+                            window.location.href = '/';
+                            return;
+                        }
+                    } else {
+                        window.location.href = '/';
+                        return;
+                    }
+                } catch (e) {
+                    window.location.href = '/';
+                    return;
+                }
+            }
+            fetchLogs();
         }
 
         async function fetchLogs() {
@@ -345,8 +366,8 @@
             }
         }
 
-        // Initial fetch
-        fetchLogs();
+        // Initial auth check and fetch
+        initAuthAndLogs();
     </script>
 </body>
 

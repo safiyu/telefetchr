@@ -66,7 +66,7 @@ def _load_or_create_secret_key() -> str:
 
 class Config:
     """Application configuration"""
-    VERSION = "2.0.2"
+    VERSION = "2.1.0"
     # Telegram API Configuration
     API_ID = os.getenv("API_ID")
     API_HASH = os.getenv("API_HASH")
@@ -90,6 +90,9 @@ class Config:
     #   overwrite - replace the existing destination file
     #   rename    - append an incremental counter: name (1).ext, name (2).ext, ...
     DUPLICATE_STRATEGY: str = os.getenv("DUPLICATE_STRATEGY", "skip").lower()
+
+    # Disk Space Configuration: safety margin (in MB) required beyond file size
+    MIN_FREE_DISK_SPACE_MB: int = int(os.getenv("MIN_FREE_DISK_SPACE_MB", "500"))
 
     # Session Configuration
     SESSION_DIR = os.path.abspath('sessions')

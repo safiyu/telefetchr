@@ -311,10 +311,10 @@ class TelegramService:
         else:
             effective_workers = min(workers, Config.DOWNLOAD_WORKERS)
 
-        request_chunk_size = 1024 * 1024  # 1MB aligned chunks
+        request_chunk_size = 512 * 1024  # 512KB chunks (Telethon MAX_CHUNK_SIZE for direct downloads)
         part_size = math.ceil(file_size / effective_workers)
-        # Align part_size to 1MB chunk boundaries
-        aligned_part_size = math.ceil(part_size / request_chunk_size) * request_chunk_size
+        # Align worker partition boundaries to 1MB chunk boundaries
+        aligned_part_size = math.ceil(part_size / (1024 * 1024)) * (1024 * 1024)
 
         # Pre-allocate sparse target file using truncate
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
@@ -335,12 +335,13 @@ class TelegramService:
         async def worker(worker_id: int, start_byte: int, end_byte: int) -> None:
             nonlocal downloaded_bytes
             current_offset = start_byte
+            chunk_limit = math.ceil((end_byte - start_byte) / request_chunk_size)
 
             async for chunk in self.client.iter_download(
                 message.media,
                 offset=start_byte,
-                limit=end_byte - start_byte,
-                request_size=request_chunk_size
+                request_size=request_chunk_size,
+                limit=chunk_limit
             ):
                 if not chunk:
                     break

@@ -13,6 +13,11 @@ from app.utils.state_manager import StateManager
 logger = logging.getLogger(__name__)
 
 
+class InsufficientDiskSpaceError(Exception):
+    """Raised when available disk space is insufficient for the target download."""
+    pass
+
+
 class DownloadService:
     """Service for managing file downloads"""
 
@@ -68,6 +73,16 @@ class DownloadService:
                 # Already removed from queue, just log success
                 logger.debug(f"Queued item {file_id} finished successfully")
             else:
+                # Do not retry if stopped, cancelled globally, or file was individually cancelled
+                current_status = self.state_manager.get_status()
+                if (
+                    self._stop_queue
+                    or current_status.get("cancelled")
+                    or file_id in current_status.get("cancelled_files", {})
+                ):
+                    logger.info(f"Task {file_id} was cancelled, skipping retry")
+                    return
+
                 # If it failed, check retry count
                 retry_count = item.get("retry_count", 0)
                 if retry_count < 3: # MAX_RETRIES = 3
@@ -82,9 +97,19 @@ class DownloadService:
                     self.state_manager.add_to_queue([item])
                     self.start_queue_processor()
                 
-        except Exception as e:
+        except InsufficientDiskSpaceError as e:
+            logger.error(f"Cannot download queued item {file_id}: {e}")
+            self.state_manager.update_queue_item_status(file_id, "failed")
+            return
+        except (Exception, asyncio.CancelledError) as e:
             # Check for cancellation first - don't retry if manually cancelled
-            if isinstance(e, asyncio.CancelledError) or "cancelled" in str(e).lower():
+            current_status = self.state_manager.get_status()
+            if (
+                isinstance(e, asyncio.CancelledError)
+                or "cancelled" in str(e).lower()
+                or self._stop_queue
+                or current_status.get("cancelled")
+            ):
                 logger.info(f"Task {file_id} was cancelled, skipping retry")
                 return
 
@@ -281,6 +306,12 @@ class DownloadService:
                 message_list = await self.telegram_service.get_messages(channel_username, message_ids)
                 items_to_queue = []
                 skipped_count = 0
+
+                # Account for any messages that could not be retrieved (deleted, invalid, or no media)
+                missing_count = len(message_ids) - len(message_list)
+                if missing_count > 0:
+                    logger.warning(f"Could not retrieve {missing_count} requested messages from {channel_username}")
+                    skipped_count += missing_count
                 
                 for idx, msg in enumerate(message_list):
                     # Update scan progress
@@ -381,7 +412,7 @@ class DownloadService:
                             count += 1
                             
                             # Update scan progress
-                            if limit > 0:
+                            if limit is not None and limit > 0:
                                 scan_pct = min(int(count / limit * 100), 99)  # Cap at 99% until complete
                                 self.state_manager.update_status({"scan_progress": scan_pct})
                             
@@ -477,6 +508,26 @@ class DownloadService:
                 destination_path = os.path.join(target_dir, file_name)
 
         staging_path = os.path.join(Config.INCOMPLETE_PATH, f"{file_id}_{file_name}")
+
+        # Free disk space pre-flight check
+        expected_size = 0
+        if hasattr(message, "media") and message.media:
+            if hasattr(message.media, "document") and hasattr(message.media.document, "size"):
+                expected_size = message.media.document.size
+
+        if expected_size > 0:
+            import shutil
+            try:
+                _, _, free_bytes = shutil.disk_usage(Config.SAVE_PATH)
+                safety_margin = Config.MIN_FREE_DISK_SPACE_MB * 1024 * 1024
+                if free_bytes < (expected_size + safety_margin):
+                    raise InsufficientDiskSpaceError(
+                        f"Insufficient disk space on {Config.SAVE_PATH} for {file_name}: "
+                        f"{free_bytes / (1024 * 1024):.1f}MB free, "
+                        f"{(expected_size + safety_margin) / (1024 * 1024):.1f}MB required."
+                    )
+            except OSError as e:
+                logger.warning(f"Failed to check disk usage: {e}")
 
         for attempt in range(max_retries):
             try:

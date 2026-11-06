@@ -1,15 +1,12 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
+import bcrypt
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from fastapi import HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.config import Config
 from app.models.schemas import TokenData
-
-# Password hashing context
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # HTTP Bearer token security
 security = HTTPBearer()
@@ -19,17 +16,23 @@ class AuthService:
     """Service for handling authentication"""
 
     def __init__(self):
-        self.pwd_context = pwd_context
         # Hash the admin password on initialization
         self.admin_password_hash = self.get_password_hash(Config.ADMIN_PASSWORD)
 
     def verify_password(self, plain_password: str, hashed_password: str) -> bool:
-        """Verify a password against its hash"""
-        return self.pwd_context.verify(plain_password, hashed_password)
+        """Verify a password against its bcrypt hash"""
+        try:
+            return bcrypt.checkpw(
+                plain_password.encode("utf-8"),
+                hashed_password.encode("utf-8")
+            )
+        except (ValueError, TypeError):
+            return False
 
     def get_password_hash(self, password: str) -> str:
-        """Hash a password"""
-        return self.pwd_context.hash(password)
+        """Hash a password using native bcrypt"""
+        salt = bcrypt.gensalt()
+        return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
 
     def authenticate_user(self, username: str, password: str) -> bool:
         """Authenticate a user"""
@@ -43,9 +46,9 @@ class AuthService:
         """Create a JWT access token"""
         to_encode = data.copy()
         if expires_delta:
-            expire = datetime.utcnow() + expires_delta
+            expire = datetime.now(timezone.utc) + expires_delta
         else:
-            expire = datetime.utcnow() + timedelta(minutes=Config.ACCESS_TOKEN_EXPIRE_MINUTES)
+            expire = datetime.now(timezone.utc) + timedelta(minutes=Config.ACCESS_TOKEN_EXPIRE_MINUTES)
 
         to_encode.update({"exp": expire})
         encoded_jwt = jwt.encode(to_encode, Config.SECRET_KEY, algorithm=Config.ALGORITHM)

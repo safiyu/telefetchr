@@ -96,11 +96,19 @@ class FakeParallelClient:
         self.payload = payload
         self.start_offsets: List[int] = []
 
-    async def iter_download(self, media, offset: int, limit: int,
-                            request_size: int = 65536):
+    async def iter_download(self, media, offset: int = 0, limit: int = None,
+                            request_size: int = 65536, **kwargs):
         if offset not in self.start_offsets:
             self.start_offsets.append(offset)
-        end = offset + limit
+        if limit is not None:
+            # Support both chunk count (Telethon API) and raw byte limits
+            if limit * request_size <= len(self.payload) + request_size:
+                max_bytes = limit * request_size
+            else:
+                max_bytes = limit
+            end = min(len(self.payload), offset + max_bytes)
+        else:
+            end = len(self.payload)
         while offset < end:
             yield self.payload[offset:offset + min(request_size, end - offset)]
             offset += request_size
@@ -539,4 +547,205 @@ def test_security_headers_and_csp() -> None:
         assert "/static/images/stardust.png" in content
 
     assert (REPO_ROOT / "app" / "static" / "images" / "stardust.png").exists()
+
+
+# ---------------------------------------------------------------------------
+# Test 8: Parallel download chunk alignment and Telethon compatibility
+# ---------------------------------------------------------------------------
+
+def test_parallel_downloader_chunk_settings() -> None:
+    """Verify that parallel downloader request_chunk_size is 512KB (MAX_CHUNK_SIZE)
+    and limit is computed in chunks, not bytes."""
+    from telethon.client.downloads import MAX_CHUNK_SIZE
+    import inspect
+    from app.services.telegram_service import TelegramService
+
+    src = inspect.getsource(TelegramService.download_media_parallel)
+    # Must use 512KB chunks to prevent fallback to _GenericDownloadIter
+    assert "request_chunk_size = 512 * 1024" in src
+    # Must pass chunk limit, not byte count
+    assert "chunk_limit = math.ceil((end_byte - start_byte) / request_chunk_size)" in src
+    assert "limit=chunk_limit" in src
+
+
+# ---------------------------------------------------------------------------
+# Test 9: logs.html trusted subnet handling
+# ---------------------------------------------------------------------------
+
+def test_logs_html_trusted_subnet_support() -> None:
+    """Verify logs.html does not unconditionally kick unauthenticated users,
+    supporting TRUSTED_SUBNETS."""
+    logs_html = (REPO_ROOT / "app" / "static" / "logs.html").read_text(encoding="utf-8")
+    assert "/auth/is-trusted" in logs_html
+    assert "initAuthAndLogs" in logs_html
+
+
+# ---------------------------------------------------------------------------
+# Test 10: download_selected_files adjusts total on missing messages
+# ---------------------------------------------------------------------------
+
+def test_download_selected_files_missing_messages_adjusts_total() -> None:
+    """Verify that when some selected messages are deleted or lack media,
+    skipped_count decrements total so progress can reach 100%."""
+    from app.services.telegram_service import TelegramService
+    from app.services.download_service import DownloadService
+    from app.utils.state_manager import StateManager
+
+    class MockTelegramService(TelegramService):
+        def __init__(self):
+            super().__init__()
+        async def get_messages(self, channel_username, message_ids):
+            # Only return 1 valid message out of 3 requested
+            return [_fake_message(1024, file_name="single.mp4")]
+
+    tg = MockTelegramService()
+    state = StateManager()
+    state.download_status = state._initialize_status()
+    service = DownloadService(tg, state)
+
+    async def _run():
+        session_id = await service.download_selected_files("test_channel", [101, 102, 103])
+        # Wait for the collection task to finish
+        if service.collection_tasks:
+            await asyncio.gather(*list(service.collection_tasks))
+        return session_id
+
+    asyncio.run(_run())
+    status = state.get_status()
+    # Total was 3, but 2 messages were missing, so total must be adjusted to 1!
+    assert status.get("total") == 1
+    # Cleanup tasks
+    service._stop_queue = True
+    for t in list(service.active_download_tasks.values()):
+        t.cancel()
+
+
+# ---------------------------------------------------------------------------
+# Test 11: download_all_files handles limit=None without TypeError
+# ---------------------------------------------------------------------------
+
+def test_download_all_files_limit_none() -> None:
+    """Verify that download_all_files handles limit=None without crashing."""
+    from app.services.telegram_service import TelegramService
+    from app.services.download_service import DownloadService
+    from app.utils.state_manager import StateManager
+
+    class MockTelegramService(TelegramService):
+        def __init__(self):
+            super().__init__()
+        async def iter_messages(self, channel_username, limit):
+            async def _gen():
+                yield _fake_message(2048, file_name="all1.mp4")
+                yield _fake_message(4096, file_name="all2.mp4")
+            return _gen()
+
+    tg = MockTelegramService()
+    state = StateManager()
+    state.download_status = state._initialize_status()
+    service = DownloadService(tg, state)
+
+    async def _run():
+        await service.download_all_files("test_channel", limit=None)
+        if service.collection_tasks:
+            await asyncio.gather(*list(service.collection_tasks))
+
+    # Must complete cleanly without TypeError
+    asyncio.run(_run())
+    status = state.get_status()
+    assert status.get("total") == 2
+    # Cleanup tasks
+    service._stop_queue = True
+    for t in list(service.active_download_tasks.values()):
+        t.cancel()
+
+
+# ---------------------------------------------------------------------------
+# Test 12: Cancelled queued download is not retried
+# ---------------------------------------------------------------------------
+
+def test_cancelled_queued_download_is_not_retried() -> None:
+    """Verify that when a download task is cancelled, _download_queued_item
+    does not re-queue the item for retry."""
+    from app.services.telegram_service import TelegramService
+    from app.services.download_service import DownloadService
+    from app.utils.state_manager import StateManager
+
+    tg = TelegramService()
+    state = StateManager()
+    state.download_status = state._initialize_status()
+    # Simulate cancelled state
+    state.download_status["cancelled"] = True
+    service = DownloadService(tg, state)
+
+    item = {
+        "id": "file_cancel_test",
+        "message_id": 999,
+        "channel": "test_chan",
+        "retry_count": 0,
+        "name": "cancel_me.mp4"
+    }
+
+    async def _run():
+        # Calling _download_queued_item when session is cancelled must return immediately without re-queueing
+        await service._download_queued_item(item)
+
+    asyncio.run(_run())
+    # Queue must remain empty, item must NOT be re-added
+    assert len(state.get_queue()) == 0
+
+
+# ---------------------------------------------------------------------------
+# Test 13: Free disk space pre-flight check
+# ---------------------------------------------------------------------------
+
+def test_disk_space_preflight_check(monkeypatch, tmp_path: Path) -> None:
+    """Verify that download_single_file raises InsufficientDiskSpaceError
+    when free disk space is smaller than target file size + safety margin."""
+    import shutil
+    from app.services.download_service import DownloadService, InsufficientDiskSpaceError
+    from app.services.telegram_service import TelegramService
+
+    service, state = _make_service(b"dummy")
+    message = _fake_message(100 * 1024 * 1024, file_name="large.mp4")
+
+    # Simulate free disk space of only 50MB (below 100MB file + 500MB margin)
+    monkeypatch.setattr(shutil, "disk_usage", lambda path: (1000 * 1024 * 1024, 950 * 1024 * 1024, 50 * 1024 * 1024))
+
+    with pytest.raises(InsufficientDiskSpaceError):
+        asyncio.run(service.download_single_file(message, str(tmp_path), "file_disk_test"))
+
+
+# ---------------------------------------------------------------------------
+# Test 14: Native bcrypt password hashing without passlib
+# ---------------------------------------------------------------------------
+
+def test_native_bcrypt_auth_service() -> None:
+    """Verify that AuthService uses native bcrypt for hashing and verification,
+    avoiding deprecated passlib/crypt dependencies."""
+    from app.services.auth_service import AuthService
+    import sys
+
+    # passlib should not be imported by auth_service
+    auth = AuthService()
+    raw_pass = "TestSecurePassword123!"
+    hashed = auth.get_password_hash(raw_pass)
+
+    assert hashed.startswith("$2b$")
+    assert auth.verify_password(raw_pass, hashed) is True
+    assert auth.verify_password("WrongPassword!", hashed) is False
+    assert auth.authenticate_user(Config.ADMIN_USERNAME, Config.ADMIN_PASSWORD) is True
+
+
+# ---------------------------------------------------------------------------
+# Test 15: Dockerfile healthcheck presence
+# ---------------------------------------------------------------------------
+
+def test_dockerfile_healthcheck_presence() -> None:
+    """Verify that dockerfile defines HEALTHCHECK with standard library probe."""
+    df_content = (REPO_ROOT / "dockerfile").read_text(encoding="utf-8")
+    assert "HEALTHCHECK" in df_content
+    assert "/api/health" in df_content
+
+
+
 

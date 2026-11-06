@@ -62,5 +62,9 @@ USER appuser
 # Expose port
 EXPOSE 9868
 
+# Healthcheck probe using standard library python
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:9868/api/health', timeout=4)" || exit 1
+
 # Run the application
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "9868"]
