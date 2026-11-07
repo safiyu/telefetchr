@@ -297,11 +297,10 @@
             scrollbar-width: none;
         }
 
-        /* Optimized smooth progress transition without layout reflow */
-        .progress-bar-gpu {
-            transform-origin: left center;
-            will-change: transform;
-            transition: transform 0.4s ease-out;
+        /* Optimized smooth progress transition */
+        .progress-bar-inner {
+            will-change: width;
+            transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         /* Accessibility: respect reduced motion preferences */
@@ -350,7 +349,7 @@
                     <span id="diskMetricText" class="text-amber-300 font-semibold font-mono whitespace-nowrap">-- GB free</span>
                 </div>
                 <div class="w-36 lg:w-48 bg-gray-950 h-2 rounded-full overflow-hidden border border-black/60 mt-1 relative">
-                    <div id="diskProgressBar" class="h-full bg-gradient-to-r from-amber-500 to-amber-300 transition-all duration-500 rounded-full" style="width: 0%"></div>
+                    <div id="diskProgressBar" class="h-full transition-all duration-500 rounded-full" style="width: 0%; background-color: #fbbf24; background-image: linear-gradient(90deg, #f59e0b, #fbbf24);"></div>
                 </div>
             </div>
         </div>
@@ -716,7 +715,7 @@
         </div>
     </main>
 
-    <script src="/static/js/script.js?v=40"></script>
+    <script src="/static/js/script.js?v=41"></script>
     <!-- Toast Container -->
     <div id="toastContainer"
         class="fixed bottom-8 left-4 right-4 sm:bottom-auto sm:top-6 sm:right-6 sm:left-auto flex flex-col items-center sm:items-end gap-3 pointer-events-none transition-all duration-300"

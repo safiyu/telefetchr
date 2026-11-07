@@ -452,11 +452,14 @@ async function loadDiskInfo() {
                 barEl.style.width = `${Math.min(100, Math.max(2, usedPct))}%`;
                 // Color threshold based on usage
                 if (usedPct > 90) {
-                    barEl.className = 'h-full bg-red-500 transition-all duration-500 rounded-full';
+                    barEl.style.backgroundColor = '#ef4444';
+                    barEl.style.backgroundImage = 'none';
                 } else if (usedPct > 75) {
-                    barEl.className = 'h-full bg-amber-400 transition-all duration-500 rounded-full';
+                    barEl.style.backgroundColor = '#fbbf24';
+                    barEl.style.backgroundImage = 'linear-gradient(90deg, #f59e0b, #fbbf24)';
                 } else {
-                    barEl.className = 'h-full bg-emerald-400 transition-all duration-500 rounded-full';
+                    barEl.style.backgroundColor = '#10b981';
+                    barEl.style.backgroundImage = 'linear-gradient(90deg, #059669, #34d399)';
                 }
             }
         }
@@ -2003,7 +2006,7 @@ function renderUnifiedActivity(data, preparedLists = null) {
         }
 
         container.innerHTML = `
-            <div id="activityEmptyState" class="text-center text-gray-500 py-12 animate-fade-in">
+            <div id="activityEmptyState" class="text-center text-gray-500 py-12">
                 <i class="fa-solid fa-inbox text-4xl mb-3 opacity-30"></i>
                 <p class="text-sm font-semibold text-gray-400">${escapeHtml(msg)}</p>
                 <p class="text-xs text-gray-500 mt-1">${escapeHtml(sub)}</p>
@@ -2012,7 +2015,106 @@ function renderUnifiedActivity(data, preparedLists = null) {
         return;
     }
 
-    container.innerHTML = itemsToRender.map(item => renderActivityRow(item)).join('');
+    // Remove empty state if present
+    const emptyState = document.getElementById('activityEmptyState');
+    if (emptyState) {
+        emptyState.remove();
+    }
+
+    // Surgical reconcile to avoid flashing or resetting active transitions
+    const desiredIds = new Set(itemsToRender.map(item => progressElId(item.id)));
+
+    // 1. Remove rows no longer present
+    const existingRows = container.querySelectorAll('.activity-row');
+    existingRows.forEach(row => {
+        if (!desiredIds.has(row.id)) {
+            row.remove();
+        }
+    });
+
+    // 2. Insert or update rows in order
+    let prevRow = null;
+    itemsToRender.forEach(item => {
+        const fileId = item.id;
+        const rowId = progressElId(fileId);
+        let existingRow = document.getElementById(rowId);
+
+        if (!existingRow) {
+            // New row
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = renderActivityRow(item).trim();
+            const newRow = tempDiv.firstElementChild;
+            if (prevRow) {
+                prevRow.after(newRow);
+            } else {
+                container.prepend(newRow);
+            }
+            prevRow = newRow;
+        } else {
+            // Row exists: check if status type changed
+            const currentType = existingRow.getAttribute('data-type');
+            if (currentType !== item.type) {
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = renderActivityRow(item).trim();
+                const replacement = tempDiv.firstElementChild;
+                existingRow.replaceWith(replacement);
+                existingRow = replacement;
+            } else {
+                // Same type: update in-place without touching outer DOM
+                updateActivityRowInPlace(existingRow, item);
+            }
+
+            // Sync DOM order
+            if (prevRow) {
+                if (existingRow.previousElementSibling !== prevRow) {
+                    prevRow.after(existingRow);
+                }
+            } else {
+                if (container.firstElementChild !== existingRow) {
+                    container.prepend(existingRow);
+                }
+            }
+            prevRow = existingRow;
+        }
+    });
+}
+
+function updateActivityRowInPlace(row, item) {
+    if (item.type === 'active') {
+        const pct = item.percentage || 0;
+        const cur = item.progress || 0;
+        const tot = item.total || 0;
+        const speedText = item.speed > 0 ? `${formatBytes(item.speed)}/s` : '';
+        const etaText = item.eta > 0 ? `ETA: ${formatTime(item.eta)}` : '';
+
+        // Smooth progress bar update
+        const bar = row.querySelector('.progress-bar-inner');
+        if (bar) {
+            bar.style.width = `${pct}%`;
+        }
+
+        // Badge update
+        const badge = row.querySelector('.row-badge');
+        if (badge) {
+            badge.innerHTML = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-yellow-500 bg-opacity-20 text-yellow-300 border border-yellow-500 border-opacity-40 flex items-center gap-1"><i class="fa-solid fa-spinner fa-spin text-[8px]"></i> Downloading ${pct}%</span>`;
+        }
+
+        // Details update (current/total bytes, speed, ETA)
+        const details = row.querySelector('.row-details');
+        if (details) {
+            details.innerHTML = `
+                <span class="text-yellow-400 font-mono font-medium">${formatBytes(cur)} / ${formatBytes(tot)}</span>
+                ${speedText ? `<span class="text-gray-400 font-mono">· ${speedText}</span>` : ''}
+                ${etaText ? `<span class="text-gray-400 font-mono">· ${etaText}</span>` : ''}
+            `;
+        }
+    } else if (item.type === 'queued') {
+        const qIdx = (item.queueIndex !== undefined) ? item.queueIndex + 1 : 1;
+        const badge = row.querySelector('.row-badge');
+        if (badge) {
+            badge.innerHTML = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-yellow-500 bg-opacity-20 text-yellow-300 border border-yellow-500 border-opacity-30">Queued #${qIdx}</span>`;
+        }
+    }
 }
 
 function renderActivityRow(item) {
@@ -2034,10 +2136,10 @@ function renderActivityRow(item) {
         const speedText = item.speed > 0 ? `${formatBytes(item.speed)}/s` : '';
         const etaText = item.eta > 0 ? `ETA: ${formatTime(item.eta)}` : '';
 
-        badgeHtml = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1"><i class="fa-solid fa-spinner fa-spin text-[8px]"></i> Downloading ${pct}%</span>`;
+        badgeHtml = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-yellow-500 bg-opacity-20 text-yellow-300 border border-yellow-500 border-opacity-40 flex items-center gap-1"><i class="fa-solid fa-spinner fa-spin text-[8px]"></i> Downloading ${pct}%</span>`;
 
         detailsHtml = `
-            <span class="text-amber-300 font-mono font-medium">${formatBytes(cur)} / ${formatBytes(tot)}</span>
+            <span class="text-yellow-400 font-mono font-medium">${formatBytes(cur)} / ${formatBytes(tot)}</span>
             ${speedText ? `<span class="text-gray-400 font-mono">· ${speedText}</span>` : ''}
             ${etaText ? `<span class="text-gray-400 font-mono">· ${etaText}</span>` : ''}
         `;
@@ -2051,14 +2153,14 @@ function renderActivityRow(item) {
         `;
 
         trackHtml = `
-            <div class="mt-2.5 h-2 w-full bg-gray-950 border border-black/70 rounded-full overflow-hidden relative shadow-inner">
-                <div class="progress-bar-gpu h-full bg-gradient-to-r from-amber-500 to-amber-300 rounded-full" 
-                     style="width: ${pct}%;"></div>
+            <div class="mt-2.5 h-3 w-full bg-gray-950 border border-black/80 rounded-full overflow-hidden relative shadow-inner">
+                <div class="progress-bar-inner h-full rounded-full transition-all duration-300 ease-out" 
+                     style="width: ${pct}%; background-color: #fbbf24; background-image: linear-gradient(90deg, #f59e0b, #fbbf24); box-shadow: 0 0 10px rgba(251, 191, 36, 0.45);"></div>
             </div>
         `;
     } else if (item.type === 'queued') {
         const qIdx = (item.queueIndex !== undefined) ? item.queueIndex + 1 : 1;
-        badgeHtml = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-yellow-500/20 text-yellow-300 border border-yellow-500/30">Queued #${qIdx}</span>`;
+        badgeHtml = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-yellow-500 bg-opacity-20 text-yellow-300 border border-yellow-500 border-opacity-30">Queued #${qIdx}</span>`;
         detailsHtml = `<span class="text-gray-400 italic">Waiting in line...</span>`;
         actionsHtml = `
             <button onclick="removeFromQueue(${jsStr(fileId)})" 
@@ -2072,10 +2174,10 @@ function renderActivityRow(item) {
         const cur = item.progress || 0;
         const tot = item.total || 0;
 
-        badgeHtml = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/30 flex items-center gap-1"><i class="fa-solid fa-pause text-[8px]"></i> Partial ${pct}%</span>`;
+        badgeHtml = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-red-500 bg-opacity-20 text-red-300 border border-red-500 border-opacity-30 flex items-center gap-1"><i class="fa-solid fa-pause text-[8px]"></i> Partial ${pct}%</span>`;
 
         detailsHtml = `
-            <span class="text-rose-300 font-mono">${formatBytes(cur)} of ${formatBytes(tot)}</span>
+            <span class="text-red-400 font-mono">${formatBytes(cur)} of ${formatBytes(tot)}</span>
             <span class="text-gray-500 text-[10px]">· Interrupted</span>
         `;
 
@@ -2093,12 +2195,12 @@ function renderActivityRow(item) {
         `;
 
         trackHtml = `
-            <div class="mt-2.5 h-1.5 w-full bg-gray-950 border border-black/70 rounded-full overflow-hidden relative shadow-inner">
-                <div class="h-full bg-rose-500/70 rounded-full" style="width: ${pct}%;"></div>
+            <div class="mt-2.5 h-2 w-full bg-gray-950 border border-black/80 rounded-full overflow-hidden relative shadow-inner">
+                <div class="h-full rounded-full" style="width: ${pct}%; background-color: #f43f5e;"></div>
             </div>
         `;
     } else if (item.type === 'failed') {
-        badgeHtml = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-red-500/20 text-red-300 border border-red-500/30 flex items-center gap-1"><i class="fa-solid fa-triangle-exclamation text-[8px]"></i> Failed</span>`;
+        badgeHtml = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-red-500 bg-opacity-20 text-red-300 border border-red-500 border-opacity-30 flex items-center gap-1"><i class="fa-solid fa-triangle-exclamation text-[8px]"></i> Failed</span>`;
         detailsHtml = `<span class="text-red-400 font-mono text-[10px]">Error occurred</span>`;
         actionsHtml = `
             <button onclick="retryIndividualDownload(${jsStr(fileId)})" 
@@ -2116,16 +2218,16 @@ function renderActivityRow(item) {
         const sizeStr = item.size ? formatBytes(item.size) : '';
         const timeStr = item.completed_at ? new Date(item.completed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
 
-        badgeHtml = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-green-500/20 text-green-300 border border-green-500/30 flex items-center gap-1"><i class="fa-solid fa-check text-[8px]"></i> Done</span>`;
+        badgeHtml = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-green-500 bg-opacity-20 text-green-300 border border-green-500 border-opacity-30 flex items-center gap-1"><i class="fa-solid fa-check text-[8px]"></i> Done</span>`;
 
         detailsHtml = `
-            ${sizeStr ? `<span class="text-green-300 font-mono font-medium">${sizeStr}</span>` : ''}
+            ${sizeStr ? `<span class="text-green-400 font-mono font-medium">${sizeStr}</span>` : ''}
             ${timeStr ? `<span class="text-gray-500 text-[10px]">· Finished at ${timeStr}</span>` : ''}
         `;
 
         actionsHtml = `
             <a href="/files/serve/${encodeURIComponent(fileName)}" target="_blank" 
-                class="w-7 h-7 rounded-lg bg-gray-700/50 hover:bg-amber-500 hover:text-black text-gray-300 flex items-center justify-center text-xs transition-all border border-black/50" 
+                class="w-7 h-7 rounded-lg bg-gray-700/50 hover:bg-yellow-400 hover:text-black text-gray-300 flex items-center justify-center text-xs transition-all border border-black/50" 
                 title="Open / Download File">
                 <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
             </a>
@@ -2138,7 +2240,7 @@ function renderActivityRow(item) {
     }
 
     return `
-        <div id="${progressId}" class="activity-row border-2 border-black rounded-xl p-3 sm:p-3.5 bg-gray-800/80 hover:bg-gray-800 transition-all shadow-[2px_2px_0px_rgba(0,0,0,0.3)] animate-fade-in" data-type="${item.type}">
+        <div id="${progressId}" class="activity-row border-2 border-black rounded-xl p-3 sm:p-3.5 bg-gray-800/80 hover:bg-gray-800 transition-colors shadow-[2px_2px_0px_rgba(0,0,0,0.3)]" data-type="${item.type}">
             <div class="flex items-start justify-between gap-3">
                 <div class="flex items-start gap-2.5 sm:gap-3 min-w-0 flex-1">
                     <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-gray-900 border border-black flex items-center justify-center flex-shrink-0 text-sm shadow-[1px_1px_0px_#000]">
@@ -2152,18 +2254,20 @@ function renderActivityRow(item) {
                         </div>
                         <div class="flex flex-wrap items-center gap-2 text-xs text-gray-400">
                             ${channelName ? `<span class="bg-gray-900 px-1.5 py-0.5 rounded text-[10px] font-mono text-gray-400 border border-black/40 truncate max-w-[120px]">${escapeHtml(channelName)}</span>` : ''}
-                            ${badgeHtml}
-                            ${detailsHtml}
+                            <span class="row-badge">${badgeHtml}</span>
+                            <span class="row-details flex items-center gap-2">${detailsHtml}</span>
                         </div>
                     </div>
                 </div>
 
-                <div class="flex items-center gap-1.5 flex-shrink-0">
+                <div class="row-actions flex items-center gap-1.5 flex-shrink-0">
                     ${actionsHtml}
                 </div>
             </div>
 
-            ${trackHtml}
+            <div class="row-track">
+                ${trackHtml}
+            </div>
         </div>
     `;
 }
