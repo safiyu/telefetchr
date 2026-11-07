@@ -283,12 +283,14 @@ class TelegramService:
         message, 
         file_path: str, 
         progress_callback: Optional[Callable[[int, int], None]] = None, 
-        workers: int = 4
+        workers: int = 4,
+        resume: bool = False
     ) -> str:
         """Download Telegram media using sparse file pre-allocation and direct os.pwrite range requests."""
         import os
         import math
         import asyncio
+        import json
         from app.config import Config
 
         # Determine file size
@@ -316,25 +318,99 @@ class TelegramService:
         # Align worker partition boundaries to 1MB chunk boundaries
         aligned_part_size = math.ceil(part_size / (1024 * 1024)) * (1024 * 1024)
 
-        # Pre-allocate sparse target file using truncate
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        fd = os.open(file_path, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0o644)
-        try:
-            os.ftruncate(fd, file_size)
-        except Exception:
-            os.close(fd)
-            if os.path.exists(file_path):
-                os.remove(file_path)
-            raise
+        meta_path = f"{file_path}.meta"
+        partitions = []
+        is_resuming = False
 
-        downloaded_bytes = 0
+        if resume and os.path.exists(file_path) and os.path.exists(meta_path):
+            try:
+                with open(meta_path, "r", encoding="utf-8") as f:
+                    saved_meta = json.load(f)
+                if (
+                    saved_meta.get("file_size") == file_size 
+                    and saved_meta.get("effective_workers") == effective_workers
+                    and saved_meta.get("aligned_part_size") == aligned_part_size
+                ):
+                    saved_parts = saved_meta.get("partitions", [])
+                    if len(saved_parts) == effective_workers:
+                        valid = True
+                        for idx, p in enumerate(saved_parts):
+                            expected_start = idx * aligned_part_size
+                            expected_end = min(expected_start + aligned_part_size, file_size)
+                            if (
+                                p.get("start") != expected_start 
+                                or p.get("end") != expected_end 
+                                or not (expected_start <= p.get("current", expected_start) <= expected_end)
+                            ):
+                                valid = False
+                                break
+                        if valid:
+                            partitions = saved_parts
+                            is_resuming = True
+                            logger.info(f"[RESUME] Resuming partial download for {file_path}")
+            except Exception as e:
+                logger.warning(f"[RESUME] Could not load resume metadata: {e}")
+
+        if not is_resuming:
+            partitions = []
+            for i in range(effective_workers):
+                start = i * aligned_part_size
+                end = min(start + aligned_part_size, file_size)
+                partitions.append({
+                    "worker_id": i,
+                    "start": start,
+                    "end": end,
+                    "current": start
+                })
+
+            # Pre-allocate sparse target file using truncate
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            fd = os.open(file_path, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0o644)
+            try:
+                os.ftruncate(fd, file_size)
+            except Exception:
+                os.close(fd)
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                raise
+        else:
+            fd = os.open(file_path, os.O_RDWR, 0o644)
+
+        def save_meta() -> None:
+            if not resume:
+                return
+            try:
+                tmp_meta = f"{meta_path}.tmp.{os.getpid()}"
+                with open(tmp_meta, "w", encoding="utf-8") as f:
+                    json.dump({
+                        "file_size": file_size,
+                        "effective_workers": effective_workers,
+                        "aligned_part_size": aligned_part_size,
+                        "partitions": partitions
+                    }, f)
+                os.replace(tmp_meta, meta_path)
+            except Exception as err:
+                logger.debug(f"[RESUME] Error saving meta: {err}")
+
+        # Save initial metadata when starting a fresh resumable download
+        if resume and not is_resuming:
+            save_meta()
+
+        downloaded_bytes = sum(max(0, p["current"] - p["start"]) for p in partitions)
         lock = asyncio.Lock()
         loop = asyncio.get_running_loop()
         last_callback_time = [datetime.now()]
 
+        if downloaded_bytes > 0 and progress_callback:
+            progress_callback(min(downloaded_bytes, file_size), file_size)
+
         async def worker(worker_id: int, start_byte: int, end_byte: int) -> None:
             nonlocal downloaded_bytes
             current_offset = start_byte
+
+            if current_offset >= end_byte:
+                return
+
             chunk_limit = math.ceil((end_byte - start_byte) / request_chunk_size)
 
             async for chunk in self.client.iter_download(
@@ -363,6 +439,7 @@ class TelegramService:
                 # Direct seek-free write at current offset using os.pwrite
                 await loop.run_in_executor(None, os.pwrite, fd, chunk, current_offset)
                 current_offset += chunk_len
+                partitions[worker_id]["current"] = current_offset
 
                 async with lock:
                     downloaded_bytes += chunk_len
@@ -372,25 +449,32 @@ class TelegramService:
                         if elapsed >= Config.DOWNLOAD_REQUEST_DELAY or downloaded_bytes >= file_size:
                             progress_callback(min(downloaded_bytes, file_size), file_size)
                             last_callback_time[0] = now
+                            save_meta()
 
                 if current_offset >= end_byte:
                     break
 
         tasks = []
         for i in range(effective_workers):
-            start = i * aligned_part_size
-            end = min(start + aligned_part_size, file_size)
-            if start >= file_size:
-                break
-            tasks.append(worker(i, start, end))
+            start = partitions[i]["current"]
+            end = partitions[i]["end"]
+            if start < end:
+                tasks.append(worker(i, start, end))
 
         try:
-            await asyncio.gather(*tasks)
+            if tasks:
+                await asyncio.gather(*tasks)
             if progress_callback:
                 progress_callback(file_size, file_size)
+            if resume and os.path.exists(meta_path):
+                try:
+                    os.remove(meta_path)
+                except OSError:
+                    pass
         except Exception as e:
             logger.error(f"Parallel download failed for {file_path}: {e}")
-            if os.path.exists(file_path):
+            save_meta()
+            if not resume and os.path.exists(file_path):
                 try:
                     os.remove(file_path)
                 except OSError:

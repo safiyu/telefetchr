@@ -446,6 +446,60 @@ def test_sparse_pwrite_zero_merge_simulation(tmp_path: Path) -> None:
     assert all(c <= t for c, t in progress3)
     assert progress3[-1] == (size, size)
 
+    # Resume test: an interrupted download with resume=True preserves partial chunks
+    # and resumes exactly where it left off, avoiding re-downloading from the beginning.
+    drop_after_bytes = 1024 * 1024  # 1MB
+    class InterruptedClient(FakeParallelClient):
+        def __init__(self, payload):
+            super().__init__(payload)
+            self.drop = True
+
+        async def iter_download(self, media, offset: int = 0, limit: int = None, request_size: int = 65536, **kwargs):
+            bytes_yielded = 0
+            async for chunk in super().iter_download(media, offset=offset, limit=limit, request_size=request_size, **kwargs):
+                if self.drop and bytes_yielded >= drop_after_bytes:
+                    raise RuntimeError("simulated interruption")
+                yield chunk
+                bytes_yielded += len(chunk)
+
+    tg4 = TelegramService()
+    client4 = InterruptedClient(payload)
+    tg4.client = client4
+    target4 = tmp_path / "out4" / "resumable.mp4"
+    target4.parent.mkdir(parents=True, exist_ok=True)
+    meta4 = Path(f"{target4}.meta")
+
+    with pytest.raises(RuntimeError, match="simulated interruption"):
+        asyncio.run(tg4.download_media_parallel(
+            _fake_message(size),
+            str(target4),
+            workers=4,
+            resume=True
+        ))
+
+    # Partial file and meta must be preserved
+    assert target4.exists()
+    assert meta4.exists()
+
+    # Resume phase: disable drop, call with resume=True
+    client4.drop = False
+    client4.start_offsets.clear()
+
+    res4 = asyncio.run(tg4.download_media_parallel(
+        _fake_message(size),
+        str(target4),
+        workers=4,
+        resume=True
+    ))
+
+    assert res4 == str(target4)
+    # File content must match byte-for-byte
+    assert target4.read_bytes() == payload
+    # Meta file must be cleaned up after completion
+    assert not meta4.exists()
+    # The worker that already downloaded 1MB did NOT start at byte 0
+    assert 0 not in client4.start_offsets
+
 
 # ---------------------------------------------------------------------------
 # Test 6: duplicate strategy resolution (skip / rename / overwrite)

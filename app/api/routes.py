@@ -447,6 +447,19 @@ async def clear_individual_download(file_id: str, current_user: str = Depends(ge
             state_manager.save_state()
 
     if found:
+        # Clean up partial staging and meta files if any exist
+        try:
+            incomplete_dir = Config.INCOMPLETE_PATH
+            if os.path.exists(incomplete_dir):
+                for fname in os.listdir(incomplete_dir):
+                    if fname.startswith(f"{file_id}_"):
+                        try:
+                            os.remove(os.path.join(incomplete_dir, fname))
+                        except OSError:
+                            pass
+        except Exception:
+            pass
+
         return {
             "status": "success",
             "message": f"Record for {file_id} cleared"

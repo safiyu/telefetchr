@@ -10,6 +10,10 @@ All epic victories and mysterious bugs that somehow became features are here.
 - Searchable Channel Combobox: Integrated a responsive, searchable dropdown combobox that smoothly handles large channel catalogs with search filtering, keyboard navigation, and mobile bottom-sheet styling.
 - Lightweight Fluid Animations: GPU-accelerated progress bar animations (`scaleX` / `opacity`) with battery/CPU saving visibility pausing and `prefers-reduced-motion` compliance.
 
+### Fixed
+- True Download Resumption: Parallel downloader now tracks worker partition byte offsets in a sidecar `.meta` file and preserves staging data upon cancellation or error, allowing resumed downloads to continue directly from where they stopped instead of re-downloading from the beginning.
+- UI Stability: Fixed progress bar flashing and missing fill caused by Tailwind color class mismatch and redundant row re-rendering on poll cycles; replaced with surgical DOM reconciliation and smooth CSS width transitions.
+
 ### Removed
 - Removed unused `/logs` console page and associated logging endpoints from web UI.
 

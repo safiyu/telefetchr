@@ -1,6 +1,7 @@
 import os
 import logging
 import asyncio
+import json
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from telethon.tl.types import MessageMediaDocument, MessageMediaPhoto
@@ -530,22 +531,45 @@ class DownloadService:
 
         for attempt in range(max_retries):
             try:
-                # Progress tracking updates
+                # Progress tracking updates with resume support
                 status = self.state_manager.get_status()
+
+                initial_progress = 0
+                initial_total = expected_size
+                initial_percentage = 0
+
+                meta_path = f"{staging_path}.meta"
+                if os.path.exists(staging_path) and os.path.exists(meta_path):
+                    try:
+                        with open(meta_path, "r", encoding="utf-8") as f:
+                            meta = json.load(f)
+                        if meta.get("file_size") == expected_size:
+                            parts = meta.get("partitions", [])
+                            initial_progress = sum(max(0, p.get("current", 0) - p.get("start", 0)) for p in parts)
+                            if expected_size > 0:
+                                initial_percentage = min(100, int((initial_progress / expected_size) * 100))
+                    except Exception as err:
+                        logger.debug(f"[RESUME] Could not read resume meta for {file_name}: {err}")
+                elif file_id in status.get("cancelled_files", {}):
+                    c_item = status["cancelled_files"][file_id]
+                    initial_progress = c_item.get("progress", 0)
+                    initial_total = c_item.get("total", expected_size)
+                    initial_percentage = c_item.get("percentage", 0)
+
                 status["concurrent_downloads"][file_id] = {
                     "id": file_id,
                     "name": file_name,
                     "channel": channel_identifier or (message.peer_id.channel_id if hasattr(message.peer_id, 'channel_id') else str(message.peer_id)),
                     "message_id": message.id,
-                    "progress": 0,
-                    "total": 0,
-                    "percentage": 0,
+                    "progress": initial_progress,
+                    "total": initial_total or expected_size,
+                    "percentage": initial_percentage,
                     "retry_attempt": attempt + 1 if attempt > 0 else None
                 }
                 self.state_manager.save_state()
 
                 last_progress_time = datetime.now()
-                last_progress_bytes = 0
+                last_progress_bytes = initial_progress
 
                 def progress_callback(current, total):
                     nonlocal last_progress_time, last_progress_bytes
@@ -565,7 +589,7 @@ class DownloadService:
                     time_diff = (now - last_progress_time).total_seconds()
                     
                     if time_diff >= 0.5 or current == total:
-                        bytes_diff = current - last_progress_bytes
+                        bytes_diff = max(0, current - last_progress_bytes)
                         speed = bytes_diff / time_diff if time_diff > 0 else 0
                         eta = (total - current) / speed if speed > 0 else 0
                         
@@ -579,22 +603,16 @@ class DownloadService:
                             item_status["percentage"] = min(100, int((current / total * 100))) if total > 0 else 0
                             item_status["speed"] = speed
                             item_status["eta"] = max(0, eta)
-                            # Offload the disk flush to the worker thread pool so the
-                            # event loop is never stalled by os.fsync() while
-                            # parallel MTProto chunk streaming is active.
-                            # schedule_progress_save is loop/thread-safe and
-                            # degrades to a synchronous write when no event loop
-                            # is available; redundant force=False flushes within
-                            # the 1.5s throttle window are dropped, not queued.
                             self.state_manager.schedule_progress_save(force=False)
 
                 try:
-                    # Use the parallel downloader for speed
+                    # Use the parallel downloader with resume support enabled
                     downloaded_file = await self.telegram_service.download_media_parallel(
                         message,
                         staging_path,
                         progress_callback=progress_callback,
-                        workers=Config.DOWNLOAD_WORKERS
+                        workers=Config.DOWNLOAD_WORKERS,
+                        resume=True
                     )
 
                     if downloaded_file and os.path.exists(staging_path):
@@ -616,11 +634,6 @@ class DownloadService:
                         return destination_path
 
                 except Exception as e:
-                    if os.path.exists(staging_path):
-                        try:
-                            os.remove(staging_path)
-                        except OSError:
-                            pass
                     if "cancelled" in str(e).lower():
                         raise
                     logger.error(f"Download attempt {attempt+1} failed for {file_name}: {e}")
@@ -997,7 +1010,10 @@ class DownloadService:
                 "priority": 1,
                 "status": "queued",
                 "session_id": session_id,
-                "retry_count": 0
+                "retry_count": 0,
+                "progress": item_data.get("progress", 0),
+                "total": item_data.get("total", 0),
+                "percentage": item_data.get("percentage", 0)
             }
 
             if status.get("total", 0) > 0:
