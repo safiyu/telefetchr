@@ -444,7 +444,7 @@ async function loadDiskInfo() {
 
             const mobileMetricEl = document.getElementById('diskMetricMobile');
             if (mobileMetricEl) {
-                mobileMetricEl.textContent = `${freeStr} free`;
+                mobileMetricEl.textContent = `${freeStr}`;
             }
 
             const barEl = document.getElementById('diskProgressBar');
@@ -953,10 +953,10 @@ async function listFiles() {
     }
 }
 
-function handleSortChange() {
-    const sortOption = document.getElementById("sortOption");
-    if (sortOption && window.currentScannedFiles) {
-        sortFiles(window.currentScannedFiles, sortOption.value);
+function handleSortChange(val = null) {
+    const sortVal = val || document.getElementById("sortOption")?.value || document.getElementById("sortOptionMobile")?.value;
+    if (sortVal && window.currentScannedFiles) {
+        sortFiles(window.currentScannedFiles, sortVal);
     }
 }
 
@@ -989,6 +989,8 @@ function sortFiles(files, option) {
     setTimeout(() => {
         const select = document.getElementById("sortOption");
         if (select) select.value = option;
+        const selectMobile = document.getElementById("sortOptionMobile");
+        if (selectMobile) selectMobile.value = option;
     }, 10);
 }
 
@@ -1005,31 +1007,63 @@ function displayFiles(files) {
     }
 
     let html = `
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
-            <h3 class="text-lg font-bold text-white flex items-center gap-2 italic uppercase">
-                <i class="fa-solid fa-folder-open text-amber-400"></i> Files Found
-            </h3>
-            <div class="flex flex-wrap gap-2 w-full sm:w-auto items-center">
-                <div class="relative mr-2">
-                    <select id="sortOption" onchange="handleSortChange()" class="appearance-none bg-gray-900 border border-gray-700 text-xs text-gray-300 py-1.5 pl-3 pr-8 rounded-xl focus:outline-none focus:border-amber-500 cursor-pointer">
-                        <option value="newest">Newest First</option>
-                        <option value="oldest">Oldest First</option>
-                        <option value="largest">Largest First</option>
-                        <option value="smallest">Smallest First</option>
+        <div class="mb-4 pb-3 border-b border-gray-700/60">
+            <!-- Row 1: Files Found header + Mobile Sort dropdown -->
+            <div class="flex items-center justify-between gap-3 mb-2.5">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2 italic uppercase">
+                    <i class="fa-solid fa-folder-open text-yellow-400"></i> Files Found
+                    <span class="text-xs font-normal font-mono text-gray-400 normal-case">(${files.length})</span>
+                </h3>
+                <!-- Sort Dropdown on mobile sits in the top header row -->
+                <div class="relative sm:hidden">
+                    <select id="sortOptionMobile" onchange="handleSortChange(this.value)" class="appearance-none bg-gray-900 border border-gray-700 text-xs text-gray-300 py-1.5 pl-2.5 pr-7 rounded-xl focus:outline-none focus:border-yellow-400 cursor-pointer shadow-[1px_1px_0px_#000]">
+                        <option value="newest">Newest</option>
+                        <option value="oldest">Oldest</option>
+                        <option value="largest">Largest</option>
+                        <option value="smallest">Smallest</option>
                         <option value="alpha">A-Z</option>
                         <option value="alpha_rev">Z-A</option>
                     </select>
                     <i class="fa-solid fa-sort absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-500 pointer-events-none"></i>
                 </div>
-                <button onclick="selectAllFiles()" class="flex-1 sm:flex-none py-1.5 px-3 rounded-xl btn-orange-hover flex items-center justify-center gap-1.5 focus:outline-none">
-                    <i class="fa-solid fa-check-double text-[10px]"></i> Select All
-                </button>
-                <button onclick="deselectAllFiles()" class="flex-1 sm:flex-none py-1.5 px-3 rounded-xl btn-orange-hover flex items-center justify-center gap-1.5 focus:outline-none">
-                    <i class="fa-solid fa-xmark text-[10px]"></i> Deselect
-                </button>
-                <button onclick="downloadSelected(${jsStr(currentChannel)})" id="downloadSelectedBtn" class="flex-1 sm:flex-none py-1.5 px-3 rounded-xl btn-yellow-hover text-[11px] flex items-center justify-center gap-1.5 focus:outline-none">
-                    <i class="fa-solid fa-download text-[10px]"></i> Download (<span id="selectedCount">0</span>)
-                </button>
+            </div>
+
+            <!-- Row 2: Clean action toolbar (Grouped selection buttons + Download Selected) -->
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
+                <!-- Grouped Selection Controls (Side-by-side 50/50 on mobile) -->
+                <div class="flex items-center gap-2 flex-1 sm:flex-initial">
+                    <button onclick="selectAllFiles()" type="button" 
+                        class="flex-1 sm:flex-initial py-1.5 px-3 rounded-xl btn-orange-hover text-xs font-semibold flex items-center justify-center gap-1.5 focus:outline-none whitespace-nowrap shadow-[1.5px_1.5px_0px_#000]">
+                        <i class="fa-solid fa-check-double text-[10px]"></i> <span>Select All</span>
+                    </button>
+                    <button onclick="deselectAllFiles()" type="button" 
+                        class="flex-1 sm:flex-initial py-1.5 px-3 rounded-xl btn-orange-hover text-xs font-semibold flex items-center justify-center gap-1.5 focus:outline-none whitespace-nowrap shadow-[1.5px_1.5px_0px_#000]">
+                        <i class="fa-solid fa-xmark text-[10px]"></i> <span>Deselect</span>
+                    </button>
+                </div>
+
+                <div class="flex items-center gap-2 w-full sm:w-auto">
+                    <!-- Sort Dropdown on desktop -->
+                    <div class="relative hidden sm:block">
+                        <select id="sortOption" onchange="handleSortChange(this.value)" class="appearance-none bg-gray-900 border border-gray-700 text-xs text-gray-300 py-1.5 pl-3 pr-8 rounded-xl focus:outline-none focus:border-yellow-400 cursor-pointer shadow-[1px_1px_0px_#000]">
+                            <option value="newest">Newest First</option>
+                            <option value="oldest">Oldest First</option>
+                            <option value="largest">Largest First</option>
+                            <option value="smallest">Smallest First</option>
+                            <option value="alpha">A-Z</option>
+                            <option value="alpha_rev">Z-A</option>
+                        </select>
+                        <i class="fa-solid fa-sort absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-500 pointer-events-none"></i>
+                    </div>
+
+                    <!-- Download Selected Button: Never wraps, clean badge -->
+                    <button onclick="downloadSelected(${jsStr(currentChannel)})" id="downloadSelectedBtn" type="button" 
+                        class="w-full sm:w-auto py-2 sm:py-1.5 px-3.5 rounded-xl btn-yellow-hover text-xs font-bold flex items-center justify-center gap-2 focus:outline-none whitespace-nowrap shadow-[2px_2px_0px_#000]">
+                        <i class="fa-solid fa-download text-xs"></i>
+                        <span>Download Selected</span>
+                        <span class="px-1.5 py-0.2 rounded bg-black bg-opacity-30 text-black font-mono font-bold text-[10px] ml-0.5"><span id="selectedCount">0</span></span>
+                    </button>
+                </div>
             </div>
         </div>
         <div class="grid grid-cols-1 gap-3">`;

@@ -323,15 +323,15 @@
 
     <!-- Sidebar / Navigation or Top Bar -->
     <header
-        class="glass-card m-2 sm:m-4 px-3 sm:px-6 py-2.5 sm:py-3.5 flex justify-between items-center sticky top-2 sm:top-4 z-40 gap-2">
-        <div class="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+        class="glass-card w-[calc(100%-1rem)] sm:w-[calc(100%-2rem)] max-w-7xl mx-auto my-2 sm:my-4 px-2.5 sm:px-6 py-2 sm:py-3.5 flex justify-between items-center sticky top-2 sm:top-4 z-40 gap-1.5 sm:gap-4 box-border">
+        <div class="flex items-center gap-2 sm:gap-3 min-w-0 flex-shrink">
             <img src="/static/images/logo.png?v=2" alt="TeleFetchr Logo"
-                class="h-9 sm:h-12 w-9 sm:w-12 border-2 border-black shadow-[3px_3px_0px_#000] rounded-full object-cover"
+                class="h-8 w-8 sm:h-11 sm:w-11 border-2 border-black shadow-[2px_2px_0px_#000] rounded-full object-cover flex-shrink-0"
                 style="clip-path: circle(50%);" />
-            <div class="flex flex-col">
-                <h1 class="text-base sm:text-2xl font-bold tracking-tight header-gradient leading-tight">TeleFetchr</h1>
+            <div class="flex flex-col min-w-0">
+                <h1 class="text-sm sm:text-2xl font-bold tracking-tight header-gradient leading-tight truncate">TeleFetchr</h1>
                 <button onclick="showAbout()"
-                    class="text-[9px] sm:text-[10px] text-gray-400 hover:text-amber-400 font-mono tracking-wider transition-colors text-left cursor-pointer"
+                    class="text-[9px] sm:text-[10px] text-gray-400 hover:text-yellow-400 font-mono tracking-wider transition-colors text-left cursor-pointer truncate"
                     title="Click to view changelog">
                     <span id="appVersion"></span>
                 </button>
@@ -340,13 +340,13 @@
 
         <!-- Disk Total Meter for Configured Directory (Desktop / Tablet) -->
         <div id="diskWidget" class="hidden md:flex items-center gap-3 px-3.5 py-1.5 rounded-xl bg-gray-900/80 border border-black shadow-[2px_2px_0px_#000]" title="Disk space for configured download directory">
-            <div class="w-8 h-8 rounded-lg bg-amber-500/15 flex items-center justify-center text-amber-400 border border-black flex-shrink-0">
+            <div class="w-8 h-8 rounded-lg bg-yellow-500/15 flex items-center justify-center text-yellow-400 border border-black flex-shrink-0">
                 <i class="fa-solid fa-hard-drive text-sm"></i>
             </div>
             <div class="flex flex-col min-w-0">
                 <div class="flex items-center justify-between text-[11px] gap-3">
                     <span id="diskPathText" class="font-mono text-gray-300 font-semibold truncate max-w-[140px]" title="/downloads">/downloads</span>
-                    <span id="diskMetricText" class="text-amber-300 font-semibold font-mono whitespace-nowrap">-- GB free</span>
+                    <span id="diskMetricText" class="text-yellow-300 font-semibold font-mono whitespace-nowrap">-- GB free</span>
                 </div>
                 <div class="w-36 lg:w-48 bg-gray-950 h-2 rounded-full overflow-hidden border border-black/60 mt-1 relative">
                     <div id="diskProgressBar" class="h-full transition-all duration-500 rounded-full" style="width: 0%; background-color: #fbbf24; background-image: linear-gradient(90deg, #f59e0b, #fbbf24);"></div>
@@ -354,33 +354,33 @@
             </div>
         </div>
 
-        <div id="statusBadge" class="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+        <div id="statusBadge" class="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
             <!-- Mobile Disk Pill (< 768px) -->
-            <div id="diskWidgetMobile" class="md:hidden flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gray-900/90 border border-black text-[10px] text-amber-300 font-mono font-medium shadow-[1.5px_1.5px_0px_#000]" title="Configured directory disk free">
-                <i class="fa-solid fa-hard-drive text-amber-400 text-xs"></i>
+            <div id="diskWidgetMobile" class="md:hidden flex items-center gap-1 px-2 py-0.5 rounded-lg bg-gray-900/90 border border-black text-[10px] text-yellow-300 font-mono font-medium shadow-[1.5px_1.5px_0px_#000]" title="Configured directory disk free">
+                <i class="fa-solid fa-hard-drive text-yellow-400 text-[11px]"></i>
                 <span id="diskMetricMobile">--</span>
             </div>
 
             <!-- Connection Status -->
             <div id="connectionStatus" class="flex items-center">
-                <span class="relative flex h-2.5 w-2.5 sm:h-3 sm:w-3">
-                    <span class="relative inline-flex rounded-full h-2.5 w-2.5 sm:h-3 sm:w-3 bg-green-500"></span>
+                <span class="relative flex h-2 w-2 sm:h-3 sm:w-3">
+                    <span class="relative inline-flex rounded-full h-2 w-2 sm:h-3 sm:w-3 bg-green-500"></span>
                 </span>
                 <span class="hidden lg:inline ml-1.5 text-xs font-medium text-green-400">Connected</span>
             </div>
 
             <!-- Action Buttons (No console link) -->
-            <div class="flex items-center gap-1 sm:gap-2 pl-2 sm:pl-3 border-l border-gray-700/60" id="userInfoActions">
+            <div class="flex items-center gap-1 sm:gap-2 pl-1.5 sm:pl-3 border-l border-gray-700/60" id="userInfoActions">
                 <span id="userInfo" class="text-xs font-medium text-gray-300 hidden xl:inline-block"></span>
                 <button onclick="logoutSession()"
-                    class="bg-red-500/15 border border-black text-red-400 hover:bg-red-500 hover:text-white hover:-translate-y-0.5 hover:shadow-[2px_2px_0px_#000] transition-all p-1.5 sm:p-2 rounded-xl focus:outline-none"
+                    class="bg-red-500/15 border border-black text-red-400 hover:bg-red-500 hover:text-white hover:-translate-y-0.5 hover:shadow-[2px_2px_0px_#000] transition-all w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-lg sm:rounded-xl focus:outline-none"
                     title="Delete Session">
-                    <i class="fa-solid fa-power-off text-xs sm:text-sm"></i>
+                    <i class="fa-solid fa-power-off text-xs"></i>
                 </button>
                 <button onclick="logout()"
-                    class="bg-gray-500/15 border border-black text-gray-400 hover:bg-gray-600 hover:text-white hover:-translate-y-0.5 hover:shadow-[2px_2px_0px_#000] transition-all p-1.5 sm:p-2 rounded-xl focus:outline-none"
+                    class="bg-gray-500/15 border border-black text-gray-400 hover:bg-gray-600 hover:text-white hover:-translate-y-0.5 hover:shadow-[2px_2px_0px_#000] transition-all w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-lg sm:rounded-xl focus:outline-none"
                     title="Logout">
-                    <i class="fa-solid fa-sign-out-alt text-xs sm:text-sm"></i>
+                    <i class="fa-solid fa-sign-out-alt text-xs"></i>
                 </button>
             </div>
         </div>
@@ -715,7 +715,7 @@
         </div>
     </main>
 
-    <script src="/static/js/script.js?v=41"></script>
+    <script src="/static/js/script.js?v=42"></script>
     <!-- Toast Container -->
     <div id="toastContainer"
         class="fixed bottom-8 left-4 right-4 sm:bottom-auto sm:top-6 sm:right-6 sm:left-auto flex flex-col items-center sm:items-end gap-3 pointer-events-none transition-all duration-300"
