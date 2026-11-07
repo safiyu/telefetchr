@@ -2,6 +2,17 @@
 
 All epic victories and mysterious bugs that somehow became features are here.
 
+## [4.0.0] - 2026-11-07
+### Added
+- Unified Activity Screen: Replaced fragmented tabs (Search/Queue) and active/history split with a single-screen feed showing Downloading, Queued, Partial, and Completed items with instant filter chips.
+- Partial Download History & Direct Resume: Interrupted/cancelled downloads retain their exact partial progress and can be individually resumed or retried with one click; removed obstructive modal/banner popups.
+- Top Bar Disk Widget: Added real-time disk space usage (free/total) and visual progress meter for the configured download directory in the top bar.
+- Searchable Channel Combobox: Integrated a responsive, searchable dropdown combobox that smoothly handles large channel catalogs with search filtering, keyboard navigation, and mobile bottom-sheet styling.
+- Lightweight Fluid Animations: GPU-accelerated progress bar animations (`scaleX` / `opacity`) with battery/CPU saving visibility pausing and `prefers-reduced-motion` compliance.
+
+### Removed
+- Removed unused `/logs` console page and associated logging endpoints from web UI.
+
 ## [2.0.0] - 2026-10-20
 ### Added
 - Zero-merge download engine: sparse-file preallocation with parallel range workers (`os.pwrite`), eliminating multi-gigabyte merge phases.

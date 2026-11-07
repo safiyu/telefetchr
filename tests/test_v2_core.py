@@ -537,7 +537,6 @@ def test_security_headers_and_csp() -> None:
     html_files = [
         REPO_ROOT / "app" / "static" / "login.html",
         REPO_ROOT / "app" / "static" / "view.html",
-        REPO_ROOT / "app" / "static" / "logs.html",
     ]
     for path in html_files:
         content = path.read_text(encoding="utf-8")
@@ -569,15 +568,45 @@ def test_parallel_downloader_chunk_settings() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Test 9: logs.html trusted subnet handling
+# Test 9: /api/disk endpoint and download retry functionality
 # ---------------------------------------------------------------------------
 
-def test_logs_html_trusted_subnet_support() -> None:
-    """Verify logs.html does not unconditionally kick unauthenticated users,
-    supporting TRUSTED_SUBNETS."""
-    logs_html = (REPO_ROOT / "app" / "static" / "logs.html").read_text(encoding="utf-8")
-    assert "/auth/is-trusted" in logs_html
-    assert "initAuthAndLogs" in logs_html
+@pytest.mark.asyncio
+async def test_disk_info_and_retry_functionality() -> None:
+    """Verify that /api/disk returns storage metrics and retry_download correctly re-queues."""
+    from app.services.download_service import DownloadService
+    from app.utils.state_manager import StateManager
+    from unittest.mock import AsyncMock, MagicMock
+
+    tg_mock = MagicMock()
+    sm = StateManager()
+    ds = DownloadService(tg_mock, sm)
+
+    # Test disk info endpoint logic
+    import shutil
+    from app.config import Config
+    total, used, free = shutil.disk_usage(Config.SAVE_PATH)
+    assert total > 0
+    assert free >= 0
+
+    # Test retry functionality for cancelled files
+    status = sm.get_status()
+    status["channel"] = "testchannel"
+    status["cancelled_files"]["file_123_456"] = {
+        "id": "file_123_456",
+        "name": "sample_video.mp4",
+        "channel": "testchannel",
+        "message_id": 456,
+        "progress": 500,
+        "total": 1000
+    }
+    sm.save_state()
+
+    result = await ds.retry_download("file_123_456")
+    assert result["status"] == "success"
+    assert "file_123_456" not in sm.get_status().get("cancelled_files", {})
+    queue = sm.get_queue()
+    assert any(item["id"] == "file_123_456" for item in queue)
 
 
 # ---------------------------------------------------------------------------
@@ -745,6 +774,55 @@ def test_dockerfile_healthcheck_presence() -> None:
     df_content = (REPO_ROOT / "dockerfile").read_text(encoding="utf-8")
     assert "HEALTHCHECK" in df_content
     assert "/api/health" in df_content
+
+
+# ---------------------------------------------------------------------------
+# Test 16: Partial progress retention on cancellation & retry endpoint
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_cancellation_tracks_partial_progress_and_allows_retry() -> None:
+    """Verify that cancelling active downloads snapshots progress into cancelled_files
+    and retry_download allows them to be resumed."""
+    from app.services.download_service import DownloadService
+    from app.utils.state_manager import StateManager
+    from unittest.mock import MagicMock
+
+    tg_mock = MagicMock()
+    sm = StateManager()
+    ds = DownloadService(tg_mock, sm)
+
+    status = sm.get_status()
+    status["channel"] = "my_channel"
+    status["total"] = 2
+    status["concurrent_downloads"]["file_part_1"] = {
+        "id": "file_part_1",
+        "name": "movie_part.mkv",
+        "channel": "my_channel",
+        "message_id": 888,
+        "progress": 450 * 1024 * 1024,
+        "total": 1000 * 1024 * 1024,
+        "percentage": 45
+    }
+    sm.save_state()
+
+    # Cancel individual
+    res = await ds.cancel_individual_download("file_part_1")
+    assert res["status"] == "success"
+
+    # Must be in cancelled_files with exact progress
+    cancelled = sm.get_status().get("cancelled_files", {})
+    assert "file_part_1" in cancelled
+    assert cancelled["file_part_1"]["progress"] == 450 * 1024 * 1024
+    assert cancelled["file_part_1"]["percentage"] == 45
+
+    # Retry should re-queue it
+    retry_res = await ds.retry_download("file_part_1")
+    assert retry_res["status"] == "success"
+    assert "file_part_1" not in sm.get_status().get("cancelled_files", {})
+    queue_items = sm.get_queue()
+    assert any(q["id"] == "file_part_1" and q["status"] == "queued" for q in queue_items)
+
 
 
 

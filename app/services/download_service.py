@@ -268,8 +268,7 @@ class DownloadService:
             "started_at": datetime.now().isoformat(),
             "total": total_count,
             "progress": 0, # Reset progress counter
-            "concurrent_downloads": {},
-            "cancelled_files": {}
+            "concurrent_downloads": {}
         })
 
     async def download_selected_files(self, channel_username: str, message_ids: List[int]) -> str:
@@ -681,6 +680,23 @@ class DownloadService:
             for qid in [item["id"] for item in queue]:
                 self.state_manager.remove_from_queue(qid)
         
+        # Snapshot concurrent downloads into cancelled_files before clearing
+        status = self.state_manager.get_status()
+        concurrent = status.get("concurrent_downloads", {})
+        if "cancelled_files" not in status:
+            status["cancelled_files"] = {}
+        for fid, cdata in list(concurrent.items()):
+            status["cancelled_files"][fid] = {
+                "id": fid,
+                "name": cdata.get("name"),
+                "channel": cdata.get("channel"),
+                "message_id": cdata.get("message_id"),
+                "progress": cdata.get("progress", 0),
+                "total": cdata.get("total", 0),
+                "percentage": cdata.get("percentage", 0),
+                "cancelled_at": datetime.now().isoformat()
+            }
+
         # Update state cleanly
         self.state_manager.update_status({
             "cancelled": True,
@@ -891,8 +907,20 @@ class DownloadService:
         
         if file_id in concurrent:
             data = concurrent[file_id]
-            # Just remove it
+            # Move to cancelled_files
             del status["concurrent_downloads"][file_id]
+            if "cancelled_files" not in status:
+                status["cancelled_files"] = {}
+            status["cancelled_files"][file_id] = {
+                "id": file_id,
+                "name": data.get("name"),
+                "channel": data.get("channel"),
+                "message_id": data.get("message_id"),
+                "progress": data.get("progress", 0),
+                "total": data.get("total", 0),
+                "percentage": data.get("percentage", 0),
+                "cancelled_at": datetime.now().isoformat()
+            }
             
             # Decrement session total so UI doesn't wait for "phantom" files
             if status.get("total", 0) > 0:
@@ -936,6 +964,64 @@ class DownloadService:
                 return {"status": "success", "message": f"Item {item.get('name')} removed from queue."}
         
         return {"status": "error", "message": "Download not found or already finished."}
+
+    async def retry_download(self, file_id: str) -> Dict[str, Any]:
+        """Retry a cancelled, failed, or partial download item"""
+        status = self.state_manager.get_status()
+        cancelled = status.get("cancelled_files", {})
+        queue = self.state_manager.get_queue()
+
+        if file_id in cancelled:
+            item_data = cancelled.pop(file_id)
+            message_id = item_data.get("message_id")
+            channel = item_data.get("channel") or status.get("channel")
+            name = item_data.get("name")
+            session_id = status.get("session_id") or str(uuid.uuid4())
+
+            if not message_id:
+                try:
+                    message_id = int(file_id.split("_")[-1])
+                except Exception:
+                    pass
+
+            if not channel or not message_id:
+                # Put it back if cannot retry
+                cancelled[file_id] = item_data
+                return {"status": "error", "message": "Cannot retry: channel or message ID missing"}
+
+            queue_item = {
+                "id": file_id,
+                "message_id": int(message_id),
+                "channel": channel,
+                "name": name or f"file_{message_id}",
+                "priority": 1,
+                "status": "queued",
+                "session_id": session_id,
+                "retry_count": 0
+            }
+
+            if status.get("total", 0) > 0:
+                status["total"] += 1
+            status["active"] = True
+            status["cancelled"] = False
+            self.state_manager.save_state()
+
+            self.state_manager.add_to_queue([queue_item])
+            self.start_queue_processor()
+            return {"status": "success", "message": f"Queued {name or file_id} for retry"}
+
+        # Check if item is in queue with status 'failed'
+        for q_item in queue:
+            if q_item.get("id") == file_id:
+                q_item["status"] = "queued"
+                q_item["retry_count"] = 0
+                status["active"] = True
+                status["cancelled"] = False
+                self.state_manager.save_state()
+                self.start_queue_processor()
+                return {"status": "success", "message": f"Queued {q_item.get('name', file_id)} for retry"}
+
+        return {"status": "error", "message": f"Download {file_id} not found in cancelled or failed records."}
 
     def get_status_as_dict(self) -> Dict[str, Any]:
         """Get the current download status, augmented with live service info"""

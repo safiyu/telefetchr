@@ -18,3 +18,5 @@ sessions/*
 *.log
 
 # Old files (no longer needed) - Removed to allow updates
+.venv
+.pytest_cache

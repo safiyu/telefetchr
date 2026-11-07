@@ -265,12 +265,55 @@
             animation: kapow 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
         }
 
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(6px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-fade-in {
+            animation: fadeIn 0.25s ease-out forwards;
+        }
+
         .line-clamp-2 {
             display: -webkit-box;
             -webkit-line-clamp: 2;
             line-clamp: 2;
             -webkit-box-orient: vertical;
             overflow: hidden;
+        }
+
+        /* Hide scrollbars for filter pill rows */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* Optimized smooth progress transition without layout reflow */
+        .progress-bar-gpu {
+            transform-origin: left center;
+            will-change: transform;
+            transition: transform 0.4s ease-out;
+        }
+
+        /* Accessibility: respect reduced motion preferences */
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+                scroll-behavior: auto !important;
+            }
         }
     </style>
 </head>
@@ -279,51 +322,66 @@
 
 
 
-    <!-- Sidebar / Navigation (for larger layout) or Top Bar -->
+    <!-- Sidebar / Navigation or Top Bar -->
     <header
-        class="glass-card m-2 sm:m-4 px-3 sm:px-6 py-3 sm:py-4 flex justify-between items-center sticky top-2 sm:top-4 z-40">
-        <div class="flex items-center gap-2 sm:gap-4">
+        class="glass-card m-2 sm:m-4 px-3 sm:px-6 py-2.5 sm:py-3.5 flex justify-between items-center sticky top-2 sm:top-4 z-40 gap-2">
+        <div class="flex items-center gap-2 sm:gap-4 flex-shrink-0">
             <img src="/static/images/logo.png?v=2" alt="TeleFetchr Logo"
-                class="h-10 sm:h-14 w-10 sm:w-14 border-2 border-black shadow-[3px_3px_0px_#000] rounded-full object-cover"
+                class="h-9 sm:h-12 w-9 sm:w-12 border-2 border-black shadow-[3px_3px_0px_#000] rounded-full object-cover"
                 style="clip-path: circle(50%);" />
             <div class="flex flex-col">
-                <h1 class="text-lg sm:text-2xl font-bold tracking-tight header-gradient">TeleFetchr</h1>
+                <h1 class="text-base sm:text-2xl font-bold tracking-tight header-gradient leading-tight">TeleFetchr</h1>
                 <button onclick="showAbout()"
-                    class="text-[9px] sm:text-[10px] text-gray-500 hover:text-amber-400 font-mono tracking-wider transition-colors text-left cursor-pointer"
+                    class="text-[9px] sm:text-[10px] text-gray-400 hover:text-amber-400 font-mono tracking-wider transition-colors text-left cursor-pointer"
                     title="Click to view changelog">
                     <span id="appVersion"></span>
                 </button>
             </div>
         </div>
 
-        <div id="statusBadge" class="flex items-center gap-2 sm:gap-4">
-            <!-- Status Pill -->
-            <div id="connectionStatus" class="flex items-center">
-                <span class="relative flex h-3 w-3 sm:h-4 sm:w-4">
-                    <span
-                        class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75"></span>
-                    <span class="relative inline-flex rounded-full h-3 w-3 sm:h-4 sm:w-4 bg-green-500"></span>
-                </span>
-                <span class="hidden md:inline ml-2 text-xs font-medium text-green-400">Connected</span>
+        <!-- Disk Total Meter for Configured Directory (Desktop / Tablet) -->
+        <div id="diskWidget" class="hidden md:flex items-center gap-3 px-3.5 py-1.5 rounded-xl bg-gray-900/80 border border-black shadow-[2px_2px_0px_#000]" title="Disk space for configured download directory">
+            <div class="w-8 h-8 rounded-lg bg-amber-500/15 flex items-center justify-center text-amber-400 border border-black flex-shrink-0">
+                <i class="fa-solid fa-hard-drive text-sm"></i>
+            </div>
+            <div class="flex flex-col min-w-0">
+                <div class="flex items-center justify-between text-[11px] gap-3">
+                    <span id="diskPathText" class="font-mono text-gray-300 font-semibold truncate max-w-[140px]" title="/downloads">/downloads</span>
+                    <span id="diskMetricText" class="text-amber-300 font-semibold font-mono whitespace-nowrap">-- GB free</span>
+                </div>
+                <div class="w-36 lg:w-48 bg-gray-950 h-2 rounded-full overflow-hidden border border-black/60 mt-1 relative">
+                    <div id="diskProgressBar" class="h-full bg-gradient-to-r from-amber-500 to-amber-300 transition-all duration-500 rounded-full" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="statusBadge" class="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+            <!-- Mobile Disk Pill (< 768px) -->
+            <div id="diskWidgetMobile" class="md:hidden flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gray-900/90 border border-black text-[10px] text-amber-300 font-mono font-medium shadow-[1.5px_1.5px_0px_#000]" title="Configured directory disk free">
+                <i class="fa-solid fa-hard-drive text-amber-400 text-xs"></i>
+                <span id="diskMetricMobile">--</span>
             </div>
 
-            <!-- Action Buttons -->
-            <div class="flex items-center gap-1 sm:gap-3 sm:pl-4 sm:border-l sm:border-gray-700" id="userInfoActions">
-                <span id="userInfo" class="text-sm font-medium text-gray-300 hidden md:inline-block"></span>
-                <a href="/logs" target="_blank"
-                    class="bg-amber-500/15 border border-black text-amber-400 hover:bg-amber-500 hover:text-black hover:-translate-y-0.5 hover:shadow-[2px_2px_0px_#000] transition-all p-1.5 sm:p-2 rounded-xl focus:outline-none"
-                    title="View System Logs">
-                    <i class="fa-solid fa-file-lines text-sm sm:text-base"></i>
-                </a>
+            <!-- Connection Status -->
+            <div id="connectionStatus" class="flex items-center">
+                <span class="relative flex h-2.5 w-2.5 sm:h-3 sm:w-3">
+                    <span class="relative inline-flex rounded-full h-2.5 w-2.5 sm:h-3 sm:w-3 bg-green-500"></span>
+                </span>
+                <span class="hidden lg:inline ml-1.5 text-xs font-medium text-green-400">Connected</span>
+            </div>
+
+            <!-- Action Buttons (No console link) -->
+            <div class="flex items-center gap-1 sm:gap-2 pl-2 sm:pl-3 border-l border-gray-700/60" id="userInfoActions">
+                <span id="userInfo" class="text-xs font-medium text-gray-300 hidden xl:inline-block"></span>
                 <button onclick="logoutSession()"
                     class="bg-red-500/15 border border-black text-red-400 hover:bg-red-500 hover:text-white hover:-translate-y-0.5 hover:shadow-[2px_2px_0px_#000] transition-all p-1.5 sm:p-2 rounded-xl focus:outline-none"
                     title="Delete Session">
-                    <i class="fa-solid fa-power-off text-sm sm:text-base"></i>
+                    <i class="fa-solid fa-power-off text-xs sm:text-sm"></i>
                 </button>
                 <button onclick="logout()"
                     class="bg-gray-500/15 border border-black text-gray-400 hover:bg-gray-600 hover:text-white hover:-translate-y-0.5 hover:shadow-[2px_2px_0px_#000] transition-all p-1.5 sm:p-2 rounded-xl focus:outline-none"
                     title="Logout">
-                    <i class="fa-solid fa-sign-out-alt text-sm sm:text-base"></i>
+                    <i class="fa-solid fa-sign-out-alt text-xs sm:text-sm"></i>
                 </button>
             </div>
         </div>
@@ -384,105 +442,74 @@
         <!-- Dashboard (Download Section) -->
         <div id="downloadSection" class="w-full hidden space-y-6">
 
-            <!-- Stats Row -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <!-- Save Path Card -->
-                <div class="glass-card p-5 flex items-start justify-between relative overflow-hidden group">
-                    <div class="absolute right-0 top-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                        <i class="fa-solid fa-folder-open text-6xl text-white"></i>
-                    </div>
-                    <div>
-                        <p class="text-gray-400 text-sm font-medium mb-1">Save Location</p>
-                        <p id="savePathText" class="text-white font-mono text-sm break-all font-semibold">/downloads</p>
-                    </div>
-                    <div class="bg-yellow-500/20 p-2 rounded-lg text-yellow-400">
-                        <i class="fa-solid fa-hard-drive"></i>
-                    </div>
-                </div>
-
-                <!-- Active Workers Card -->
-                <div class="glass-card p-5 flex items-start justify-between relative overflow-hidden group">
-                    <div class="absolute right-0 top-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                        <i class="fa-solid fa-network-wired text-6xl text-white"></i>
-                    </div>
-                    <div>
-                        <p class="text-gray-400 text-sm font-medium mb-1">Parallel Workers</p>
-                        <div class="flex items-baseline gap-2">
-                            <h3 class="text-2xl font-bold text-white">4</h3>
-                            <span class="text-xs text-green-400 font-medium">Active</span>
-                        </div>
-                    </div>
-                    <div class="bg-orange-500/20 p-2 rounded-lg text-orange-400">
-                        <i class="fa-solid fa-network-wired"></i>
-                    </div>
-                </div>
-
-                <!-- Session Status -->
-                <div class="glass-card p-5 flex items-start justify-between relative overflow-hidden group">
-                    <div class="absolute right-0 top-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                        <i class="fa-solid fa-clock text-6xl text-white"></i>
-                    </div>
-                    <div>
-                        <p class="text-gray-400 text-sm font-medium mb-1">Session Duration</p>
-                        <h3 class="text-2xl font-bold text-white" id="sessionTimer">00:00</h3>
-                    </div>
-                    <div class="bg-amber-500/20 p-2 rounded-lg text-amber-400">
-                        <i class="fa-solid fa-clock"></i>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Tab Navigation -->
-            <div class="flex space-x-3 border-b border-black pb-2 mb-6">
-                <button onclick="switchTab('search')" id="tab-search"
-                    class="btn-gradient px-6 py-2.5 rounded-xl font-medium transition-all flex items-center gap-2 focus:outline-none">
-                    <i class="fa-solid fa-search text-xs opacity-70"></i> Search
-                </button>
-                <button onclick="switchTab('queue')" id="tab-queue"
-                    class="px-6 py-2.5 rounded-xl text-gray-400 hover:text-amber-400 font-medium transition-all flex items-center gap-2 border border-transparent hover:border-black hover:bg-amber-500/10 focus:outline-none">
-                    <i class="fa-solid fa-list text-xs opacity-70"></i> Queue <span id="queueCountBadge"
-                        class="ml-1 bg-amber-600 text-white text-[10px] px-1.5 py-0.5 rounded-full hidden border border-black queue-badge-text">0</span>
-                </button>
-            </div>
-
-            <!-- SEARCH TAB CONTENT -->
+            <!-- SEARCH / CONTROLS (Main Container) -->
             <div id="searchTabContent" class="space-y-6">
                 <!-- Main Controls -->
-                <div class="glass-card p-6 md:p-8">
-                    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
-                        <div class="lg:col-span-2">
-                            <label
-                                class="block text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">Source
-                                Channel</label>
+                <div class="glass-card p-4 sm:p-6 md:p-8">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6">
+                        <div class="sm:col-span-2 relative" id="channelPickerWrapper">
+                            <label class="block text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">
+                                Source Channel
+                            </label>
+
+                            <!-- Hidden select for full backward compatibility -->
+                            <select id="channelUsername" class="hidden">
+                                <option value="">Select a channel...</option>
+                            </select>
+
+                            <!-- Custom Searchable Combobox Trigger -->
                             <div class="relative">
-                                <i
-                                    class="fa-brands fa-telegram absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
-                                <select id="channelUsername"
-                                    class="w-full pl-11 pr-4 py-3 rounded-lg appearance-none cursor-pointer focus:ring-2 focus:ring-amber-500 transition-all outline-none border border-gray-700 bg-gray-900">
-                                    <option>Loading channels...</option>
-                                </select>
-                                <i
-                                    class="fa-solid fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 text-xs pointer-events-none"></i>
+                                <button type="button" id="channelDropdownBtn" onclick="toggleChannelDropdown(event)"
+                                    class="w-full pl-10 pr-10 py-3 rounded-lg bg-gray-900 border border-gray-700 text-left text-white flex items-center justify-between focus:ring-2 focus:ring-amber-500 transition-all cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,0.2)]">
+                                    <div class="flex items-center gap-2 min-w-0">
+                                        <i class="fa-brands fa-telegram absolute left-3.5 top-1/2 -translate-y-1/2 text-amber-400 text-base flex-shrink-0"></i>
+                                        <span id="channelSelectedLabel" class="truncate text-sm font-medium text-gray-300">Select a channel...</span>
+                                    </div>
+                                    <i id="channelDropdownChevron" class="fa-solid fa-chevron-down text-gray-400 text-xs transition-transform duration-200"></i>
+                                </button>
+
+                                <!-- Dropdown Menu Panel -->
+                                <div id="channelDropdownPanel"
+                                    class="hidden absolute z-50 left-0 right-0 top-full mt-2 bg-gray-900 border-2 border-black rounded-xl shadow-2xl overflow-hidden animate-fade-in">
+                                    <div class="p-2.5 border-b border-gray-800 bg-gray-950/70">
+                                        <div class="relative">
+                                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs"></i>
+                                            <input type="text" id="channelSearchInput" oninput="filterChannels(this.value)"
+                                                placeholder="Type to filter channels..."
+                                                class="w-full pl-8 pr-7 py-2 text-xs rounded-lg bg-gray-900 border border-gray-700 text-white placeholder-gray-500 focus:outline-none focus:border-amber-500"
+                                                autocomplete="off">
+                                            <button type="button" onclick="clearChannelSearch()" id="channelSearchClearBtn"
+                                                class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white text-xs">
+                                                <i class="fa-solid fa-xmark"></i>
+                                            </button>
+                                        </div>
+                                        <div class="flex items-center justify-between text-[10px] text-gray-400 mt-1.5 px-1 font-mono">
+                                            <span id="channelMatchCount">Loading channels...</span>
+                                            <span class="text-gray-500 hidden sm:inline">Esc to close</span>
+                                        </div>
+                                    </div>
+
+                                    <div id="channelOptionsList"
+                                        class="max-h-60 sm:max-h-72 overflow-y-auto overscroll-contain p-1.5 space-y-1 custom-scrollbar">
+                                        <!-- Options injected via JS -->
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
                         <div>
-                            <label
-                                class="block text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">Limit</label>
+                            <label class="block text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">Limit</label>
                             <div class="relative">
-                                <i
-                                    class="fa-solid fa-list-ol absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
+                                <i class="fa-solid fa-list-ol absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
                                 <input type="number" id="fileLimit" value="10" min="1" max="1000"
                                     class="w-full pl-11 pr-4 py-3 rounded-lg border border-gray-700 bg-gray-900 focus:ring-2 focus:ring-amber-500 outline-none transition-all">
                             </div>
                         </div>
 
                         <div>
-                            <label
-                                class="block text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">Type</label>
+                            <label class="block text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">Type</label>
                             <div class="relative">
-                                <i
-                                    class="fa-solid fa-filter absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
+                                <i class="fa-solid fa-filter absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
                                 <select id="fileType"
                                     class="w-full pl-11 pr-4 py-3 rounded-lg border border-gray-700 bg-gray-900 appearance-none cursor-pointer focus:ring-2 focus:ring-amber-500 outline-none transition-all">
                                     <option value="">All Files</option>
@@ -491,8 +518,7 @@
                                     <option value="document">Documents</option>
                                     <option value="photo">Photos</option>
                                 </select>
-                                <i
-                                    class="fa-solid fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 text-xs pointer-events-none"></i>
+                                <i class="fa-solid fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 text-xs pointer-events-none"></i>
                             </div>
                         </div>
                     </div>
@@ -598,96 +624,91 @@
                     </div>
                 </div>
 
-                <!-- Active Download Progress -->
-                <div id="downloadProgress" class="hidden animate-fade-in space-y-8">
-                    <!-- Active Section -->
-                    <div id="activeSection" class="space-y-4 hidden">
-                        <div class="flex justify-between items-end px-1">
-                            <h3 id="activeTitle" class="text-lg font-semibold text-white flex items-center gap-2">
-                                <i id="activeIcon" class="fa-solid fa-circle-notch fa-spin text-amber-500"></i>
-                                Active Download
-                            </h3>
-                        </div>
-                        <div id="activeDownloadContainer" class="space-y-4"></div>
-                    </div>
-
-
-
-                    <!-- History Section -->
-                    <div id="historySection" class="space-y-4 hidden">
-                        <div class="flex justify-between items-end px-1">
-                            <h3 class="text-lg font-semibold text-white flex items-center gap-2">
-                                <i class="fa-solid fa-clock-rotate-left text-green-500"></i>
-                                History
-                            </h3>
-                            <button id="clearHistoryBtn" onclick="clearProgress()"
-                                class="px-2 py-1 rounded-md bg-gray-500/10 text-[10px] uppercase tracking-tighter text-gray-400/60 hover:bg-red-500/20 hover:text-red-400 transition-all font-medium focus:outline-none">Clear
-                                History</button>
-                        </div>
-                        <div id="historyContainer"
-                            class="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar"></div>
-                    </div>
-                </div>
-
                 <!-- File List (Scan Results) -->
-                <div id="filesList" class="hidden glass-card p-6 animate-slide-up">
+                <div id="filesList" class="hidden glass-card p-4 sm:p-6 animate-fade-in">
                     <!-- Content handled by JS -->
                 </div>
-            </div>
 
-            <!-- QUEUE TAB CONTENT -->
-            <div id="queueTabContent" class="hidden space-y-6">
-                <div class="glass-card p-6">
-                    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-                        <div class="flex items-center gap-3">
-                            <h2 class="text-lg sm:text-xl font-bold text-white">Download Queue</h2>
-                            <span id="queueTotalCount" class="bg-gray-700 text-gray-300 text-xs px-2 py-1 rounded-md">0
-                                items</span>
-                        </div>
-                        <div class="flex gap-2">
-                            <button onclick="refreshQueue()"
-                                class="w-9 h-9 flex items-center justify-center btn-orange-hover rounded-xl focus:outline-none"
-                                title="Refresh Queue">
-                                <i class="fa-solid fa-rotate text-sm"></i>
-                            </button>
-                            <button onclick="clearQueue()" id="clearQueueBtn"
-                                class="px-3 sm:px-4 py-1.5 btn-red rounded-xl focus:outline-none text-xs sm:text-sm">
-                                <i class="fa-solid fa-trash-can sm:mr-2 text-xs"></i> <span
-                                    class="hidden sm:inline">Clear Queue</span><span class="sm:hidden">Clear</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <div id="queueList" class="space-y-3 min-h-[200px]">
-                        <!-- Queue items injected here -->
-                        <div class="text-center text-gray-500 py-10">
-                            <i class="fa-solid fa-basket-shopping text-4xl mb-3 opacity-30"></i>
-                            <p>Queue is empty</p>
-                        </div>
-                    </div>
-
-                    <!-- Pagination Controls -->
-                    <div id="queuePagination"
-                        class="mt-6 sm:mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-gray-700/50 pt-4 sm:pt-6 hidden">
-                        <div
-                            class="text-xs text-gray-500 bg-gray-800/50 px-3 py-1.5 rounded-lg border border-gray-700/30 order-2 sm:order-1">
-                            Showing <span id="paginationRange" class="text-gray-300 font-medium">0 - 0</span> of <span
-                                id="paginationTotal" class="text-gray-300 font-medium">0</span>
-                        </div>
-                        <div class="flex gap-2 order-1 sm:order-2">
-                            <button onclick="changeQueuePage(-1)" id="prevPageBtn"
-                                class="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl bg-gray-800/50 border border-black text-gray-400 hover:bg-amber-500 hover:text-black hover:shadow-[2px_2px_0px_#000] hover:-translate-y-0.5 disabled:opacity-30 disabled:cursor-not-allowed transition-all focus:outline-none">
-                                <i class="fa-solid fa-chevron-left text-xs"></i>
-                            </button>
-                            <div
-                                class="flex items-center px-3 sm:px-4 rounded-xl bg-gray-800/30 border border-gray-700/30 text-xs font-semibold text-amber-400">
-                                Page <span id="currentPageNum" class="mx-1">1</span> of <span id="totalPageNum"
-                                    class="ml-1 text-gray-500">1</span>
+                <!-- UNIFIED ACTIVITY & HISTORY SECTION (Single Screen) -->
+                <div id="downloadProgress" class="w-full">
+                    <div id="activityCard" class="glass-card p-4 sm:p-6 space-y-4">
+                        <!-- Activity Toolbar & Summary -->
+                        <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-4 border-b border-gray-700/60 pb-4">
+                            <div class="flex items-center gap-3">
+                                <div id="activityStatusIcon" class="w-10 h-10 rounded-xl bg-amber-500/15 border border-black flex items-center justify-center text-amber-400 shadow-[2px_2px_0px_#000] flex-shrink-0">
+                                    <i class="fa-solid fa-list-check text-lg"></i>
+                                </div>
+                                <div>
+                                    <div class="flex items-center gap-2">
+                                        <h2 class="text-lg sm:text-xl font-bold text-white tracking-wide">Downloads & History</h2>
+                                        <span id="activityLiveIndicator" class="hidden px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-green-500/20 text-green-400 border border-green-500/30">
+                                            <i class="fa-solid fa-circle text-[6px] mr-1"></i>Active
+                                        </span>
+                                    </div>
+                                    <div class="flex items-center gap-3 text-xs text-gray-400 mt-0.5">
+                                        <span id="sessionTimerWrapper" class="hidden items-center gap-1 font-mono text-amber-300">
+                                            <i class="fa-solid fa-clock text-[10px]"></i> <span id="sessionTimer">00:00</span>
+                                        </span>
+                                        <span id="activityTotalSummary">0 items</span>
+                                    </div>
+                                </div>
                             </div>
-                            <button onclick="changeQueuePage(1)" id="nextPageBtn"
-                                class="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl bg-gray-800/50 border border-black text-gray-400 hover:bg-amber-500 hover:text-black hover:shadow-[2px_2px_0px_#000] hover:-translate-y-0.5 disabled:opacity-30 disabled:cursor-not-allowed transition-all focus:outline-none">
-                                <i class="fa-solid fa-chevron-right text-xs"></i>
-                            </button>
+
+                            <!-- Filter Chips & Actions -->
+                            <div class="flex flex-wrap items-center justify-between xl:justify-end gap-2">
+                                <!-- Filter Chips -->
+                                <div class="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 no-scrollbar" id="activityFilterGroup">
+                                    <button type="button" onclick="setActivityFilter('all')" id="filterBtn-all"
+                                        class="activity-chip px-3 py-1.5 rounded-xl text-xs font-bold transition-all border border-black bg-amber-400 text-black shadow-[2px_2px_0px_#000]">
+                                        All <span id="count-all" class="ml-1 opacity-75 font-mono">0</span>
+                                    </button>
+                                    <button type="button" onclick="setActivityFilter('active')" id="filterBtn-active"
+                                        class="activity-chip px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all border border-transparent text-gray-400 hover:text-white hover:bg-gray-800">
+                                        Active <span id="count-active" class="ml-1 px-1.5 py-0.2 rounded-full bg-blue-500/20 text-blue-300 font-mono">0</span>
+                                    </button>
+                                    <button type="button" onclick="setActivityFilter('queued')" id="filterBtn-queued"
+                                        class="activity-chip px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all border border-transparent text-gray-400 hover:text-white hover:bg-gray-800">
+                                        Queued <span id="count-queued" class="ml-1 px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-300 font-mono">0</span>
+                                    </button>
+                                    <button type="button" onclick="setActivityFilter('partial')" id="filterBtn-partial"
+                                        class="activity-chip px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all border border-transparent text-gray-400 hover:text-white hover:bg-gray-800">
+                                        Partial <span id="count-partial" class="ml-1 px-1.5 py-0.2 rounded-full bg-red-500/20 text-red-300 font-mono">0</span>
+                                    </button>
+                                    <button type="button" onclick="setActivityFilter('completed')" id="filterBtn-completed"
+                                        class="activity-chip px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all border border-transparent text-gray-400 hover:text-white hover:bg-gray-800">
+                                        Done <span id="count-completed" class="ml-1 px-1.5 py-0.2 rounded-full bg-green-500/20 text-green-300 font-mono">0</span>
+                                    </button>
+                                </div>
+
+                                <!-- Activity Actions -->
+                                <div class="flex items-center gap-1.5">
+                                    <button type="button" onclick="resumeAllUnfinished()" id="resumeAllBtn"
+                                        class="hidden px-3 py-1.5 rounded-xl btn-yellow-hover text-xs font-bold flex items-center gap-1.5"
+                                        title="Resume all unfinished downloads">
+                                        <i class="fa-solid fa-play text-[10px]"></i> <span>Resume All</span>
+                                    </button>
+                                    <button type="button" onclick="clearCompletedHistory()" id="clearHistoryBtn"
+                                        class="hidden px-3 py-1.5 rounded-xl btn-red text-xs font-bold flex items-center gap-1.5"
+                                        title="Clear completed and partial downloads history">
+                                        <i class="fa-solid fa-broom text-[10px]"></i> <span class="hidden sm:inline">Clear History</span><span class="sm:hidden">Clear</span>
+                                    </button>
+                                    <button type="button" onclick="clearQueue()" id="clearQueueBtn"
+                                        class="hidden px-3 py-1.5 rounded-xl btn-red text-xs font-bold flex items-center gap-1.5"
+                                        title="Clear pending queue">
+                                        <i class="fa-solid fa-trash-can text-[10px]"></i> <span class="hidden sm:inline">Clear Queue</span><span class="sm:hidden">Queue</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Unified Activity List Container -->
+                        <div id="activityContainer" class="space-y-3 min-h-[140px] max-h-[620px] overflow-y-auto pr-1.5 custom-scrollbar">
+                            <!-- Items rendered here by JS -->
+                            <div id="activityEmptyState" class="text-center text-gray-500 py-12">
+                                <i class="fa-solid fa-inbox text-4xl mb-3 opacity-30"></i>
+                                <p class="text-sm font-semibold text-gray-400">No download activity yet</p>
+                                <p class="text-xs text-gray-500 mt-1">Select a channel and scan files to begin downloading</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -695,7 +716,7 @@
         </div>
     </main>
 
-    <script src="/static/js/script.js?v=37"></script>
+    <script src="/static/js/script.js?v=40"></script>
     <!-- Toast Container -->
     <div id="toastContainer"
         class="fixed bottom-8 left-4 right-4 sm:bottom-auto sm:top-6 sm:right-6 sm:left-auto flex flex-col items-center sm:items-end gap-3 pointer-events-none transition-all duration-300"

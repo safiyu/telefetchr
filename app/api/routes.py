@@ -1,4 +1,5 @@
 import os
+import shutil
 import logging
 import urllib.parse
 from datetime import timedelta
@@ -111,71 +112,30 @@ async def get_app():
         return HTMLResponse(content=f.read(), headers=NO_CACHE_HEADERS)
 
 
-@router.get("/logs", response_class=HTMLResponse)
-async def get_logs_page():
-    """Serve the logs viewer page (auth handled client-side)"""
-    html_path = os.path.join('app', 'static', 'logs.html')
-    with open(html_path, 'r', encoding='utf-8') as f:
-        return HTMLResponse(content=f.read(), headers=NO_CACHE_HEADERS)
-
-
-@router.get("/api/logs")
-async def get_logs(
-    level: Optional[str] = Query(None),
-    limit: int = Query(200, ge=1, le=1000),
-    search: Optional[str] = Query(None),
-    current_user: str = Depends(get_current_user)
-):
-    """Get parsed log entries"""
-    log_file = os.path.join(os.path.abspath('sessions'), 'app.log')
-
-    if not os.path.exists(log_file):
-        return {"logs": [], "total": 0}
-
-    entries = []
+@router.get("/api/disk")
+async def get_disk_info(current_user: str = Depends(get_current_user)):
+    """Get disk space information for configured download directory"""
+    path = Config.SAVE_PATH
     try:
-        with open(log_file, 'r', encoding='utf-8') as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                parts = line.split(' | ', 3)
-                if len(parts) < 4:
-                    continue
-                entry = {
-                    "timestamp": parts[0],
-                    "level": parts[1],
-                    "module": parts[2],
-                    "message": parts[3]
-                }
-                if level and entry["level"] != level:
-                    continue
-                if search and search.lower() not in entry["message"].lower():
-                    continue
-                entries.append(entry)
+        os.makedirs(path, exist_ok=True)
+        total, used, free = shutil.disk_usage(path)
+        return {
+            "path": path,
+            "total": total,
+            "used": used,
+            "free": free,
+            "percentage": round((used / total) * 100, 1) if total > 0 else 0
+        }
     except Exception as e:
-        logger.error(f"Error reading log file: {e}")
-        return {"logs": [], "total": 0}
-
-    entries.reverse()
-    total = len(entries)
-    entries = entries[:limit]
-
-    return {"logs": entries, "total": total}
-
-
-@router.post("/api/logs/clear")
-async def clear_logs(current_user: str = Depends(get_current_user)):
-    """Clear the log file"""
-    log_file = os.path.join(os.path.abspath('sessions'), 'app.log')
-    try:
-        with open(log_file, 'w', encoding='utf-8') as f:
-            f.truncate(0)
-        logger.info("Logs cleared by user")
-        return {"status": "success", "message": "Logs cleared"}
-    except Exception as e:
-        logger.error(f"Error clearing logs: {e}")
-        raise HTTPException(status_code=500, detail="Failed to clear logs")
+        logger.error(f"Error checking disk space: {e}")
+        return {
+            "path": path,
+            "total": 0,
+            "used": 0,
+            "free": 0,
+            "percentage": 0,
+            "error": str(e)
+        }
 
 
 @router.get("/status")
@@ -402,6 +362,15 @@ async def cancel_individual_download(file_id: str, current_user: str = Depends(g
     result = await download_service.cancel_individual_download(file_id)
     if result.get("status") == "error":
         raise HTTPException(status_code=404, detail=result.get("message"))
+    return result
+
+
+@router.post("/download/retry/{file_id}")
+async def retry_individual_download(file_id: str, current_user: str = Depends(get_current_user)):
+    """Retry or re-queue a cancelled, failed, or partial download by its ID"""
+    result = await download_service.retry_download(file_id)
+    if result.get("status") == "error":
+        raise HTTPException(status_code=400, detail=result.get("message"))
     return result
 
 

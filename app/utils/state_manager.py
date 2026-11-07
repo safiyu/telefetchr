@@ -50,6 +50,7 @@ class StateManager:
             "concurrent_downloads": {},
             "completed_downloads": {},
             "cancelled_files": {},
+            "failed_files": {},
             "cancelled": False,
             "session_id": str(uuid.uuid4()),
             "started_at": None,
@@ -100,6 +101,7 @@ class StateManager:
                 "concurrent_downloads": copy.deepcopy(self.download_status.get("concurrent_downloads", {})),
                 "completed_downloads": copy.deepcopy(self.download_status.get("completed_downloads", {})),
                 "cancelled_files": copy.deepcopy(self.download_status.get("cancelled_files", {})),
+                "failed_files": copy.deepcopy(self.download_status.get("failed_files", {})),
                 "cancelled": bool(self.download_status.get("cancelled", False)),
                 "session_id": self.download_status.get("session_id"),
                 "started_at": self.download_status.get("started_at"),
@@ -350,6 +352,7 @@ class StateManager:
         with self._thread_lock:
             self.download_status["completed_downloads"] = {}
             self.download_status["cancelled_files"] = {}
+            self.download_status["failed_files"] = {}
             self.download_status["progress"] = 0
 
             # If nothing is active and queue is empty, reset session counters cleanly
@@ -367,6 +370,7 @@ class StateManager:
             removed = False
             completed = self.download_status.get("completed_downloads", {})
             cancelled = self.download_status.get("cancelled_files", {})
+            failed = self.download_status.get("failed_files", {})
 
             if file_id in completed:
                 del completed[file_id]
@@ -374,6 +378,10 @@ class StateManager:
 
             if file_id in cancelled:
                 del cancelled[file_id]
+                removed = True
+
+            if file_id in failed:
+                del failed[file_id]
                 removed = True
 
             if removed:

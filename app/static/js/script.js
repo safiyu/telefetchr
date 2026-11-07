@@ -3,6 +3,7 @@
 
 let statusCheckInterval;
 let channelList = [];
+let rawChannels = [];
 let savePath = "";
 let selectedFiles = new Set();
 let progressMonitoringInterval = null;
@@ -10,6 +11,9 @@ let completedDownloads = new Map(); // Track completed downloads
 let lastProgressUpdate = null; // Track last progress update time
 let progressWatchdog = null; // Watchdog to detect stalled progress monitoring
 let currentSessionId = null; // Track current active session ID
+let currentActivityFilter = 'all'; // Current active filter: 'all' | 'active' | 'queued' | 'partial' | 'completed'
+let lastKnownProgressData = null;
+let diskCheckInterval = null;
 let queueCurrentPage = 1;
 const queueItemsPerPage = 10;
 
@@ -415,273 +419,297 @@ async function fetchVersion() {
 }
 
 
+// --- Disk Storage Metric in Top Bar ---
+async function loadDiskInfo() {
+    try {
+        const response = await authFetch('/api/disk');
+        if (!response || !response.ok) return;
+        const data = await safeJsonParse(response, 'Load disk info');
+
+        if (data.total > 0) {
+            const freeStr = formatBytes(data.free);
+            const totalStr = formatBytes(data.total);
+            const usedPct = data.percentage || Math.round((data.used / data.total) * 100);
+
+            const pathEl = document.getElementById('diskPathText');
+            if (pathEl) {
+                pathEl.textContent = data.path || '/downloads';
+                pathEl.title = data.path;
+            }
+
+            const metricEl = document.getElementById('diskMetricText');
+            if (metricEl) {
+                metricEl.textContent = `${freeStr} free of ${totalStr}`;
+            }
+
+            const mobileMetricEl = document.getElementById('diskMetricMobile');
+            if (mobileMetricEl) {
+                mobileMetricEl.textContent = `${freeStr} free`;
+            }
+
+            const barEl = document.getElementById('diskProgressBar');
+            if (barEl) {
+                barEl.style.width = `${Math.min(100, Math.max(2, usedPct))}%`;
+                // Color threshold based on usage
+                if (usedPct > 90) {
+                    barEl.className = 'h-full bg-red-500 transition-all duration-500 rounded-full';
+                } else if (usedPct > 75) {
+                    barEl.className = 'h-full bg-amber-400 transition-all duration-500 rounded-full';
+                } else {
+                    barEl.className = 'h-full bg-emerald-400 transition-all duration-500 rounded-full';
+                }
+            }
+        }
+    } catch (err) {
+        console.debug('Failed to load disk info:', err);
+    }
+}
+
+// --- Searchable Channel Dropdown Combobox ---
 async function loadChannels() {
     try {
         const response = await authFetch("/config/channels");
         if (!response) return;
         const data = await safeJsonParse(response, 'Load channels');
 
-        const channelList = data.channels;
-        const savePath = data.save_path;
+        rawChannels = data.channels || [];
+        savePath = data.save_path || '/downloads';
 
-        document.getElementById("savePathText").textContent = savePath;
+        // Keep savePath updated and fetch disk info
+        const savePathEl = document.getElementById("savePathText");
+        if (savePathEl) savePathEl.textContent = savePath;
+        loadDiskInfo();
 
+        // Populate hidden select for full backward compatibility
         const channelSelect = document.getElementById("channelUsername");
-        channelSelect.innerHTML = '<option value="">Select a channel...</option>';
+        if (channelSelect) {
+            channelSelect.innerHTML = '<option value="">Select a channel...</option>';
+            rawChannels.forEach((channel) => {
+                const option = document.createElement("option");
+                option.value = channel.username || channel.id;
+                option.textContent = channel.name;
+                channelSelect.appendChild(option);
+            });
+        }
 
-        channelList.forEach((channel) => {
-            const option = document.createElement("option");
-            option.value = channel.username || channel.id; // fallback to ID if username is missing
-            const trimmedName =
-                channel.name.length > 40 ?
-                    channel.name.slice(0, 37) + "..." :
-                    channel.name;
-
-            option.textContent = trimmedName;
-            channelSelect.appendChild(option);
-        });
+        renderChannelOptions(rawChannels);
     } catch (error) {
         console.error("Error loading channels:", error);
     }
 }
 
-// Check for saved state on page load
-async function checkSavedState() {
-    try {
-        const response = await authFetch("/download/state");
-        if (!response) return;
-        const data = await safeJsonParse(response, 'Check saved state');
+function toggleChannelDropdown(e) {
+    if (e) e.stopPropagation();
+    const panel = document.getElementById("channelDropdownPanel");
+    const chevron = document.getElementById("channelDropdownChevron");
+    if (!panel) return;
 
+    const isHidden = panel.classList.contains("hidden");
+    if (isHidden) {
+        panel.classList.remove("hidden");
+        chevron?.classList.add("rotate-180");
+        const searchInput = document.getElementById("channelSearchInput");
+        if (searchInput) {
+            searchInput.focus();
+        }
+    } else {
+        closeChannelDropdown();
+    }
+}
 
-        if (data.has_saved_state && !data.active) {
-            const completedCount = data.progress || 0;
-            const totalCount = data.total || 0;
-            const remainingCount = totalCount - completedCount;
-            const wasCancelled = data.cancelled || false;
+function closeChannelDropdown() {
+    const panel = document.getElementById("channelDropdownPanel");
+    const chevron = document.getElementById("channelDropdownChevron");
+    if (panel) panel.classList.add("hidden");
+    if (chevron) chevron.classList.remove("rotate-180");
+}
 
-            // If it's cancelled, we don't want to alert the user about it on refresh
-            if (wasCancelled) {
-                return;
-            }
+function renderChannelOptions(channelsToRender) {
+    const list = document.getElementById("channelOptionsList");
+    const matchCount = document.getElementById("channelMatchCount");
+    if (!list) return;
 
-            // If it's an empty session (0 total and no history), skip it
-            if (totalCount === 0 && completedCount === 0) {
-                return;
-            }
+    if (!channelsToRender || channelsToRender.length === 0) {
+        list.innerHTML = `
+            <div class="p-4 text-center text-xs text-gray-500">
+                <i class="fa-solid fa-magnifying-glass mb-1.5 opacity-40"></i>
+                <p>No matching channels</p>
+            </div>
+        `;
+        if (matchCount) matchCount.textContent = "0 channels";
+        return;
+    }
 
-            /*
-             */
+    const currentVal = document.getElementById("channelUsername")?.value;
+    const maxDisplay = 100;
+    const sliced = channelsToRender.slice(0, maxDisplay);
 
-            // Determine the status message and icon
-            const statusIcon = wasCancelled ?
-                '<i class="fa-solid fa-circle-xmark text-red-400 mr-3 text-2xl"></i>' :
-                '<i class="fa-solid fa-circle-pause text-yellow-400 mr-3 text-2xl"></i>';
+    if (matchCount) {
+        matchCount.textContent = channelsToRender.length > maxDisplay 
+            ? `Showing 100 of ${channelsToRender.length}` 
+            : `${channelsToRender.length} channels`;
+    }
 
-            const statusTitle = wasCancelled ?
-                'Cancelled download session found' :
-                'Previous download session found';
+    list.innerHTML = sliced.map(channel => {
+        const val = channel.username || channel.id;
+        const isSelected = String(val) === String(currentVal);
+        const usernameStr = channel.username ? `@${escapeHtml(channel.username)}` : `ID: ${channel.id}`;
 
-            // Dark theme colors - Comic Style
-            const containerClasses = wasCancelled ?
-                'bg-red-900 bg-opacity-40 border-2 border-black' :
-                'bg-yellow-900 bg-opacity-40 border-2 border-black';
-
-            const textClasses = wasCancelled ? 'text-red-200' : 'text-yellow-200';
-            const subTextClasses = wasCancelled ? 'text-red-300' : 'text-yellow-300';
-
-            // Show resume option only if there are remaining files AND it wasn't cancelled
-            const showResumeButton = remainingCount > 0 && !wasCancelled;
-
-            const resumeHtml = `
-                <div id="resumeNotification" class="${containerClasses} p-4 mb-4 rounded-xl relative overflow-hidden" style="box-shadow: 4px 4px 0px rgba(0,0,0,0.4)">
-                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div class="flex items-start gap-3">
-                            <div class="flex-shrink-0 mt-0.5">${statusIcon}</div>
-                            <div class="min-w-0">
-                                <p class="text-sm font-bold uppercase tracking-wider ${textClasses} break-words" style="text-shadow: 1px 1px 0px rgba(0,0,0,0.5)">${statusTitle}</p>
-                                <div class="text-xs ${subTextClasses} mt-1 space-y-0.5">
-                                    <p class="truncate"><span class="opacity-70">Channel:</span> ${escapeHtml(data.channel || 'Unknown')}</p>
-                                    <p><span class="opacity-70">Progress:</span> ${completedCount}/${totalCount} files ${remainingCount > 0 ? `(${remainingCount} left)` : ''}</p>
-                                    ${wasCancelled ? '<p class="text-red-300"><i class="fa-solid fa-ban text-[10px] mr-1"></i>Cancelled by user</p>' : ''}
-                                    <p class="text-xs opacity-50 font-mono mt-1">ID: ${escapeHtml(data.session_id || 'N/A')}</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto mt-2 sm:mt-0">
-                            ${showResumeButton ? `
-                                <button onclick="resumeDownload()" class="flex-1 sm:flex-none py-2 px-4 rounded-xl bg-yellow-500 bg-opacity-20 text-yellow-500 font-medium hover:bg-yellow-600 hover:text-white transition-all flex items-center justify-center gap-2 text-xs sm:text-sm focus:outline-none border border-black" style="box-shadow: 2px 2px 0px rgba(0,0,0,0.2)">
-                                    <i class="fa-solid fa-play"></i> Resume
-                                </button>
-                            ` : ''}
-                            <button onclick="viewCompletedDownloads()" class="flex-1 sm:flex-none py-2 px-4 rounded-xl bg-indigo-500 bg-opacity-20 text-indigo-400 font-medium hover:bg-indigo-600 hover:text-white transition-all flex items-center justify-center gap-2 text-xs sm:text-sm focus:outline-none border border-black" style="box-shadow: 2px 2px 0px rgba(0,0,0,0.2)">
-                                <i class="fa-solid fa-eye"></i> View Completed${completedCount > 0 ? ` (${completedCount})` : ''}
-                            </button>
-                            <button onclick="clearSavedState()" class="flex-1 sm:flex-none py-2 px-4 rounded-xl bg-gray-500 bg-opacity-20 text-gray-400 font-medium hover:bg-gray-600 hover:text-white transition-all flex items-center justify-center gap-2 text-xs sm:text-sm focus:outline-none border border-black" style="box-shadow: 2px 2px 0px rgba(0,0,0,0.2)">
-                                <i class="fa-solid fa-xmark"></i> Clear
-                            </button>
-                        </div>
+        return `
+            <div onclick="selectChannel(${jsStr(val)}, ${jsStr(channel.name)})"
+                class="flex items-center justify-between p-2.5 rounded-lg cursor-pointer transition-all ${isSelected ? 'bg-amber-500/20 border border-amber-500/40 text-amber-300' : 'hover:bg-gray-800 text-gray-200 border border-transparent'}">
+                <div class="flex items-center gap-2.5 min-w-0">
+                    <div class="w-7 h-7 rounded-md bg-gray-800 flex items-center justify-center text-xs text-amber-400 flex-shrink-0">
+                        <i class="fa-brands fa-telegram"></i>
+                    </div>
+                    <div class="min-w-0">
+                        <p class="text-xs font-semibold truncate ${isSelected ? 'text-amber-300' : 'text-white'}" title="${escapeHtml(channel.name)}">${escapeHtml(channel.name)}</p>
+                        <p class="text-[10px] text-gray-500 truncate font-mono">${usernameStr}</p>
                     </div>
                 </div>
-            `;
+                ${isSelected ? '<i class="fa-solid fa-check text-amber-400 text-xs ml-2"></i>' : ''}
+            </div>
+        `;
+    }).join('');
+}
 
-            const targetContainer = document.getElementById("downloadSection");
-            if (targetContainer && !document.getElementById("resumeNotification")) {
-                targetContainer.insertAdjacentHTML("afterbegin", resumeHtml);
-            }
+function filterChannels(query) {
+    const clearBtn = document.getElementById("channelSearchClearBtn");
+    if (clearBtn) {
+        clearBtn.classList.toggle("hidden", !query);
+    }
 
-        } else if (!data.has_saved_state) {
-        } else if (data.active) {
-        }
+    const q = (query || "").trim().toLowerCase();
+    if (!q) {
+        renderChannelOptions(rawChannels);
+        return;
+    }
 
-        // If download is active, restore progress monitoring
-        if (data.active) {
-            document.getElementById("downloadProgress").classList.remove("hidden");
-            document.getElementById("stopAllBtn").classList.remove("hidden");
-            startProgressMonitoring();
-        }
+    const filtered = rawChannels.filter(c => {
+        const name = (c.name || "").toLowerCase();
+        const username = (c.username || "").toLowerCase();
+        const idStr = String(c.id || "");
+        return name.includes(q) || username.includes(q) || idStr.includes(q);
+    });
 
-        // Restore completed downloads to UI if they exist (whether active or not)
-        if (data.completed_count > 0 || data.active) {
-            const progressResponse = await authFetch("/download-progress");
-            if (!progressResponse) return;
-            const progressData = await progressResponse.json();
-            updateProgressUI(progressData);
-        }
-    } catch (error) {
-        console.error("Error checking saved state:", error);
+    renderChannelOptions(filtered);
+}
+
+function clearChannelSearch() {
+    const input = document.getElementById("channelSearchInput");
+    if (input) {
+        input.value = "";
+        filterChannels("");
+        input.focus();
     }
 }
 
-async function viewCompletedDownloads() {
-    try {
-        const progressResponse = await authFetch("/download-progress");
-        if (!progressResponse) return;
-        const data = await progressResponse.json();
-        updateProgressUI(data);
-
-        const hasHistory = (data.completed_downloads && Object.keys(data.completed_downloads).length > 0) ||
-            (data.cancelled_files && Object.keys(data.cancelled_files).length > 0);
-
-        if (hasHistory) {
-            const count = (Object.keys(data.completed_downloads || {}).length) + (Object.keys(data.cancelled_files || {}).length);
-            showAlert("downloadAlert", `History: ${count} files.`, "success");
-        } else {
-            showAlert("downloadAlert", "No completed downloads found", "info");
-        }
-    } catch (error) {
-        showAlert("downloadAlert", "Error loading completed downloads: " + error.message, "error");
+function selectChannel(val, label) {
+    const selectEl = document.getElementById("channelUsername");
+    if (selectEl) {
+        selectEl.value = val;
+        selectEl.dispatchEvent(new Event("change"));
     }
+
+    const labelEl = document.getElementById("channelSelectedLabel");
+    if (labelEl) {
+        labelEl.textContent = label || "Select a channel...";
+        labelEl.classList.remove("text-gray-400");
+        labelEl.classList.add("text-white");
+    }
+
+    closeChannelDropdown();
+    renderChannelOptions(rawChannels);
 }
 
+// Global click outside listener for channel picker
+document.addEventListener("click", (e) => {
+    const wrapper = document.getElementById("channelPickerWrapper");
+    if (wrapper && !wrapper.contains(e.target)) {
+        closeChannelDropdown();
+    }
+});
 
+document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+        closeChannelDropdown();
+    }
+});
 
-async function clearSavedState() {
+// --- Retry, Resume & History Actions ---
+async function retryIndividualDownload(fileId) {
     try {
-        const response = await authFetch("/download/clear-completed", {
-            method: "POST",
+        const response = await authFetch(`/download/retry/${encodeURIComponent(fileId)}`, {
+            method: 'POST'
         });
+        if (!response || !response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            showAlert("downloadAlert", errData.detail || "Failed to retry download", "error");
+            return;
+        }
+        showAlert("downloadAlert", "Re-queued file for download", "success");
+        document.getElementById('stopAllBtn')?.classList.remove('hidden');
+        startProgressMonitoring();
+        refreshProgress();
+    } catch (err) {
+        showAlert("downloadAlert", "Error retrying download: " + err.message, "error");
+    }
+}
 
+async function resumeAllUnfinished() {
+    try {
+        const response = await authFetch('/download/resume', { method: 'POST' });
+        if (!response || !response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            showAlert("downloadAlert", errData.detail || "Failed to resume downloads", "error");
+            return;
+        }
+        const data = await response.json();
+        showAlert("downloadAlert", data.message || "Resuming unfinished downloads...", "success");
+        document.getElementById('stopAllBtn')?.classList.remove('hidden');
+        startProgressMonitoring();
+        refreshProgress();
+    } catch (err) {
+        showAlert("downloadAlert", "Error resuming downloads: " + err.message, "error");
+    }
+}
+
+async function clearCompletedHistory() {
+    try {
+        const response = await authFetch('/download/clear-completed', { method: 'POST' });
         if (response && response.ok) {
-            // Clear local tracking
             completedDownloads.clear();
-
-            // Clear UI
-            const notification = document.getElementById("resumeNotification");
-            if (notification) notification.remove();
-
-            const historyContainer = document.getElementById("historyContainer");
-            const historySection = document.getElementById("historySection");
-            if (historyContainer) {
-                historyContainer.innerHTML = "";
-                historySection?.classList.add('hidden');
-            }
-
-            // check if overall progress section should be hidden
-            const statusResponse = await authFetch("/download-progress");
-            if (statusResponse) {
-                const status = await statusResponse.json();
-                if (!status.active && (!status.queue || status.queue.length === 0)) {
-                    document.getElementById("downloadProgress").classList.add("hidden");
-                }
-            }
-
-            showAlert("downloadAlert", "Saved state cleared", "info");
+            refreshProgress();
+            loadDiskInfo();
+            showAlert("downloadAlert", "Finished downloads history cleared", "info");
         }
-    } catch (error) {
-        showAlert("downloadAlert", "Error: " + error.message, "error");
+    } catch (err) {
+        showAlert("downloadAlert", "Error clearing history: " + err.message, "error");
     }
 }
 
+// Backward-compatible aliases
 async function clearProgress() {
-    try {
-        const response = await authFetch("/download/clear-completed", { method: "POST" });
-        if (!response || !response.ok) throw new Error("Failed to clear progress on server");
-
-        completedDownloads.clear();
-
-        const historyContainer = document.getElementById("historyContainer");
-        const historySection = document.getElementById("historySection");
-        if (historyContainer) {
-            historyContainer.innerHTML = '';
-            historySection?.classList.add('hidden');
-        }
-
-        // If session not active and no other sections shown, hide the whole progress section
-        const statusResponse = await authFetch("/download-progress");
-        if (statusResponse) {
-            const status = await statusResponse.json();
-            if (!status.active && (!status.queue || status.queue.length === 0)) {
-                document.getElementById("downloadProgress").classList.add("hidden");
-            }
-        }
-
-        // Immediately hide the resume notification if it exists
-        const resumeNotification = document.getElementById("resumeNotification");
-        if (resumeNotification) {
-            resumeNotification.classList.add("hidden");
-            resumeNotification.remove(); // Also remove it to be sure
-        }
-
-        // Reset local session trackers
-        currentSessionId = null;
-
-        showAlert("downloadAlert", "Progress history cleared", "success");
-    } catch (error) {
-        showAlert("downloadAlert", "Error clearing progress: " + error.message, "error");
-    }
+    await clearCompletedHistory();
+}
+async function clearSavedState() {
+    await clearCompletedHistory();
+}
+async function resumeDownload() {
+    await resumeAllUnfinished();
 }
 
-async function resumeDownload() {
+async function refreshProgress() {
     try {
-        // First, load the existing completed downloads into UI
-        const progressResponse = await authFetch("/download-progress");
-        const data = await progressResponse.json();
+        const response = await authFetch('/download-progress');
+        if (!response) return;
+        const data = await safeJsonParse(response, 'Refresh progress');
         updateProgressUI(data);
-
-        // Now resume the download
-        const response = await authFetch("/download/resume", {
-            method: "POST",
-        });
-
-        const resumeData = await response.json();
-
-        if (response.ok) {
-            showAlert("downloadAlert", `Resuming ${resumeData.remaining || 0} files...`, "success");
-
-            // Remove resume notification
-            const notification = document.getElementById("resumeNotification");
-            if (notification) notification.remove();
-
-            // Show cancel button
-            document.getElementById("stopAllBtn").classList.remove("hidden");
-
-            // Start monitoring for new downloads
+        if (data.active || data.scanning) {
             startProgressMonitoring();
-        } else {
-            showAlert("downloadAlert", data.detail || data.message, "error");
         }
-    } catch (error) {
-        showAlert("downloadAlert", "Error: " + error.message, "error");
+    } catch (err) {
+        console.error("Error refreshing progress:", err);
     }
 }
 
@@ -699,14 +727,18 @@ async function checkStatus() {
         if (data.status === "connected") {
             connectionStatus.className = "flex items-center";
             connectionStatus.innerHTML =
-                `<span class="relative flex h-3 w-3 sm:h-4 sm:w-4">
-                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75"></span>
-                    <span class="relative inline-flex rounded-full h-3 w-3 sm:h-4 sm:w-4 bg-green-500"></span>
+                `<span class="relative flex h-2.5 w-2.5 sm:h-3 sm:w-3">
+                    <span class="relative inline-flex rounded-full h-2.5 w-2.5 sm:h-3 sm:w-3 bg-green-500"></span>
                 </span>
-                <span class="hidden md:inline ml-2 text-xs font-medium text-green-400">Connected</span>`;
+                <span class="hidden lg:inline ml-1.5 text-xs font-medium text-green-400">Connected</span>`;
             userInfo.innerHTML = `<p><i class="fa-solid fa-user text-[10px] opacity-70 mr-1.5" title="Logged in user"></i> ${escapeHtml(data.user.first_name)} (@${escapeHtml(data.user.username || "N/A")})</p>`;
             loginSection.classList.add("hidden");
             downloadSection.classList.remove("hidden");
+
+            // Load data when authenticated
+            loadChannels();
+            loadDiskInfo();
+            refreshProgress();
         } else if (data.status === "not_authenticated" || data.status === "disconnected") {
             connectionStatus.className = "flex items-center";
             connectionStatus.innerHTML =
@@ -1090,44 +1122,16 @@ async function clearIndividualProgress(fileId) {
         });
 
         if (response && response.ok) {
-            // Clear from frontend
             completedDownloads.delete(fileId);
             const element = document.getElementById(progressElId(fileId));
             if (element) {
                 element.remove();
             }
-
-            // Also try removing the cancelled variant if it exists
             const cancelledElement = document.getElementById(progressElId(fileId, "cancelled"));
             if (cancelledElement) {
                 cancelledElement.remove();
             }
-
-            // If no more progress items in any section, hide the entire progress section
-            const activeContainer = document.getElementById("activeDownloadContainer");
-            const queueContainer = document.getElementById("queueContainer");
-            const historyContainer = document.getElementById("historyContainer");
-
-            const hasItems = (activeContainer?.children.length > 0) ||
-                (queueContainer?.children.length > 0) ||
-                (historyContainer?.children.length > 0);
-
-            if (!hasItems) {
-                document.getElementById("downloadProgress").classList.add("hidden");
-            }
-
-            // Update overall progress text if visible
-            const overallText = document.getElementById('overallText');
-            if (overallText) {
-                // Fetch updated progress from backend
-                const progressResponse = await authFetch("/download-progress");
-                if (progressResponse && progressResponse.ok) {
-                    const progressData = await progressResponse.json();
-                    if (progressData.total > 0) {
-                        overallText.textContent = `${progressData.progress || 0}/${progressData.total} files`;
-                    }
-                }
-            }
+            refreshProgress();
         } else {
             console.error("Failed to clear individual download from backend");
         }
@@ -1679,6 +1683,7 @@ function startProgressMonitoring() {
                 const completedCount = Object.keys(data.completed_downloads || {}).length;
                 if (completedCount > 0) {
                     showAlert("downloadAlert", `Download session complete! ${completedCount} files downloaded.`, "success");
+                    loadDiskInfo();
                 }
                 return;
             }
@@ -1695,7 +1700,7 @@ function startProgressMonitoring() {
                 showAlert("downloadAlert", "Error monitoring download progress. Please refresh the page.", "error");
             }
         }
-    }, 500);
+    }, 1000);
 }
 
 function showAlert(_elementId, message, type) {
@@ -1790,506 +1795,393 @@ style.innerHTML = `
 `;
 document.head.appendChild(style);
 
-// Handle page visibility changes to restore progress monitoring
-document.addEventListener('visibilitychange', async function () {
+// Handle page visibility changes to restore progress monitoring and save battery/CPU
+document.addEventListener('visibilitychange', function () {
     if (!document.hidden) {
-        // Page became visible again
-
-        try {
-            const response = await authFetch('/download-progress');
-            if (!response) return;
-
-            const data = await response.json();
-
-            // If there's an active download and no monitoring is running
-            if (data.active && !progressMonitoringInterval) {
-
-                // Show progress section and cancel button
-                document.getElementById('downloadProgress').classList.remove('hidden');
-                document.getElementById('stopAllBtn').classList.remove('hidden');
-
-                // Restore progress monitoring
-                startProgressMonitoring();
-
-                // Immediately update to show current state
-                updateProgressUI(data);
-            } else if (data.active && progressMonitoringInterval) {
-                // Monitoring is running, just refresh the UI
-            } else if (!data.active && data.completed_downloads && Object.keys(data.completed_downloads).length > 0) {
-                // No active download but there are completed ones, show them
-                document.getElementById('downloadProgress').classList.remove('hidden');
-                document.getElementById('clearProgressBtn')?.classList.remove('hidden');
-                updateProgressUI(data);
-            }
-        } catch (error) {
-            console.error('Error restoring download state:', error);
-        }
-    } else {
-        // Page became hidden
+        refreshProgress();
+        loadDiskInfo();
     }
 });
 
-// Helper function to update progress UI
-function updateProgressUI(data) {
-    if (!data) {
-        return;
+// --- Unified Activity & History Display ---
+
+function setActivityFilter(filter) {
+    currentActivityFilter = filter;
+
+    const filterBtns = document.querySelectorAll('.activity-chip');
+    filterBtns.forEach(btn => {
+        const isCurrent = btn.id === `filterBtn-${filter}`;
+        if (isCurrent) {
+            btn.className = "activity-chip px-3 py-1.5 rounded-xl text-xs font-bold transition-all border border-black bg-amber-400 text-black shadow-[2px_2px_0px_#000]";
+        } else {
+            btn.className = "activity-chip px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all border border-transparent text-gray-400 hover:text-white hover:bg-gray-800";
+        }
+    });
+
+    if (lastKnownProgressData) {
+        renderUnifiedActivity(lastKnownProgressData);
     }
+}
 
-    const activeContainer = document.getElementById('activeDownloadContainer');
-    const queueList = document.getElementById('queueList'); // Replaced queueContainer
-    const historyContainer = document.getElementById('historyContainer');
+function getFileIconHtml(fileName) {
+    const ext = (fileName || "").split('.').pop().toLowerCase();
+    if (['mp4', 'mkv', 'avi', 'mov', 'webm', 'flv'].includes(ext)) {
+        return '<i class="fa-solid fa-file-video text-amber-400"></i>';
+    }
+    if (['mp3', 'm4a', 'flac', 'wav', 'ogg', 'opus'].includes(ext)) {
+        return '<i class="fa-solid fa-file-audio text-emerald-400"></i>';
+    }
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
+        return '<i class="fa-solid fa-file-image text-purple-400"></i>';
+    }
+    if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) {
+        return '<i class="fa-solid fa-file-zipper text-indigo-400"></i>';
+    }
+    if (['pdf', 'doc', 'docx', 'txt', 'epub'].includes(ext)) {
+        return '<i class="fa-solid fa-file-lines text-blue-400"></i>';
+    }
+    return '<i class="fa-solid fa-file text-gray-400"></i>';
+}
 
-    const activeSection = document.getElementById('activeSection');
-    const queueSection = document.getElementById('queueTabContent'); // Use tab content as section
-    const historySection = document.getElementById('historySection');
-    const progressSection = document.getElementById('downloadProgress');
+function updateProgressUI(data) {
+    if (!data) return;
+    lastKnownProgressData = data;
 
-    const hasQueuedItems = data.queue && data.queue.length > 0;
-    const isFinished = data.total > 0 && data.progress >= data.total;
-    const isScanning = data.scanning || false;
-    const scanProgress = data.scan_progress || 0;
-
-    // Removed early return to allow partial updates even if some containers are missing
-
-    // 1. Check for session change
+    // Check for session change
     if (data.session_id && data.session_id !== currentSessionId) {
         currentSessionId = data.session_id;
-
-        // Reset UI for new session
         completedDownloads.clear();
-        if (activeContainer) activeContainer.innerHTML = '';
-        if (queueList) queueList.innerHTML = '';
-        if (historyContainer) historyContainer.innerHTML = '';
-
-        if (progressSection) progressSection.classList.remove('hidden');
     }
 
-    // [Diagnostic] Log transition state
-    const activeCount = data.concurrent_downloads ? Object.keys(data.concurrent_downloads).length : 0;
-    const isActuallyActive = data.active && !isFinished;
-    if (isActuallyActive) {
+    const concurrent = data.concurrent_downloads || {};
+    const queue = data.queue || [];
+    const completed = data.completed_downloads || {};
+    const cancelled = data.cancelled_files || {};
+    const failed = data.failed_files || {};
+
+    const activeList = Object.entries(concurrent).map(([id, item]) => ({ ...item, id, type: 'active' }));
+    const queuedList = queue.filter(q => q.status === 'queued').map((q, idx) => ({ ...q, type: 'queued', queueIndex: idx }));
+    const partialList = [
+        ...Object.entries(cancelled).map(([id, item]) => ({ ...item, id, type: 'partial' })),
+        ...queue.filter(q => q.status === 'failed').map(q => ({ ...q, type: 'failed' })),
+        ...Object.entries(failed).map(([id, item]) => ({ ...item, id, type: 'failed' }))
+    ];
+    const completedList = Object.entries(completed)
+        .map(([id, item]) => ({ ...item, id, type: 'completed' }))
+        .sort((a, b) => new Date(b.completed_at || 0) - new Date(a.completed_at || 0));
+
+    const activeCount = activeList.length;
+    const queuedCount = queuedList.length;
+    const partialCount = partialList.length;
+    const completedCount = completedList.length;
+    const totalCount = activeCount + queuedCount + partialCount + completedCount;
+
+    // Update filter counts
+    const countAll = document.getElementById('count-all');
+    if (countAll) countAll.textContent = totalCount;
+    const countActive = document.getElementById('count-active');
+    if (countActive) countActive.textContent = activeCount;
+    const countQueued = document.getElementById('count-queued');
+    if (countQueued) countQueued.textContent = queuedCount;
+    const countPartial = document.getElementById('count-partial');
+    if (countPartial) countPartial.textContent = partialCount;
+    const countCompleted = document.getElementById('count-completed');
+    if (countCompleted) countCompleted.textContent = completedCount;
+
+    const summaryEl = document.getElementById('activityTotalSummary');
+    if (summaryEl) {
+        summaryEl.textContent = `${totalCount} item${totalCount === 1 ? '' : 's'} (${completedCount} completed)`;
     }
 
-    // 2. Update Header / Visibility based on active status
-    const hasActive = data.active && data.concurrent_downloads && Object.keys(data.concurrent_downloads).length > 0;
-    const hasHistory = (data.completed_downloads && Object.keys(data.completed_downloads).length > 0) ||
-        (data.cancelled_files && Object.keys(data.cancelled_files).length > 0);
+    // Live indicators & Session timer
+    const liveIndicator = document.getElementById('activityLiveIndicator');
+    const timerWrapper = document.getElementById('sessionTimerWrapper');
+    const statusIcon = document.getElementById('activityStatusIcon');
+    const stopAllBtn = document.getElementById('stopAllBtn');
 
-    const hasVisibleContent = hasActive || hasHistory || (data.active && !isFinished) || isScanning;
-    if (hasVisibleContent) {
-        if (progressSection) progressSection.classList.remove('hidden');
-    } else {
-        // Only hide if session is truly inactive or finished
-        if (!data.active || isFinished) {
-            if (progressSection) progressSection.classList.add('hidden');
+    const isRunning = Boolean(data.active && (activeCount > 0 || queuedCount > 0 || data.scanning));
+    if (isRunning) {
+        liveIndicator?.classList.remove('hidden');
+        timerWrapper?.classList.remove('hidden');
+        timerWrapper?.classList.add('flex');
+        if (statusIcon) statusIcon.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-lg text-amber-400"></i>';
+        stopAllBtn?.classList.remove('hidden');
+        if (data.started_at) {
+            updateSessionTimer(data.started_at);
         }
-    }
-
-    // 3. Update Stop All button visibility - only show if there is actually something to stop
-    // (Active downloads, Queued items, or Scanning)
-    const canStop = hasActive || hasQueuedItems || isScanning;
-    if (canStop && data.active) {
-        document.getElementById('stopAllBtn')?.classList.remove('hidden');
-        document.getElementById('activeIcon')?.classList.add('fa-spin');
     } else {
-        document.getElementById('stopAllBtn')?.classList.add('hidden');
-        document.getElementById('activeIcon')?.classList.remove('fa-spin');
+        liveIndicator?.classList.add('hidden');
+        timerWrapper?.classList.add('hidden');
+        timerWrapper?.classList.remove('flex');
+        if (statusIcon) statusIcon.innerHTML = '<i class="fa-solid fa-list-check text-lg text-amber-400"></i>';
+        stopAllBtn?.classList.add('hidden');
     }
 
-    // 4. Update or add completed downloads (History)
-    if (data.completed_downloads && historyContainer) {
-        const completedEntries = Object.entries(data.completed_downloads);
-        if (completedEntries.length > 0) {
-            historySection?.classList.remove('hidden');
-
-            // Sort by completed_at descending and take last 10
-            const last10 = completedEntries
-                .sort((a, b) => new Date(b[1].completed_at) - new Date(a[1].completed_at))
-                .slice(0, 10);
-
-            // Surgical update: only add new items, don't wipe and re-render
-            const existingIds = new Set(
-                Array.from(historyContainer.querySelectorAll('.file-progress-block'))
-                    .map(el => el.id.replace('progress-', ''))
-            );
-
-            for (const [fileId, fileData] of last10) {
-                completedDownloads.set(fileId, fileData.path);
-
-                // Skip if already rendered
-                if (existingIds.has(fileId)) {
-                    existingIds.delete(fileId); // Mark as still valid
-                    continue;
-                }
-
-                const percentage = fileData.percentage || 100;
-                const html = createProgressBar(fileId, fileData.name, true, percentage, fileData.size, fileData.size);
-                historyContainer.insertAdjacentHTML('afterbegin', html);
-            }
-
-            // Remove items that are no longer in the top 10 (but keep cancelled divider)
-            existingIds.forEach(staleId => {
-                const staleEl = document.getElementById(progressElId(staleId));
-                if (staleEl && !staleId.includes('cancelled')) {
-                    staleEl.remove();
-                }
-            });
-
-            // Add cancelled downloads if not already present
-            if (data.cancelled_files) {
-                const cancelledEntries = Object.entries(data.cancelled_files);
-                if (cancelledEntries.length > 0) {
-                    // Add divider if needed
-                    if (last10.length > 0 && !document.getElementById('cancelled-divider')) {
-                        historyContainer.insertAdjacentHTML('beforeend',
-                            '<div id="cancelled-divider" class="border-t border-gray-700/50 my-4 pt-2"><p class="text-xs text-red-400 font-semibold mb-2">Cancelled Files</p></div>');
-                    }
-
-                    for (const [fileId, fileData] of cancelledEntries) {
-                        if (document.getElementById(progressElId(fileId, "cancelled"))) continue;
-
-                        const percentage = fileData.percentage || 0;
-                        const size = fileData.total || 0;
-                        historyContainer.insertAdjacentHTML('beforeend',
-                            createCancelledProgressBar(fileId, fileData.name, percentage, fileData.progress, size)
-                        );
-                    }
-                }
-            }
-        } else if (data.cancelled_files && Object.keys(data.cancelled_files).length > 0) {
-            // Only cancelled files
-            historySection?.classList.remove('hidden');
-
-            for (const [fileId, fileData] of Object.entries(data.cancelled_files)) {
-                if (document.getElementById(progressElId(fileId, "cancelled"))) continue;
-
-                const percentage = fileData.percentage || 0;
-                const size = fileData.total || 0;
-                historyContainer.insertAdjacentHTML('beforeend',
-                    createCancelledProgressBar(fileId, fileData.name, percentage, fileData.progress, size)
-                );
-            }
-        } else {
-            historySection?.classList.add('hidden');
-        }
-    }
-
-    // 5. Update active downloads and Scanning Indicator
-    // (A) Scanning Indicator - Independent of active download count
+    // Dedicated Scanning container
     const scanningContainer = document.getElementById('scanningContainer');
-    if (isScanning && scanningContainer) {
+    if (data.scanning && scanningContainer) {
         scanningContainer.classList.remove('hidden');
         const progressBar = document.getElementById('scanningProgressBar');
         const progressText = document.getElementById('scanningProgressText');
-        if (progressBar) progressBar.style.width = `${scanProgress}%`;
-        if (progressText) progressText.textContent = `${scanProgress}%`;
+        const scanPct = data.scan_progress || 0;
+        if (progressBar) progressBar.style.width = `${scanPct}%`;
+        if (progressText) progressText.textContent = `${scanPct}%`;
     } else if (scanningContainer) {
         scanningContainer.classList.add('hidden');
     }
 
-    // (B) Active Download Items
-    if (data.concurrent_downloads && activeContainer) {
-        const activeIds = Object.keys(data.concurrent_downloads);
-
-        // Remove stale active downloads
-        const currentActiveBars = activeContainer.querySelectorAll('.file-progress-block');
-        currentActiveBars.forEach(bar => {
-            const id = bar.id.replace('progress-', '');
-            if (!activeIds.includes(id)) {
-                bar.remove();
-            }
-        });
-
-        if (activeIds.length > 0) {
-            // We have files actively downloading
-            activeSection?.classList.remove('hidden');
-            document.getElementById('initializing-placeholder')?.remove();
-
-            for (const [fileId, fileData] of Object.entries(data.concurrent_downloads)) {
-                if (completedDownloads.has(fileId)) continue;
-
-                const percentage = fileData.percentage || 0;
-                const existingProgress = document.getElementById(progressElId(fileId));
-                const html = createProgressBar(
-                    fileId, fileData.name, false, percentage,
-                    fileData.progress, fileData.total, fileData.retry_attempt,
-                    fileData.last_update, fileData.speed, fileData.eta, false
-                );
-
-                if (existingProgress) {
-                    // Surgical update to avoid flickering/missing clicks
-                    const pBar = existingProgress.querySelector('.progress-inner');
-                    const pPercent = existingProgress.querySelector('.progress-percentage');
-                    const pEta = existingProgress.querySelector('.progress-eta');
-                    const pSize = existingProgress.querySelector('.progress-size-text');
-                    const pSpeed = existingProgress.querySelector('.speed-val');
-
-                    if (pBar) pBar.style.width = `${percentage}%`;
-                    if (pPercent) pPercent.textContent = `${percentage}%`;
-                    if (pEta) pEta.textContent = fileData.eta > 0 ? `ETA: ${formatTime(fileData.eta)}` : '';
-                    if (pSize) {
-                        const currentStr = formatBytes(fileData.progress || 0);
-                        const totalStr = formatBytes(fileData.total || 0);
-                        pSize.innerHTML = `${currentStr} <span class="opacity-50 mx-1">/</span> ${totalStr}`;
-                    }
-                    if (pSpeed) {
-                        pSpeed.textContent = fileData.speed > 0 ? `${formatBytes(fileData.speed)}/s` : '';
-                    }
-
-                    // For more complex state changes (like retry/stall badges), we could do more,
-                    // but the above covers 99% of updates and fixes the "blinking button" issue.
-                } else {
-                    activeContainer.insertAdjacentHTML('beforeend', html);
-                }
-            }
-        } else {
-            // No concurrent downloads right now
-            if (data.active && !isFinished) {
-                // We are transitioning or preparing
-                activeSection?.classList.remove('hidden');
-                if (!document.getElementById('initializing-placeholder')) {
-                    activeContainer.insertAdjacentHTML('beforeend', `
-                        <div id="initializing-placeholder" class="text-center py-8 animate-pulse bg-gray-800 bg-opacity-20 rounded-2xl border border-gray-700 border-opacity-30">
-                            <i class="fa-solid fa-circle-notch fa-spin text-indigo-400 text-3xl mb-3"></i>
-                            <p class="text-white text-sm font-medium">Preparing next download...</p>
-                        </div>
-                    `);
-                }
-            } else {
-                // Truly inactive
-                activeSection?.classList.add('hidden');
-                document.getElementById('initializing-placeholder')?.remove();
-            }
-        }
+    // Buttons visibility
+    const resumeAllBtn = document.getElementById('resumeAllBtn');
+    if (resumeAllBtn) {
+        resumeAllBtn.classList.toggle('hidden', !(partialCount > 0 && !data.active));
+    }
+    const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+    if (clearHistoryBtn) {
+        clearHistoryBtn.classList.toggle('hidden', !(completedCount > 0 || partialCount > 0));
+    }
+    const clearQueueBtn = document.getElementById('clearQueueBtn');
+    if (clearQueueBtn) {
+        clearQueueBtn.classList.toggle('hidden', !(queuedCount > 0));
     }
 
-    // 6. Update Queue
-    if (data.queue) {
-        // Only sync badge and count, list rendering moved to Queue tab
-        updateQueueBadge(data.queue.length);
-    }
-
-    // 7. Cleanup UI - Remove items from containers if they move between states
-    // (Already handled by logic above for most cases)
+    renderUnifiedActivity(data, { activeList, queuedList, partialList, completedList });
 }
 
-// On page load, check status and load channels if connected
-(async function () {
-    await checkStatus();
+function renderUnifiedActivity(data, preparedLists = null) {
+    const container = document.getElementById('activityContainer');
+    if (!container) return;
 
-    const connectionStatus = document.getElementById('connectionStatus');
-    if (connectionStatus && connectionStatus.textContent.includes('Connected')) {
-        await loadChannels();
-        await checkSavedState();
-    } else {
+    let { activeList, queuedList, partialList, completedList } = preparedLists || {};
+    if (!activeList) {
+        const concurrent = data.concurrent_downloads || {};
+        const queue = data.queue || [];
+        const completed = data.completed_downloads || {};
+        const cancelled = data.cancelled_files || {};
+        const failed = data.failed_files || {};
+
+        activeList = Object.entries(concurrent).map(([id, item]) => ({ ...item, id, type: 'active' }));
+        queuedList = queue.filter(q => q.status === 'queued').map((q, idx) => ({ ...q, type: 'queued', queueIndex: idx }));
+        partialList = [
+            ...Object.entries(cancelled).map(([id, item]) => ({ ...item, id, type: 'partial' })),
+            ...queue.filter(q => q.status === 'failed').map(q => ({ ...q, type: 'failed' })),
+            ...Object.entries(failed).map(([id, item]) => ({ ...item, id, type: 'failed' }))
+        ];
+        completedList = Object.entries(completed)
+            .map(([id, item]) => ({ ...item, id, type: 'completed' }))
+            .sort((a, b) => new Date(b.completed_at || 0) - new Date(a.completed_at || 0));
     }
 
-})();
+    // Filter items based on currentActivityFilter
+    let itemsToRender = [];
+    if (currentActivityFilter === 'all') {
+        itemsToRender = [...activeList, ...queuedList, ...partialList, ...completedList];
+    } else if (currentActivityFilter === 'active') {
+        itemsToRender = activeList;
+    } else if (currentActivityFilter === 'queued') {
+        itemsToRender = queuedList;
+    } else if (currentActivityFilter === 'partial') {
+        itemsToRender = partialList;
+    } else if (currentActivityFilter === 'completed') {
+        itemsToRender = completedList;
+    }
 
-// --- Queue Management ---
-
-let queuePollInterval = null;
-let currentQueue = [];
-
-function switchTab(tab) {
-    const searchTab = document.getElementById('searchTabContent');
-    const queueTab = document.getElementById('queueTabContent');
-    const searchBtn = document.getElementById('tab-search');
-    const queueBtn = document.getElementById('tab-queue');
-    const downloadProgress = document.getElementById('downloadProgress');
-
-    if (tab === 'search') {
-        searchTab.classList.remove('hidden');
-        queueTab.classList.add('hidden');
-
-        searchBtn.classList.add('btn-gradient');
-        searchBtn.classList.remove('text-gray-400', 'border-transparent');
-
-        queueBtn.classList.remove('btn-gradient');
-        queueBtn.classList.add('text-gray-400', 'border-transparent');
-
-        // Stop queue polling
-        if (queuePollInterval) {
-            clearInterval(queuePollInterval);
-            queuePollInterval = null;
+    if (itemsToRender.length === 0) {
+        let msg = "No download activity yet";
+        let sub = "Select a channel and scan files to begin downloading";
+        if (currentActivityFilter === 'active') {
+            msg = "No active downloads";
+            sub = "Nothing is downloading right now";
+        } else if (currentActivityFilter === 'queued') {
+            msg = "Download queue is empty";
+            sub = "Scan files and add them to download";
+        } else if (currentActivityFilter === 'partial') {
+            msg = "No partial or interrupted downloads";
+            sub = "All interrupted files will appear here with a resume option";
+        } else if (currentActivityFilter === 'completed') {
+            msg = "No completed downloads in history";
+            sub = "Finished downloads will be recorded here";
         }
 
-    } else if (tab === 'queue') {
-        searchTab.classList.add('hidden');
-        queueTab.classList.remove('hidden');
-
-        queueBtn.classList.add('btn-gradient');
-        queueBtn.classList.remove('text-gray-400', 'border-transparent');
-
-        searchBtn.classList.remove('btn-gradient');
-        searchBtn.classList.add('text-gray-400', 'border-transparent');
-
-        // Fetch queue immediately
-        fetchQueue();
-
-        // Start polling queue
-        if (!queuePollInterval) {
-            queuePollInterval = setInterval(fetchQueue, 2000);
-        }
-    }
-}
-
-async function fetchQueue() {
-    try {
-        const response = await authFetch('/queue');
-        if (!response) return;
-
-        const data = await safeJsonParse(response);
-        if (data.status === 'success') {
-            currentQueue = data.queue || [];
-            renderQueue(currentQueue);
-            updateQueueBadge(currentQueue.length);
-        }
-    } catch (e) {
-        console.error("Error fetching queue:", e);
-    }
-}
-
-function updateQueueBadge(count) {
-    const badge = document.getElementById('queueCountBadge');
-    const totalCount = document.getElementById('queueTotalCount');
-
-    if (badge) {
-        badge.textContent = count;
-        badge.classList.toggle('hidden', count === 0);
-    }
-
-    if (totalCount) {
-        totalCount.textContent = `${count} items`;
-    }
-
-    // Also update pagination total if it exists
-    const pagTotal = document.getElementById('paginationTotal');
-    if (pagTotal) {
-        pagTotal.textContent = count;
-    }
-}
-
-function renderQueue(queue) {
-    const list = document.getElementById('queueList');
-    if (!list) return;
-
-    if (queue.length === 0) {
-        list.innerHTML = `
-            <div class="text-center text-gray-500 py-10">
-                <i class="fa-solid fa-basket-shopping text-4xl mb-3 opacity-30"></i>
-                <p>Queue is empty</p>
+        container.innerHTML = `
+            <div id="activityEmptyState" class="text-center text-gray-500 py-12 animate-fade-in">
+                <i class="fa-solid fa-inbox text-4xl mb-3 opacity-30"></i>
+                <p class="text-sm font-semibold text-gray-400">${escapeHtml(msg)}</p>
+                <p class="text-xs text-gray-500 mt-1">${escapeHtml(sub)}</p>
             </div>
         `;
-        updatePaginationUI(0);
         return;
     }
 
-    // Pagination logic
-    const totalItems = queue.length;
-    const totalPages = Math.ceil(totalItems / queueItemsPerPage);
+    container.innerHTML = itemsToRender.map(item => renderActivityRow(item)).join('');
+}
 
-    // Ensure current page is within bounds
-    if (queueCurrentPage > totalPages) queueCurrentPage = Math.max(1, totalPages);
+function renderActivityRow(item) {
+    const fileId = item.id;
+    const progressId = progressElId(fileId);
+    const fileName = item.name || `file_${item.message_id || fileId}`;
+    const fileIcon = getFileIconHtml(fileName);
+    const channelName = item.channel || '';
 
-    const startIndex = (queueCurrentPage - 1) * queueItemsPerPage;
-    const endIndex = Math.min(startIndex + queueItemsPerPage, totalItems);
-    const paginatedItems = queue.slice(startIndex, endIndex);
+    let badgeHtml = '';
+    let detailsHtml = '';
+    let actionsHtml = '';
+    let trackHtml = '';
 
-    list.innerHTML = paginatedItems.map((item, index) => {
-        const globalIndex = startIndex + index;
-        return `
-        <div class="bg-gray-800/50 hover:bg-gray-800 border border-gray-700 hover:border-gray-600 rounded-lg p-3 sm:p-4 transition-all flex items-center gap-2 sm:gap-4 group">
-            <div class="text-gray-500 font-mono text-xs w-5 sm:w-6 text-center flex-shrink-0">${globalIndex + 1}</div>
-            
-            <div class="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded bg-indigo-500/10 flex items-center justify-center text-indigo-400">
-                <i class="fa-solid fa-file text-xs sm:text-sm"></i>
+    if (item.type === 'active') {
+        const pct = item.percentage || 0;
+        const cur = item.progress || 0;
+        const tot = item.total || 0;
+        const speedText = item.speed > 0 ? `${formatBytes(item.speed)}/s` : '';
+        const etaText = item.eta > 0 ? `ETA: ${formatTime(item.eta)}` : '';
+
+        badgeHtml = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1"><i class="fa-solid fa-spinner fa-spin text-[8px]"></i> Downloading ${pct}%</span>`;
+
+        detailsHtml = `
+            <span class="text-amber-300 font-mono font-medium">${formatBytes(cur)} / ${formatBytes(tot)}</span>
+            ${speedText ? `<span class="text-gray-400 font-mono">· ${speedText}</span>` : ''}
+            ${etaText ? `<span class="text-gray-400 font-mono">· ${etaText}</span>` : ''}
+        `;
+
+        actionsHtml = `
+            <button onclick="cancelIndividualDownload(${jsStr(fileId)})" 
+                class="w-8 h-8 rounded-lg btn-red flex items-center justify-center text-xs focus:outline-none" 
+                title="Cancel Download">
+                <i class="fa-solid fa-stop"></i>
+            </button>
+        `;
+
+        trackHtml = `
+            <div class="mt-2.5 h-2 w-full bg-gray-950 border border-black/70 rounded-full overflow-hidden relative shadow-inner">
+                <div class="progress-bar-gpu h-full bg-gradient-to-r from-amber-500 to-amber-300 rounded-full" 
+                     style="width: ${pct}%;"></div>
             </div>
-            
-            <div class="flex-grow min-w-0">
-                <div class="text-xs sm:text-sm font-medium text-white line-clamp-2" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</div>
-                <div class="text-xs text-gray-400 flex items-center gap-2 mt-0.5">
-                    <span class="bg-gray-700 px-1.5 rounded text-[10px] truncate max-w-[100px]">${escapeHtml(item.channel)}</span>
-                    <span class="${getStatusColor(item.status)} capitalize text-[10px] sm:text-xs">${escapeHtml(item.status)}</span>
+        `;
+    } else if (item.type === 'queued') {
+        const qIdx = (item.queueIndex !== undefined) ? item.queueIndex + 1 : 1;
+        badgeHtml = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-yellow-500/20 text-yellow-300 border border-yellow-500/30">Queued #${qIdx}</span>`;
+        detailsHtml = `<span class="text-gray-400 italic">Waiting in line...</span>`;
+        actionsHtml = `
+            <button onclick="removeFromQueue(${jsStr(fileId)})" 
+                class="w-8 h-8 rounded-lg btn-red flex items-center justify-center text-xs focus:outline-none" 
+                title="Remove from Queue">
+                <i class="fa-solid fa-trash-can"></i>
+            </button>
+        `;
+    } else if (item.type === 'partial') {
+        const pct = item.percentage || 0;
+        const cur = item.progress || 0;
+        const tot = item.total || 0;
+
+        badgeHtml = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/30 flex items-center gap-1"><i class="fa-solid fa-pause text-[8px]"></i> Partial ${pct}%</span>`;
+
+        detailsHtml = `
+            <span class="text-rose-300 font-mono">${formatBytes(cur)} of ${formatBytes(tot)}</span>
+            <span class="text-gray-500 text-[10px]">· Interrupted</span>
+        `;
+
+        actionsHtml = `
+            <button onclick="retryIndividualDownload(${jsStr(fileId)})" 
+                class="px-2.5 py-1 rounded-lg btn-yellow-hover text-xs font-bold flex items-center gap-1.5 focus:outline-none" 
+                title="Resume download from where it stopped">
+                <i class="fa-solid fa-rotate text-[10px]"></i> <span>Resume</span>
+            </button>
+            <button onclick="clearIndividualProgress(${jsStr(fileId)})" 
+                class="w-7 h-7 rounded-lg btn-red flex items-center justify-center text-xs focus:outline-none" 
+                title="Dismiss from history">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        `;
+
+        trackHtml = `
+            <div class="mt-2.5 h-1.5 w-full bg-gray-950 border border-black/70 rounded-full overflow-hidden relative shadow-inner">
+                <div class="h-full bg-rose-500/70 rounded-full" style="width: ${pct}%;"></div>
+            </div>
+        `;
+    } else if (item.type === 'failed') {
+        badgeHtml = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-red-500/20 text-red-300 border border-red-500/30 flex items-center gap-1"><i class="fa-solid fa-triangle-exclamation text-[8px]"></i> Failed</span>`;
+        detailsHtml = `<span class="text-red-400 font-mono text-[10px]">Error occurred</span>`;
+        actionsHtml = `
+            <button onclick="retryIndividualDownload(${jsStr(fileId)})" 
+                class="px-2.5 py-1 rounded-lg btn-yellow-hover text-xs font-bold flex items-center gap-1.5 focus:outline-none" 
+                title="Retry download">
+                <i class="fa-solid fa-rotate text-[10px]"></i> <span>Retry</span>
+            </button>
+            <button onclick="clearIndividualProgress(${jsStr(fileId)})" 
+                class="w-7 h-7 rounded-lg btn-red flex items-center justify-center text-xs focus:outline-none" 
+                title="Dismiss from history">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        `;
+    } else if (item.type === 'completed') {
+        const sizeStr = item.size ? formatBytes(item.size) : '';
+        const timeStr = item.completed_at ? new Date(item.completed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+
+        badgeHtml = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-green-500/20 text-green-300 border border-green-500/30 flex items-center gap-1"><i class="fa-solid fa-check text-[8px]"></i> Done</span>`;
+
+        detailsHtml = `
+            ${sizeStr ? `<span class="text-green-300 font-mono font-medium">${sizeStr}</span>` : ''}
+            ${timeStr ? `<span class="text-gray-500 text-[10px]">· Finished at ${timeStr}</span>` : ''}
+        `;
+
+        actionsHtml = `
+            <a href="/files/serve/${encodeURIComponent(fileName)}" target="_blank" 
+                class="w-7 h-7 rounded-lg bg-gray-700/50 hover:bg-amber-500 hover:text-black text-gray-300 flex items-center justify-center text-xs transition-all border border-black/50" 
+                title="Open / Download File">
+                <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+            </a>
+            <button onclick="clearIndividualProgress(${jsStr(fileId)})" 
+                class="w-7 h-7 rounded-lg btn-red flex items-center justify-center text-xs focus:outline-none" 
+                title="Clear from history">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        `;
+    }
+
+    return `
+        <div id="${progressId}" class="activity-row border-2 border-black rounded-xl p-3 sm:p-3.5 bg-gray-800/80 hover:bg-gray-800 transition-all shadow-[2px_2px_0px_rgba(0,0,0,0.3)] animate-fade-in" data-type="${item.type}">
+            <div class="flex items-start justify-between gap-3">
+                <div class="flex items-start gap-2.5 sm:gap-3 min-w-0 flex-1">
+                    <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-gray-900 border border-black flex items-center justify-center flex-shrink-0 text-sm shadow-[1px_1px_0px_#000]">
+                        ${fileIcon}
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <div class="flex flex-wrap items-center gap-1.5 mb-1">
+                            <span class="text-xs sm:text-sm font-semibold text-white line-clamp-2" title="${escapeHtml(fileName)}">
+                                ${escapeHtml(fileName)}
+                            </span>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 text-xs text-gray-400">
+                            ${channelName ? `<span class="bg-gray-900 px-1.5 py-0.5 rounded text-[10px] font-mono text-gray-400 border border-black/40 truncate max-w-[120px]">${escapeHtml(channelName)}</span>` : ''}
+                            ${badgeHtml}
+                            ${detailsHtml}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-1.5 flex-shrink-0">
+                    ${actionsHtml}
                 </div>
             </div>
-            
-            <div class="flex items-center gap-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex-shrink-0">
-                <button onclick="removeFromQueue(${jsStr(item.id)})" class="w-8 h-8 flex items-center justify-center bg-red-500/20 text-red-400 hover:bg-red-600 hover:text-white rounded-lg transition-all focus:outline-none">
-                    <i class="fa-solid fa-trash-can text-[10px]"></i>
-                </button>
-            </div>
+
+            ${trackHtml}
         </div>
-    `}).join('');
-
-    updatePaginationUI(totalItems);
-}
-
-function updatePaginationUI(totalItems) {
-    const paginationEl = document.getElementById('queuePagination');
-    if (!paginationEl) return;
-
-    if (totalItems === 0) {
-        paginationEl.classList.add('hidden');
-        return;
-    }
-
-    paginationEl.classList.remove('hidden');
-
-    const totalPages = Math.ceil(totalItems / queueItemsPerPage);
-    const startIndex = (queueCurrentPage - 1) * queueItemsPerPage + 1;
-    const endIndex = Math.min(queueCurrentPage * queueItemsPerPage, totalItems);
-
-    document.getElementById('paginationRange').textContent = `${startIndex} - ${endIndex}`;
-    document.getElementById('paginationTotal').textContent = totalItems;
-    document.getElementById('currentPageNum').textContent = queueCurrentPage;
-    document.getElementById('totalPageNum').textContent = totalPages;
-
-    document.getElementById('prevPageBtn').disabled = queueCurrentPage === 1;
-    document.getElementById('nextPageBtn').disabled = queueCurrentPage === totalPages;
-}
-
-function changeQueuePage(delta) {
-    const totalPages = Math.ceil(currentQueue.length / queueItemsPerPage);
-    const next = queueCurrentPage + delta;
-
-    if (next >= 1 && next <= totalPages) {
-        queueCurrentPage = next;
-        renderQueue(currentQueue);
-    }
-}
-
-function getStatusColor(status) {
-    switch (status) {
-        case 'downloading': return 'text-green-400 animate-pulse';
-        case 'queued': return 'text-yellow-400';
-        case 'failed': return 'text-red-400';
-        default: return 'text-gray-400';
-    }
-}
-
-async function reorderQueue(index, direction) {
-    // Reorder disabled as per user request to remove drag/drop & simplify
+    `;
 }
 
 async function removeFromQueue(id) {
     try {
-        await authFetch(`/queue/${id}`, { method: 'DELETE' });
-        // Optimistic update
-        currentQueue = currentQueue.filter(item => item.id !== id);
-        renderQueue(currentQueue);
-        updateQueueBadge(currentQueue.length);
+        await authFetch(`/queue/${encodeURIComponent(id)}`, { method: 'DELETE' });
+        refreshProgress();
     } catch (e) {
-        console.error("Remove failed", e);
-        fetchQueue();
+        console.error("Remove from queue failed", e);
+        refreshProgress();
     }
 }
 
 async function clearQueue() {
-    // Show confirmation modal
     const confirmed = await showConfirmModal({
         title: 'Clear Queue?',
-        message: 'Are you sure you want to remove all items from the download queue?',
+        message: 'Are you sure you want to remove all pending items from the download queue?',
         icon: 'fa-trash-can',
         iconType: 'danger',
         confirmText: 'Clear Queue',
@@ -2298,29 +2190,15 @@ async function clearQueue() {
 
     if (!confirmed) return;
 
-    setButtonLoading("clearQueueBtn", true, "Clearing...");
-
     try {
         await authFetch('/queue/clear', { method: 'POST' });
-        currentQueue = [];
-        renderQueue([]);
-        updateQueueBadge(0);
+        refreshProgress();
         showAlert('downloadAlert', 'Queue cleared', 'info');
     } catch (e) {
         showAlert('downloadAlert', 'Failed to clear queue', 'error');
-    } finally {
-        setButtonLoading("clearQueueBtn", false);
     }
 }
 
-async function refreshQueue() {
-    const btn = document.querySelector('button[title="Refresh Queue"] i');
-    if (btn) btn.classList.add('fa-spin');
-    await fetchQueue();
-    if (btn) btn.classList.remove('fa-spin');
-}
-
-// Session Timer
 function updateSessionTimer(startedAt) {
     const timerEl = document.getElementById('sessionTimer');
     if (!timerEl || !startedAt) return;
