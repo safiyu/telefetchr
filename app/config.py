@@ -84,6 +84,9 @@ class Config:
     DOWNLOAD_CHUNK_SIZE = int(os.getenv("DOWNLOAD_CHUNK_SIZE", "4194304"))  # 4MB chunks (faster)
     DOWNLOAD_REQUEST_DELAY = float(os.getenv("DOWNLOAD_REQUEST_DELAY", "0.01"))  # 10ms delay between chunk requests
     DOWNLOAD_WORKERS = int(os.getenv("DOWNLOAD_WORKERS", "8"))  # Number of parallel workers for downloading single file
+    # Parallel Multi-Connection Transfer (FastTelethon architecture)
+    # When True, each worker opens an independent TCP MTProto connection to Telegram's DC
+    PARALLEL_CONNECTIONS: bool = os.getenv("PARALLEL_CONNECTIONS", "true").lower() in ("true", "1", "yes")
 
     # Duplicate filename resolution strategy when the destination exists:
     #   skip      - skip download if destination exists with matching size

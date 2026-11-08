@@ -289,6 +289,57 @@ class TelegramService:
             progress_callback=throttled_progress_callback if progress_callback else None
         )
 
+    async def _create_parallel_senders(self, dc_id: int, count: int):
+        """Create and connect independent MTProtoSender instances for multi-connection parallel downloads."""
+        from telethon.network import MTProtoSender
+        from telethon.tl.alltlobjects import LAYER
+        from telethon.tl.functions import InvokeWithLayerRequest
+        from telethon.tl.functions.auth import ExportAuthorizationRequest, ImportAuthorizationRequest
+
+        if not hasattr(self.client, "_get_dc") or not getattr(self.client, "session", None):
+            return None
+
+        try:
+            dc = await self.client._get_dc(dc_id)
+            is_current_dc = (dc_id == self.client.session.dc_id)
+            auth_key = self.client.session.auth_key if is_current_dc else None
+
+            async def _connect_single(key):
+                s = MTProtoSender(key, loggers=self.client._log)
+                conn = self.client._connection(
+                    dc.ip_address,
+                    dc.port,
+                    dc.id,
+                    loggers=self.client._log,
+                    proxy=self.client._proxy,
+                    local_addr=getattr(self.client, "_local_addr", None)
+                )
+                await s.connect(conn)
+                return s
+
+            senders = []
+            first_sender = await _connect_single(auth_key)
+
+            if not is_current_dc and not auth_key:
+                logger.info(f"Exporting auth to DC {dc_id} for multi-connection parallel transfer")
+                auth = await self.client(ExportAuthorizationRequest(dc_id))
+                self.client._init_request.query = ImportAuthorizationRequest(id=auth.id, bytes=auth.bytes)
+                req = InvokeWithLayerRequest(LAYER, self.client._init_request)
+                await first_sender.send(req)
+                auth_key = first_sender.auth_key
+
+            senders.append(first_sender)
+
+            if count > 1:
+                remaining = await asyncio.gather(*[_connect_single(auth_key) for _ in range(count - 1)])
+                senders.extend(remaining)
+
+            logger.info(f"Connected {len(senders)} parallel MTProto connections to DC {dc_id}")
+            return senders
+        except Exception as e:
+            logger.warning(f"Could not establish multi-connection sender pool (falling back to single connection): {e}")
+            return None
+
     async def download_media_parallel(
         self, 
         message, 
@@ -297,7 +348,8 @@ class TelegramService:
         workers: int = 4,
         resume: bool = False
     ) -> str:
-        """Download Telegram media using sparse file pre-allocation and direct os.pwrite range requests."""
+        """Download Telegram media using sparse file pre-allocation, direct os.pwrite range requests,
+        and multi-connection parallel MTProto senders when available."""
         import os
         import math
         import asyncio
@@ -418,6 +470,21 @@ class TelegramService:
         if downloaded_bytes > 0 and progress_callback:
             progress_callback(min(downloaded_bytes, file_size), file_size)
 
+        # Attempt to establish parallel MTProto sender connections if enabled and multiple workers used
+        senders = None
+        input_location = None
+        if getattr(Config, "PARALLEL_CONNECTIONS", True) and effective_workers > 1:
+            try:
+                from telethon import utils as tl_utils
+                dc_id, input_location = tl_utils.get_input_location(message.media)
+                if not dc_id and getattr(self.client, "session", None):
+                    dc_id = self.client.session.dc_id
+                if dc_id:
+                    senders = await self._create_parallel_senders(dc_id, effective_workers)
+            except Exception as ex:
+                logger.debug(f"Multi-connection parallel setup skipped: {ex}")
+                senders = None
+
         async def worker(worker_id: int, start_byte: int, end_byte: int) -> None:
             nonlocal downloaded_bytes
             current_offset = start_byte
@@ -425,48 +492,100 @@ class TelegramService:
             if current_offset >= end_byte:
                 return
 
-            chunk_limit = math.ceil((end_byte - start_byte) / request_chunk_size)
+            use_dedicated_sender = (
+                senders is not None 
+                and worker_id < len(senders) 
+                and senders[worker_id] is not None
+                and input_location is not None
+            )
 
-            async for chunk in self.client.iter_download(
-                message.media,
-                offset=start_byte,
-                request_size=request_chunk_size,
-                limit=chunk_limit
-            ):
-                if not chunk:
-                    break
+            if use_dedicated_sender:
+                sender = senders[worker_id]
+                from telethon.tl import functions as tl_functions, types as tl_types
+                while current_offset < end_byte:
+                    chunk_to_request = min(request_chunk_size, end_byte - current_offset)
+                    aligned_limit = math.ceil(chunk_to_request / 4096) * 4096
+                    req = tl_functions.upload.GetFileRequest(
+                        input_location,
+                        offset=current_offset,
+                        limit=aligned_limit
+                    )
+                    result = await self.client._call(sender, req)
+                    if isinstance(result, tl_types.upload.FileCdnRedirect):
+                        raise RuntimeError("CDN redirect in parallel transfer")
 
-                # Boundary guard: if this worker already filled its byte range, exit immediately
-                if current_offset >= end_byte:
-                    break
+                    chunk = getattr(result, "bytes", b"")
+                    if not chunk:
+                        break
 
-                # Slicing guard: truncate any chunk that crosses this worker's upper boundary
-                remaining = end_byte - current_offset
-                chunk_len = len(chunk)
-                if chunk_len > remaining:
-                    chunk = chunk[:remaining]
-                    chunk_len = remaining
+                    remaining = end_byte - current_offset
+                    chunk_len = len(chunk)
+                    if chunk_len > remaining:
+                        chunk = chunk[:remaining]
+                        chunk_len = remaining
 
-                if chunk_len == 0:
-                    break
+                    if chunk_len == 0:
+                        break
 
-                # Direct seek-free write at current offset using os.pwrite
-                await loop.run_in_executor(None, os.pwrite, fd, chunk, current_offset)
-                current_offset += chunk_len
-                partitions[worker_id]["current"] = current_offset
+                    # Direct seek-free write at current offset using os.pwrite
+                    await loop.run_in_executor(None, os.pwrite, fd, chunk, current_offset)
+                    current_offset += chunk_len
+                    partitions[worker_id]["current"] = current_offset
 
-                async with lock:
-                    downloaded_bytes += chunk_len
-                    if progress_callback:
-                        now = datetime.now()
-                        elapsed = (now - last_callback_time[0]).total_seconds()
-                        if elapsed >= Config.DOWNLOAD_REQUEST_DELAY or downloaded_bytes >= file_size:
-                            progress_callback(min(downloaded_bytes, file_size), file_size)
-                            last_callback_time[0] = now
-                            save_meta()
+                    async with lock:
+                        downloaded_bytes += chunk_len
+                        if progress_callback:
+                            now = datetime.now()
+                            elapsed = (now - last_callback_time[0]).total_seconds()
+                            if elapsed >= Config.DOWNLOAD_REQUEST_DELAY or downloaded_bytes >= file_size:
+                                progress_callback(min(downloaded_bytes, file_size), file_size)
+                                last_callback_time[0] = now
+                                save_meta()
 
-                if current_offset >= end_byte:
-                    break
+                    if current_offset >= end_byte:
+                        break
+            else:
+                chunk_limit = math.ceil((end_byte - start_byte) / request_chunk_size)
+                async for chunk in self.client.iter_download(
+                    message.media,
+                    offset=start_byte,
+                    request_size=request_chunk_size,
+                    limit=chunk_limit
+                ):
+                    if not chunk:
+                        break
+
+                    # Boundary guard: if this worker already filled its byte range, exit immediately
+                    if current_offset >= end_byte:
+                        break
+
+                    # Slicing guard: truncate any chunk that crosses this worker's upper boundary
+                    remaining = end_byte - current_offset
+                    chunk_len = len(chunk)
+                    if chunk_len > remaining:
+                        chunk = chunk[:remaining]
+                        chunk_len = remaining
+
+                    if chunk_len == 0:
+                        break
+
+                    # Direct seek-free write at current offset using os.pwrite
+                    await loop.run_in_executor(None, os.pwrite, fd, chunk, current_offset)
+                    current_offset += chunk_len
+                    partitions[worker_id]["current"] = current_offset
+
+                    async with lock:
+                        downloaded_bytes += chunk_len
+                        if progress_callback:
+                            now = datetime.now()
+                            elapsed = (now - last_callback_time[0]).total_seconds()
+                            if elapsed >= Config.DOWNLOAD_REQUEST_DELAY or downloaded_bytes >= file_size:
+                                progress_callback(min(downloaded_bytes, file_size), file_size)
+                                last_callback_time[0] = now
+                                save_meta()
+
+                    if current_offset >= end_byte:
+                        break
 
         tasks = []
         for i in range(effective_workers):
@@ -496,5 +615,12 @@ class TelegramService:
             raise
         finally:
             os.close(fd)
+            if senders:
+                for s in senders:
+                    if s:
+                        try:
+                            await s.disconnect()
+                        except Exception:
+                            pass
 
         return file_path

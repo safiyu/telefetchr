@@ -902,6 +902,59 @@ def test_get_current_user_query_token_auth() -> None:
     assert user == "remote_user"
 
 
+def test_parallel_multi_sender_download(tmp_path: Path) -> None:
+    from app.services.telegram_service import TelegramService
+    from telethon.tl.types import MessageMediaDocument, Document
+    from unittest.mock import AsyncMock, MagicMock
+
+    size = 10 * 1024 * 1024  # 10MB
+    payload = bytes((i * 11 + 3) % 256 for i in range(size))
+
+    client = MagicMock()
+    client.session = MagicMock()
+    client.session.dc_id = 2
+
+    senders_disconnected = []
+
+    class MockSender:
+        def __init__(self, idx):
+            self.idx = idx
+
+        async def disconnect(self):
+            senders_disconnected.append(self.idx)
+
+    mock_senders = [MockSender(i) for i in range(2)]
+
+    async def mock_call(sender, req):
+        offset = req.offset
+        limit = req.limit
+        chunk = payload[offset:offset + limit]
+        res = MagicMock()
+        res.bytes = chunk
+        return res
+
+    client._call = AsyncMock(side_effect=mock_call)
+
+    tg = TelegramService()
+    tg.client = client
+    tg._create_parallel_senders = AsyncMock(return_value=mock_senders)
+
+    doc = Document(id=999, access_hash=888, file_reference=b'ref', date=None, mime_type='video/mp4', size=size, dc_id=2, attributes=[])
+    media = MessageMediaDocument(document=doc)
+    msg = MagicMock()
+    msg.media = media
+
+    target = tmp_path / "parallel_fast.mp4"
+    res = asyncio.run(tg.download_media_parallel(msg, str(target), workers=2))
+
+    assert res == str(target)
+    assert target.is_file()
+    assert target.read_bytes() == payload
+    # Verify all senders were disconnected
+    assert sorted(senders_disconnected) == [0, 1]
+
+
+
 
 
 
