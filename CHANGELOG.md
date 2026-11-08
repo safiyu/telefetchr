@@ -2,6 +2,10 @@
 
 All epic victories and mysterious bugs that somehow became features are here.
 
+## [4.2.10] - 2026-11-09
+### Fixed
+- Auto Download scan failing with `Cannot find any entity corresponding to "@@name"`: channel references are now normalized (duplicate leading `@` collapsed) when saving rules, in the UI, and when scanning, so existing broken rules work without recreation.
+
 ## [4.2.9] - 2026-11-09
 ### Fixed
 - Auto Download rule scan now shows the real server error (instead of a generic "Server error (400)") and the backend logs the full traceback with the channel.

@@ -566,7 +566,7 @@ function renderChannelOptions(channelsToRender) {
     list.innerHTML = sliced.map(channel => {
         const val = channel.username || channel.id;
         const isSelected = String(val) === String(currentVal);
-        const usernameStr = channel.username ? `@${escapeHtml(channel.username)}` : `ID: ${channel.id}`;
+        const usernameStr = channel.username ? `@${escapeHtml(String(channel.username).replace(/^@+/, ''))}` : `ID: ${channel.id}`;
 
         return `
             <div onclick="selectChannel(${jsStr(val)}, ${jsStr(channel.name)})"
@@ -2599,7 +2599,7 @@ function populateWatchRuleChannels() {
     select.innerHTML = '<option value="">Select a channel to watch...</option>';
     if (Array.isArray(rawChannels)) {
         rawChannels.forEach(c => {
-            const val = c.username ? `@${c.username}` : String(c.id);
+            const val = c.username ? `@${String(c.username).replace(/^@+/, '')}` : String(c.id);
             const opt = document.createElement("option");
             opt.value = val;
             opt.textContent = `${c.name || c.username || c.id} (${val})`;
@@ -2917,6 +2917,7 @@ async function createWatchRule() {
     if (channel === "__custom__") {
         channel = (customChannelInput ? customChannelInput.value : "").trim();
     }
+    if (channel.startsWith("@")) channel = "@" + channel.replace(/^@+/, "");
     if (!channel) {
         showAlert("downloadAlert", "Target channel is required.", "warning");
         return;

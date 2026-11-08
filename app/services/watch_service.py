@@ -72,6 +72,14 @@ class WatchService:
         with self._lock:
             return self.rules.get(rule_id)
 
+    @staticmethod
+    def _normalize_channel_ref(value: Any) -> str:
+        """Trim a channel reference and collapse repeated leading '@' (e.g. '@@name' -> '@name')."""
+        ref = str(value or "").strip()
+        if ref.startswith("@"):
+            ref = "@" + ref.lstrip("@")
+        return ref
+
     def add_rule(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Create and persist a new watch rule."""
         from app.utils.path_utils import sanitize_subfolder
@@ -82,7 +90,7 @@ class WatchService:
         rule_id = f"rule_{uuid.uuid4().hex[:8]}"
         rule = {
             "id": rule_id,
-            "channel": str(data.get("channel", "")).strip(),
+            "channel": self._normalize_channel_ref(data.get("channel", "")),
             "channel_name": data.get("channel_name") or data.get("channel", ""),
             "keywords": data.get("keywords") or "",
             "file_extensions": data.get("file_extensions") or "",
@@ -114,7 +122,7 @@ class WatchService:
             rule = self.rules[rule_id]
             for key in ["channel", "channel_name", "keywords", "file_extensions", "subfolder", "organize_by", "enabled"]:
                 if key in data and data[key] is not None:
-                    rule[key] = data[key]
+                    rule[key] = self._normalize_channel_ref(data[key]) if key == "channel" else data[key]
             for key in ["min_size_mb", "max_size_mb"]:
                 if key in data:
                     rule[key] = float(data[key]) if data[key] is not None else None
@@ -284,7 +292,7 @@ class WatchService:
         if not rule:
             return {"status": "error", "message": "Rule not found"}
 
-        channel = rule.get("channel")
+        channel = self._normalize_channel_ref(rule.get("channel"))
         queued_count = 0
         try:
             async for message in await self.telegram_service.iter_messages(channel, limit=limit):
