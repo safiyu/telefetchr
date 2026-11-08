@@ -2,6 +2,10 @@
 
 All epic victories and mysterious bugs that somehow became features are here.
 
+## [4.2.5] - 2026-11-09
+### Changed
+- Taller Top Row: Channel selection and Downloads cards now take about half of the page height on desktop (`46vh`), with the Downloads list scrolling inside.
+
 ## [4.2.4] - 2026-11-09
 ### Fixed
 - Downloads Card Scrollbar & Height Lock: Locked the desktop Downloads panel (`lg-abs-fill`) to strictly match the intrinsic height of the Channel Selection card so download items never stretch the top row or push the Scanned Files list off-screen.

@@ -219,8 +219,11 @@
             scrollbar-color: #475569 #0b1120;
         }
 
-        /* Desktop Height Lock for Downloads Panel to match Left Card height */
+        /* Desktop Height Lock for Downloads Panel to match Left Card height (50% Page Height Split) */
         @media (min-width: 1024px) {
+            .lg-top-half {
+                min-height: 46vh;
+            }
             .lg-abs-fill {
                 position: absolute !important;
                 top: 0;
@@ -233,7 +236,7 @@
         }
         @media (max-width: 1023px) {
             #activityContainer {
-                max-height: 300px;
+                max-height: 360px;
             }
         }
 
@@ -703,7 +706,7 @@
             <!-- SEARCH / CONTROLS (Main Container) -->
             <div id="searchTabContent" class="w-full flex-1 flex flex-col min-h-0 space-y-2.5 lg:overflow-hidden">
                 <!-- Top Row: Channel Controls & Downloads Card side-by-side with equal height -->
-                <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch flex-shrink-0">
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch flex-shrink-0 lg-top-half">
                     <!-- Left Column: Source Controls & Scan Filters Card (7 cols) -->
                     <div class="lg:col-span-7 flex flex-col min-w-0">
                         <!-- Main Controls -->
@@ -1137,7 +1140,7 @@
         </div>
     </main>
 
-    <script src="/static/js/script.js?v=52"></script>
+    <script src="/static/js/script.js?v=53"></script>
     <!-- Toast Container -->
     <div id="toastContainer"
         class="fixed bottom-8 left-4 right-4 sm:bottom-auto sm:top-6 sm:right-6 sm:left-auto flex flex-col items-center sm:items-end gap-3 pointer-events-none transition-all duration-300"
