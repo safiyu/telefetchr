@@ -11,6 +11,7 @@ from app.config import Config
 from app.services.telegram_service import TelegramService
 from app.services.download_service import DownloadService
 from app.services.auth_service import AuthService
+from app.services.watch_service import WatchService
 from app.utils.state_manager import StateManager
 from app.utils.auth_dependencies import set_auth_service
 from app.api.routes import router, set_services
@@ -46,6 +47,7 @@ telegram_service: TelegramService = None
 download_service: DownloadService = None
 state_manager: StateManager = None
 auth_service: AuthService = None
+watch_service: WatchService = None
 
 
 def cleanup_old_logs(log_file_path: str, max_age_days: int = 30):
@@ -81,7 +83,7 @@ def cleanup_old_logs(log_file_path: str, max_age_days: int = 30):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan event handler for startup and shutdown."""
-    global telegram_service, download_service, state_manager, auth_service
+    global telegram_service, download_service, state_manager, auth_service, watch_service
 
     # Startup
     try:
@@ -110,8 +112,13 @@ async def lifespan(app: FastAPI):
         # Initialize download service
         download_service = DownloadService(telegram_service, state_manager)
 
+        # Initialize watch service
+        watch_service = WatchService(telegram_service, download_service)
+        if telegram_service and await telegram_service.is_connected():
+            watch_service.attach_event_handler_if_needed()
+
         # Inject services into routes
-        set_services(telegram_service, download_service, state_manager, auth_service)
+        set_services(telegram_service, download_service, state_manager, auth_service, watch_service)
 
         # Log saved state information
         # Auto-resume if active and has a session ID
@@ -132,6 +139,10 @@ async def lifespan(app: FastAPI):
     # Cancel any active download tasks
     if download_service:
         download_service.cleanup_tasks()
+
+    # Detach watch event handler
+    if watch_service:
+        watch_service.detach_event_handler()
 
     # Disconnect Telegram client
     if telegram_service:

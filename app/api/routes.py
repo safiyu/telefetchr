@@ -14,12 +14,17 @@ from app.models.schemas import (
     CodeRequest,
     PasswordRequest,
     DownloadRequest,
-    DownloadSelectedRequest
+    DownloadSelectedRequest,
+    QuickFetchRequest,
+    WatchRuleCreateRequest,
+    WatchRuleUpdateRequest
 )
 from app.services.telegram_service import TelegramService
 from app.services.download_service import DownloadService
 from app.services.auth_service import AuthService
+from app.services.watch_service import WatchService
 from app.utils.state_manager import StateManager
+from app.utils.path_utils import sanitize_subfolder
 from app.utils.auth_dependencies import get_current_user, get_client_ip, is_trusted_ip
 from app.utils.rate_limiter import login_limiter, code_request_limiter, code_verify_limiter
 from app.config import Config
@@ -34,15 +39,23 @@ telegram_service: TelegramService = None
 download_service: DownloadService = None
 state_manager: StateManager = None
 auth_service: AuthService = None
+watch_service: Optional[WatchService] = None
 
 
-def set_services(tg_service: TelegramService, dl_service: DownloadService, st_manager: StateManager, a_service: AuthService):
+def set_services(
+    tg_service: TelegramService, 
+    dl_service: DownloadService, 
+    st_manager: StateManager, 
+    a_service: AuthService,
+    w_service: Optional[WatchService] = None
+):
     """Set service instances"""
-    global telegram_service, download_service, state_manager, auth_service
+    global telegram_service, download_service, state_manager, auth_service, watch_service
     telegram_service = tg_service
     download_service = dl_service
     state_manager = st_manager
     auth_service = a_service
+    watch_service = w_service
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -204,6 +217,8 @@ async def verify_login(request: CodeRequest, http_request: Request, current_user
         )
     try:
         user = await telegram_service.verify_code(request.code)
+        if watch_service:
+            watch_service.attach_event_handler_if_needed()
         return {
             "status": "success",
             "message": "Logged in successfully",
@@ -234,6 +249,8 @@ async def verify_password(request: PasswordRequest, http_request: Request, curre
         )
     try:
         user = await telegram_service.verify_password(request.password)
+        if watch_service:
+            watch_service.attach_event_handler_if_needed()
         return {
             "status": "success",
             "message": "Logged in successfully",
@@ -281,14 +298,22 @@ async def list_files(request: DownloadRequest, current_user: str = Depends(get_c
 
 @router.post("/files/download-selected")
 async def download_selected_files(request: DownloadSelectedRequest, background_tasks: BackgroundTasks, current_user: str = Depends(get_current_user)):
-    """Download selected files"""
+    """Download selected files with optional subfolder routing"""
     if not await telegram_service.is_connected():
         raise HTTPException(status_code=400, detail="Not connected. Login first.")
+
+    if request.subfolder:
+        try:
+            sanitize_subfolder(request.subfolder)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
 
     try:
         session_id = await download_service.download_selected_files(
             request.channel_username,
-            request.message_ids
+            request.message_ids,
+            subfolder=request.subfolder,
+            organize_by=request.organize_by
         )
         return {
             "status": "started",
@@ -302,15 +327,23 @@ async def download_selected_files(request: DownloadSelectedRequest, background_t
 
 @router.post("/files/download-all")
 async def download_all_files(request: DownloadRequest, background_tasks: BackgroundTasks, current_user: str = Depends(get_current_user)):
-    """Download all files from a channel"""
+    """Download all files from a channel with optional subfolder routing"""
     if not await telegram_service.is_connected():
         raise HTTPException(status_code=400, detail="Not connected. Login first.")
+
+    if request.subfolder:
+        try:
+            sanitize_subfolder(request.subfolder)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
 
     try:
         session_id = await download_service.download_all_files(
             request.channel_username,
             request.limit,
-            request.filter_type
+            request.filter_type,
+            subfolder=request.subfolder,
+            organize_by=request.organize_by
         )
         return {
             "status": "started",
@@ -327,17 +360,31 @@ async def download_file(
     message_id: int, 
     background_tasks: BackgroundTasks,
     channel_username: str = Query(..., description="Channel username or ID"),
+    subfolder: Optional[str] = Query(None, description="Optional relative subfolder"),
+    organize_by: Optional[str] = Query(None, description="Optional organization strategy: channel or type"),
     current_user: str = Depends(get_current_user)
 ):
     """Download a specific file by message ID - starts download in background"""
     if not await telegram_service.is_connected():
         raise HTTPException(status_code=400, detail="Not connected. Login first.")
+
+    if subfolder:
+        try:
+            sanitize_subfolder(subfolder)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
     
     try:
         file_id = f"single_{message_id}"
         
         # Add to background tasks properly
-        background_tasks.add_task(download_service.download_single, channel_username, message_id)
+        background_tasks.add_task(
+            download_service.download_single, 
+            channel_username, 
+            message_id, 
+            subfolder=subfolder, 
+            organize_by=organize_by
+        )
         
         return {
             "status": "started",
@@ -348,6 +395,97 @@ async def download_file(
         error_msg = str(e)
         logger.error(f"Download error: {error_msg}")
         raise HTTPException(status_code=400, detail=error_msg)
+
+
+@router.post("/files/quick-fetch")
+async def quick_fetch(request: QuickFetchRequest, current_user: str = Depends(get_current_user)):
+    """Parse and queue downloads from direct Telegram t.me links."""
+    if not await telegram_service.is_connected():
+        raise HTTPException(status_code=400, detail="Not connected. Login first.")
+
+    if request.subfolder:
+        try:
+            sanitize_subfolder(request.subfolder)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+    result = await download_service.quick_fetch_links(
+        request.links,
+        subfolder=request.subfolder,
+        organize_by=request.organize_by
+    )
+    if result.get("status") == "error":
+        raise HTTPException(status_code=400, detail=result.get("message"))
+    return result
+
+
+# Watch Rules Endpoints
+
+@router.get("/api/watch-rules")
+async def get_watch_rules(current_user: str = Depends(get_current_user)):
+    """List all channel auto-watch rules."""
+    if not watch_service:
+        return {"rules": []}
+    return {"rules": watch_service.get_rules()}
+
+
+@router.post("/api/watch-rules")
+async def create_watch_rule(request: WatchRuleCreateRequest, current_user: str = Depends(get_current_user)):
+    """Create a new channel auto-watch rule."""
+    if not watch_service:
+        raise HTTPException(status_code=500, detail="Watch service not initialized")
+    if request.subfolder:
+        try:
+            sanitize_subfolder(request.subfolder)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+    try:
+        rule = watch_service.add_rule(request.model_dump())
+        return {"status": "success", "rule": rule}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.put("/api/watch-rules/{rule_id}")
+async def update_watch_rule(rule_id: str, request: WatchRuleUpdateRequest, current_user: str = Depends(get_current_user)):
+    """Update or toggle a channel auto-watch rule."""
+    if not watch_service:
+        raise HTTPException(status_code=500, detail="Watch service not initialized")
+    if request.subfolder:
+        try:
+            sanitize_subfolder(request.subfolder)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+    try:
+        updated = watch_service.update_rule(rule_id, request.model_dump(exclude_unset=True))
+        if not updated:
+            raise HTTPException(status_code=404, detail="Rule not found")
+        return {"status": "success", "rule": updated}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/api/watch-rules/{rule_id}")
+async def delete_watch_rule(rule_id: str, current_user: str = Depends(get_current_user)):
+    """Delete a channel auto-watch rule."""
+    if not watch_service:
+        raise HTTPException(status_code=500, detail="Watch service not initialized")
+    if not watch_service.delete_rule(rule_id):
+        raise HTTPException(status_code=404, detail="Rule not found")
+    return {"status": "success", "message": "Rule deleted"}
+
+
+@router.post("/api/watch-rules/{rule_id}/scan")
+async def scan_watch_rule(rule_id: str, limit: int = Query(50, ge=1, le=500), current_user: str = Depends(get_current_user)):
+    """Retroactively scan past messages for a watch rule."""
+    if not await telegram_service.is_connected():
+        raise HTTPException(status_code=400, detail="Not connected. Login first.")
+    if not watch_service:
+        raise HTTPException(status_code=500, detail="Watch service not initialized")
+    result = await watch_service.scan_rule(rule_id, limit=limit)
+    if result.get("status") == "error":
+        raise HTTPException(status_code=400, detail=result.get("message"))
+    return result
 
 
 @router.get("/download-progress")
@@ -479,17 +617,23 @@ async def clear_individual_download(file_id: str, current_user: str = Depends(ge
 
 @router.get("/files/downloaded")
 async def list_downloaded_files(current_user: str = Depends(get_current_user)):
-    """List all downloaded files"""
+    """List all downloaded files including subfolders"""
     try:
         files = []
-        for filename in os.listdir(Config.SAVE_PATH):
-            file_path = os.path.join(Config.SAVE_PATH, filename)
-            if os.path.isfile(file_path):
-                files.append({
-                    "name": filename,
-                    "size": os.path.getsize(file_path),
-                    "path": file_path
-                })
+        base_dir = Path(Config.SAVE_PATH).resolve()
+        if base_dir.exists():
+            for root, _, filenames in os.walk(base_dir):
+                if ".incomplete" in root:
+                    continue
+                for filename in filenames:
+                    file_path = os.path.join(root, filename)
+                    rel_path = os.path.relpath(file_path, base_dir)
+                    files.append({
+                        "name": filename,
+                        "relative_path": rel_path,
+                        "size": os.path.getsize(file_path),
+                        "path": file_path
+                    })
 
         return {"status": "success", "files": files, "count": len(files)}
     except Exception as e:
@@ -497,18 +641,20 @@ async def list_downloaded_files(current_user: str = Depends(get_current_user)):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/files/serve/{filename}")
+@router.get("/files/serve/{filepath:path}")
 async def serve_file(
-    filename: str, 
+    filepath: str, 
     current_user: str = Depends(get_current_user)
 ) -> FileResponse:
-    """Serve downloaded file strictly jailed to Config.SAVE_PATH."""
-    # Strip any directory components (e.g. "../../etc/passwd" -> "passwd")
-    safe_filename = os.path.basename(filename)
-
-    # Canonical path resolution to defeat symlink/traversal escapes
+    """Serve downloaded file strictly jailed to Config.SAVE_PATH, including subfolders."""
     base_dir = Path(Config.SAVE_PATH).resolve()
-    target_path = (base_dir / safe_filename).resolve()
+
+    # Reject traversal attempts
+    cleaned = filepath.strip().replace("\\", "/").lstrip("/")
+    if not cleaned or ".." in cleaned.split("/"):
+        raise HTTPException(status_code=403, detail="Access to this path is forbidden")
+
+    target_path = (base_dir / cleaned).resolve()
 
     if not target_path.is_relative_to(base_dir):
         raise HTTPException(status_code=403, detail="Access to this path is forbidden")
@@ -516,10 +662,7 @@ async def serve_file(
     if not target_path.is_file():
         raise HTTPException(status_code=404, detail="File not found")
 
-    # Force a download and disable MIME sniffing. Telegram-controlled names
-    # (e.g. "evil.html" or "a\"><script>alert(1)</script>.png") must never be
-    # rendered by the browser: the name is RFC 5987 percent-encoded, so it
-    # cannot escape the header or switch the response into inline HTML.
+    safe_filename = target_path.name
     quoted = urllib.parse.quote(safe_filename)
     ascii_fallback = safe_filename.encode("ascii", "ignore").decode("ascii") or "download"
     headers = {

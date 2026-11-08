@@ -2,6 +2,21 @@
 
 All epic victories and mysterious bugs that somehow became features are here.
 
+## [4.1.0] - 2026-11-08
+### Added
+- Auto-Watch & Auto-Download Rules: Background Telegram event listener (`events.NewMessage`) and rule engine matching incoming media by channel, file extensions, keywords/regex, and min/max file size with automatic queue ingestion and retroactive channel scans.
+- Smart Subfolder Routing & Media Server Organization: Custom target subfolders and automatic categorization by channel (`@channel/...`) or media type (`videos/`, `audio/`, `documents/`, `photos/`) with strict canonical path traversal protection jailed inside `SAVE_PATH`.
+- Media Server Webhook Notifications: Added `COMPLETION_WEBHOOK_URL` support to notify media servers (Jellyfin, Plex, Sonarr/Radarr, Ntfy) immediately upon file download completion.
+- Direct Telegram Message Link / Quick Fetch: Direct paste modal accepting public (`t.me/channel/123`), private (`t.me/c/1234567890/456`), and `tg://resolve` message links with instant routing and queueing.
+
+### Fixed
+- Subfolder File Serving: Extended `/files/serve/{filepath:path}` to support downloading and opening files saved within subfolders while strictly enforcing canonical directory jail containment.
+- Retry & Resumption Subfolder Preservation: Retrying cancelled, interrupted, or failed downloads now preserves `subfolder` and `organize_by` routing metadata instead of defaulting to root.
+- Upfront Subfolder Validation: Validated target subfolder paths upfront at all API entry points (`/files/download-selected`, `/files/download-all`, `/files/download/{id}`, `/files/quick-fetch`, `/api/watch-rules`) with 400 rejection on path traversal attempts.
+- Watch Service & Event Listener Coroutine: Fixed unawaited `is_connected()` check on service startup and hardened rule keyword matching against regex catastrophic backtracking (ReDoS).
+- Quick Fetch Request Throttling: Enforced maximum cap of 100 links per quick fetch request.
+
+
 ## [4.0.1] - 2026-11-08
 ### Fixed
 - Media Filter in Download All: Fixed document/photo condition in `download_all_files` so that video and audio media files are correctly queued and downloaded when filtering.

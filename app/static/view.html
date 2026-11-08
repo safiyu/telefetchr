@@ -354,6 +354,18 @@
                 <!-- Action Buttons (No console link) -->
                 <div class="flex items-center gap-1 sm:gap-2 pl-1.5 sm:pl-3 border-l border-gray-700/60" id="userInfoActions">
                     <span id="userInfo" class="text-xs font-medium text-gray-300 hidden xl:inline-block"></span>
+                    <button onclick="openQuickFetchModal()"
+                        class="bg-amber-500/15 border border-black text-amber-400 hover:bg-amber-500 hover:text-black hover:-translate-y-0.5 hover:shadow-[2px_2px_0px_#000] transition-all px-2 sm:px-2.5 py-1 sm:py-1.5 flex items-center gap-1.5 rounded-lg sm:rounded-xl focus:outline-none font-bold text-xs"
+                        title="Direct Link / Quick Fetch">
+                        <i class="fa-solid fa-bolt text-xs"></i>
+                        <span class="hidden md:inline">Quick Fetch</span>
+                    </button>
+                    <button onclick="openWatchRulesModal()"
+                        class="bg-blue-500/15 border border-black text-blue-400 hover:bg-blue-500 hover:text-white hover:-translate-y-0.5 hover:shadow-[2px_2px_0px_#000] transition-all px-2 sm:px-2.5 py-1 sm:py-1.5 flex items-center gap-1.5 rounded-lg sm:rounded-xl focus:outline-none font-bold text-xs"
+                        title="Channel Watch & Auto-Download Rules">
+                        <i class="fa-solid fa-tower-broadcast text-xs"></i>
+                        <span class="hidden md:inline">Watch Rules</span>
+                    </button>
                     <button onclick="logoutSession()"
                         class="bg-red-500/15 border border-black text-red-400 hover:bg-red-500 hover:text-white hover:-translate-y-0.5 hover:shadow-[2px_2px_0px_#000] transition-all w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-lg sm:rounded-xl focus:outline-none"
                         title="Delete Session">
@@ -564,19 +576,42 @@
                     </div>
 
                     <!-- Destination & Storage Info Bar -->
-                    <div class="mb-5 p-3 sm:px-4 sm:py-2.5 bg-gray-900/60 rounded-xl border border-gray-800 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                        <div class="flex items-center gap-2 text-gray-300 min-w-0">
-                            <i class="fa-solid fa-folder-open text-yellow-400 flex-shrink-0"></i>
-                            <span class="text-gray-400 flex-shrink-0">Destination:</span>
-                            <span id="diskPathText" class="font-mono text-white bg-gray-950 px-2 py-0.5 rounded border border-gray-800 text-[11px] font-semibold truncate max-w-[200px] sm:max-w-xs" title="/downloads">/downloads</span>
-                        </div>
-                        <div class="flex items-center justify-between sm:justify-end gap-3 min-w-0">
-                            <div class="flex items-center gap-1.5 text-gray-400 text-[11px] sm:text-xs">
-                                <i class="fa-solid fa-hard-drive text-gray-500 text-[11px]"></i>
-                                <span id="diskMetricText" class="text-yellow-300 font-semibold font-mono whitespace-nowrap">-- GB free</span>
+                    <div class="mb-5 p-3 sm:p-4 bg-gray-900/60 rounded-xl border border-gray-800 text-xs flex flex-col gap-3">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                            <div class="flex items-center gap-2 text-gray-300 min-w-0">
+                                <i class="fa-solid fa-folder-open text-yellow-400 flex-shrink-0"></i>
+                                <span class="text-gray-400 flex-shrink-0">Root:</span>
+                                <span id="diskPathText" class="font-mono text-white bg-gray-950 px-2 py-0.5 rounded border border-gray-800 text-[11px] font-semibold truncate max-w-[200px] sm:max-w-xs" title="/downloads">/downloads</span>
                             </div>
-                            <div class="w-24 sm:w-36 bg-gray-950 h-2 rounded-full overflow-hidden border border-black/60 flex-shrink-0 relative" title="Disk Usage">
-                                <div id="diskProgressBar" class="h-full transition-all duration-500 rounded-full" style="width: 0%; background-color: #fbbf24; background-image: linear-gradient(90deg, #f59e0b, #fbbf24);"></div>
+                            <div class="flex items-center justify-between sm:justify-end gap-3 min-w-0">
+                                <div class="flex items-center gap-1.5 text-gray-400 text-[11px] sm:text-xs">
+                                    <i class="fa-solid fa-hard-drive text-gray-500 text-[11px]"></i>
+                                    <span id="diskMetricText" class="text-yellow-300 font-semibold font-mono whitespace-nowrap">-- GB free</span>
+                                </div>
+                                <div class="w-24 sm:w-36 bg-gray-950 h-2 rounded-full overflow-hidden border border-black/60 flex-shrink-0 relative" title="Disk Usage">
+                                    <div id="diskProgressBar" class="h-full transition-all duration-500 rounded-full" style="width: 0%; background-color: #fbbf24; background-image: linear-gradient(90deg, #f59e0b, #fbbf24);"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Subfolder Routing & Organization -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2.5 border-t border-gray-800/80">
+                            <div>
+                                <label class="block text-gray-400 text-[11px] font-semibold uppercase tracking-wider mb-1">
+                                    <i class="fa-solid fa-folder-tree mr-1 text-amber-400"></i> Target Subfolder (Optional)
+                                </label>
+                                <input type="text" id="targetSubfolder" placeholder="e.g. Movies/2026 or Series/Season 1"
+                                    class="w-full px-3 py-1.5 text-xs rounded-lg border border-gray-700 bg-gray-900 focus:ring-1 focus:ring-amber-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-gray-400 text-[11px] font-semibold uppercase tracking-wider mb-1">
+                                    <i class="fa-solid fa-sitemap mr-1 text-amber-400"></i> Auto-Organize By
+                                </label>
+                                <select id="organizeBy"
+                                    class="w-full px-3 py-1.5 text-xs rounded-lg border border-gray-700 bg-gray-900 focus:ring-1 focus:ring-amber-500 outline-none">
+                                    <option value="">No Auto-Organization (Direct to destination)</option>
+                                    <option value="channel">Channel Name / ID (e.g. @channel/...)</option>
+                                    <option value="media_type">Media Type (videos/, audio/, documents/, photos/)</option>
+                                </select>
                             </div>
                         </div>
                     </div>
@@ -716,7 +751,7 @@
         </div>
     </main>
 
-    <script src="/static/js/script.js?v=45"></script>
+    <script src="/static/js/script.js?v=46"></script>
     <!-- Toast Container -->
     <div id="toastContainer"
         class="fixed bottom-8 left-4 right-4 sm:bottom-auto sm:top-6 sm:right-6 sm:left-auto flex flex-col items-center sm:items-end gap-3 pointer-events-none transition-all duration-300"
@@ -828,6 +863,174 @@
                 <div class="p-4 bg-gray-900/80 border-t border-black text-center">
                     <p class="text-[10px] text-gray-600 font-medium italic">"Crafted by Safiyu — May the code be with
                         you! ⚔️"</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Fetch Modal -->
+    <div id="quickFetchModal" class="fixed inset-0 z-[999999] hidden overflow-y-auto" role="dialog" aria-modal="true">
+        <div class="flex min-h-screen items-center justify-center p-4 text-center sm:p-0">
+            <div class="fixed inset-0 bg-gray-900/80 backdrop-blur-sm transition-opacity" onclick="closeQuickFetchModal()"></div>
+            <div class="relative transform overflow-hidden glass-card p-6 text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-xl animate-scale-in">
+                <!-- Header -->
+                <div class="flex items-center justify-between pb-4 border-b border-gray-800">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-amber-500/20 border border-black flex items-center justify-center text-amber-400 shadow-[2px_2px_0px_#000]">
+                            <i class="fa-solid fa-bolt text-lg"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-white">Direct Link / Quick Fetch</h3>
+                            <p class="text-xs text-gray-400">Paste Telegram message links to queue downloads directly</p>
+                        </div>
+                    </div>
+                    <button onclick="closeQuickFetchModal()" class="text-gray-400 hover:text-white transition-colors">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                </div>
+
+                <div class="mt-4 space-y-4">
+                    <div>
+                        <label class="block text-gray-300 text-xs font-bold uppercase tracking-wider mb-1.5">
+                            Telegram Links (One per line)
+                        </label>
+                        <textarea id="quickFetchLinks" rows="4"
+                            placeholder="https://t.me/channel_name/123&#10;https://t.me/c/1234567890/456&#10;tg://resolve?domain=channel&post=789"
+                            class="w-full p-3 font-mono text-xs rounded-xl border border-gray-700 bg-gray-900 text-white placeholder-gray-500 focus:ring-2 focus:ring-amber-500 outline-none resize-y"></textarea>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-gray-400 text-xs font-semibold uppercase tracking-wider mb-1">Target Subfolder</label>
+                            <input type="text" id="quickFetchSubfolder" placeholder="Optional subfolder..."
+                                class="w-full px-3 py-2 text-xs rounded-lg border border-gray-700 bg-gray-900 text-white focus:ring-1 focus:ring-amber-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-gray-400 text-xs font-semibold uppercase tracking-wider mb-1">Auto-Organize</label>
+                            <select id="quickFetchOrganize"
+                                class="w-full px-3 py-2 text-xs rounded-lg border border-gray-700 bg-gray-900 text-white focus:ring-1 focus:ring-amber-500 outline-none">
+                                <option value="">None</option>
+                                <option value="channel">By Channel</option>
+                                <option value="media_type">By Media Type</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="quickFetchResult" class="hidden p-3 rounded-xl border text-xs font-mono"></div>
+                </div>
+
+                <div class="mt-6 flex justify-end gap-3 pt-4 border-t border-gray-800">
+                    <button onclick="closeQuickFetchModal()"
+                        class="px-4 py-2 rounded-xl bg-gray-800 text-gray-300 hover:text-white text-xs font-bold transition-all">
+                        Cancel
+                    </button>
+                    <button onclick="submitQuickFetch()" id="quickFetchSubmitBtn"
+                        class="px-5 py-2 rounded-xl btn-yellow-hover text-xs font-bold flex items-center gap-2">
+                        <i class="fa-solid fa-cloud-arrow-down"></i> <span>Fetch & Queue</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Watch Rules Modal -->
+    <div id="watchRulesModal" class="fixed inset-0 z-[999999] hidden overflow-y-auto" role="dialog" aria-modal="true">
+        <div class="flex min-h-screen items-center justify-center p-4 text-center sm:p-0">
+            <div class="fixed inset-0 bg-gray-900/80 backdrop-blur-sm transition-opacity" onclick="closeWatchRulesModal()"></div>
+            <div class="relative transform overflow-hidden glass-card p-6 text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-3xl animate-scale-in max-h-[90vh] flex flex-col">
+                <!-- Header -->
+                <div class="flex items-center justify-between pb-4 border-b border-gray-800 flex-shrink-0">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-blue-500/20 border border-black flex items-center justify-center text-blue-400 shadow-[2px_2px_0px_#000]">
+                            <i class="fa-solid fa-tower-broadcast text-lg"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-white">Channel Watch & Auto-Download</h3>
+                            <p class="text-xs text-gray-400">Automate real-time media ingestion from watched channels</p>
+                        </div>
+                    </div>
+                    <button onclick="closeWatchRulesModal()" class="text-gray-400 hover:text-white transition-colors">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                </div>
+
+                <!-- Modal Body (Scrollable) -->
+                <div class="mt-4 space-y-6 overflow-y-auto custom-scrollbar flex-1 pr-1">
+                    <!-- Create / Edit Form Card -->
+                    <div class="p-4 bg-gray-950/60 rounded-xl border border-gray-800 space-y-4">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                                <i class="fa-solid fa-plus-circle"></i> Add New Watch Rule
+                            </h4>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-gray-400 text-[11px] font-semibold uppercase mb-1">Target Channel *</label>
+                                <input type="text" id="watchRuleChannel" placeholder="@channel_username or chat ID"
+                                    class="w-full px-3 py-1.5 text-xs rounded-lg border border-gray-700 bg-gray-900 text-white outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-gray-400 text-[11px] font-semibold uppercase mb-1">Subfolder</label>
+                                <input type="text" id="watchRuleSubfolder" placeholder="e.g. Watched/Tech"
+                                    class="w-full px-3 py-1.5 text-xs rounded-lg border border-gray-700 bg-gray-900 text-white outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-gray-400 text-[11px] font-semibold uppercase mb-1">File Extensions (comma-separated)</label>
+                                <input type="text" id="watchRuleExtensions" placeholder="e.g. mp4, mkv, pdf"
+                                    class="w-full px-3 py-1.5 text-xs rounded-lg border border-gray-700 bg-gray-900 text-white outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-gray-400 text-[11px] font-semibold uppercase mb-1">Keywords / Regex</label>
+                                <input type="text" id="watchRuleKeywords" placeholder="e.g. 1080p, Tutorial, S0[1-9]"
+                                    class="w-full px-3 py-1.5 text-xs rounded-lg border border-gray-700 bg-gray-900 text-white outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-gray-400 text-[11px] font-semibold uppercase mb-1">Min / Max Size (MB)</label>
+                                <div class="flex gap-2">
+                                    <input type="number" id="watchRuleMinSize" placeholder="Min MB" min="0"
+                                        class="w-1/2 px-3 py-1.5 text-xs rounded-lg border border-gray-700 bg-gray-900 text-white outline-none">
+                                    <input type="number" id="watchRuleMaxSize" placeholder="Max MB" min="0"
+                                        class="w-1/2 px-3 py-1.5 text-xs rounded-lg border border-gray-700 bg-gray-900 text-white outline-none">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-gray-400 text-[11px] font-semibold uppercase mb-1">Auto-Organize</label>
+                                <select id="watchRuleOrganize"
+                                    class="w-full px-3 py-1.5 text-xs rounded-lg border border-gray-700 bg-gray-900 text-white outline-none">
+                                    <option value="">None</option>
+                                    <option value="channel">By Channel</option>
+                                    <option value="media_type">By Media Type</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="flex justify-end pt-2">
+                            <button onclick="createWatchRule()"
+                                class="px-4 py-1.5 rounded-xl btn-yellow-hover text-xs font-bold flex items-center gap-1.5">
+                                <i class="fa-solid fa-plus"></i> <span>Save Rule</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Rules List -->
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-xs font-bold text-gray-300 uppercase tracking-wider">Active Watch Rules (<span id="watchRulesCount">0</span>)</h4>
+                            <button onclick="loadWatchRules()" class="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1">
+                                <i class="fa-solid fa-rotate-right text-[10px]"></i> Refresh
+                            </button>
+                        </div>
+                        <div id="watchRulesContainer" class="space-y-2">
+                            <!-- Injected by JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer -->
+                <div class="mt-4 pt-3 border-t border-gray-800 flex justify-end flex-shrink-0">
+                    <button onclick="closeWatchRulesModal()"
+                        class="px-4 py-2 rounded-xl bg-gray-800 text-gray-300 hover:text-white text-xs font-bold transition-all">
+                        Close
+                    </button>
                 </div>
             </div>
         </div>

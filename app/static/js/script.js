@@ -47,9 +47,14 @@ function getAuthHeaders() {
     return token ? { 'Authorization': `Bearer ${token}` } : {};
 }
 
-function getFileServeUrl(fileName) {
+function getFileServeUrl(filePathOrName) {
     const token = getAuthToken();
-    const base = `/files/serve/${encodeURIComponent(fileName)}`;
+    // Segment encode each part so slashes are preserved for FastAPI {filepath:path} parameter
+    const safePath = String(filePathOrName || '')
+        .split('/')
+        .map(encodeURIComponent)
+        .join('/');
+    const base = `/files/serve/${safePath}`;
     return token ? `${base}?token=${encodeURIComponent(token)}` : base;
 }
 
@@ -1199,6 +1204,17 @@ function formatTime(seconds) {
 
 // Legacy progress bar creators removed - replaced by unified renderActivityRow
 
+function getSubfolderAndOrganize() {
+    const subfolderEl = document.getElementById("targetSubfolder");
+    const organizeEl = document.getElementById("organizeBy");
+    const subfolder = subfolderEl ? subfolderEl.value.trim() : "";
+    const organize_by = organizeEl ? organizeEl.value : "";
+    return {
+        subfolder: subfolder || null,
+        organize_by: organize_by || null
+    };
+}
+
 async function downloadSelected(channel) {
     if (selectedFiles.size === 0) {
         showAlert(
@@ -1212,12 +1228,15 @@ async function downloadSelected(channel) {
     setButtonLoading("downloadSelectedBtn", true, "Starting...");
 
     try {
+        const { subfolder, organize_by } = getSubfolderAndOrganize();
         const response = await authFetch("/files/download-selected", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 channel_username: channel,
                 message_ids: Array.from(selectedFiles),
+                subfolder: subfolder,
+                organize_by: organize_by,
             }),
         });
 
@@ -1280,8 +1299,17 @@ async function downloadSingle(messageId, channel) {
         document.getElementById("downloadProgress").classList.remove("hidden");
         document.getElementById("stopAllBtn").classList.remove("hidden");
 
+        const { subfolder, organize_by } = getSubfolderAndOrganize();
+        let url = `/files/download/${encodeURIComponent(messageId)}?channel_username=${encodeURIComponent(channel)}`;
+        if (subfolder) {
+            url += `&subfolder=${encodeURIComponent(subfolder)}`;
+        }
+        if (organize_by) {
+            url += `&organize_by=${encodeURIComponent(organize_by)}`;
+        }
+
         const response = await authFetch(
-            `/files/download/${encodeURIComponent(messageId)}?channel_username=${encodeURIComponent(channel)}`,
+            url,
             {
                 method: "POST",
             }
@@ -1327,6 +1355,7 @@ async function downloadAll() {
     setButtonLoading("addAllBtn", true, "Queuing...");
 
     try {
+        const { subfolder, organize_by } = getSubfolderAndOrganize();
         const response = await authFetch("/files/download-all", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -1334,6 +1363,8 @@ async function downloadAll() {
                 channel_username: channel,
                 limit: parseInt(limit),
                 filter_type: fileType || null,
+                subfolder: subfolder,
+                organize_by: organize_by,
             }),
         });
 
@@ -2076,9 +2107,10 @@ function renderActivityRow(item) {
             ${timeStr ? `<span class="text-gray-500 text-[10px]">· Finished at ${timeStr}</span>` : ''}
         `;
 
-        const serveUrl = getFileServeUrl(fileName);
+        const servePath = item.relative_path || fileName;
+        const serveUrl = getFileServeUrl(servePath);
         actionsHtml = `
-            <a href="${serveUrl}" onclick="this.href=getFileServeUrl(${jsStr(fileName)})" target="_blank" download="${escapeHtml(fileName)}"
+            <a href="${serveUrl}" onclick="this.href=getFileServeUrl(${jsStr(servePath)})" target="_blank" download="${escapeHtml(fileName)}"
                 class="w-7 h-7 rounded-lg bg-gray-700/50 hover:bg-yellow-400 hover:text-black text-gray-300 flex items-center justify-center text-xs transition-all border border-black/50" 
                 title="Download to Device">
                 <i class="fa-solid fa-download text-[10px]"></i>
@@ -2254,4 +2286,271 @@ function parseChangelog(markdown) {
         .replace(/^- (.*)/gm, '<div class="flex items-start gap-2 mb-1.5"><i class="fa-solid fa-caret-right text-amber-500/50 mt-1 text-[10px]"></i><p class="text-sm text-gray-300">$1</p></div>')
         .replace(/#(.*)/g, '') // Hide main title
         .trim();
+}
+
+// ==========================================
+// FEATURE 3: Direct Link / Quick Fetch Modal
+// ==========================================
+
+function openQuickFetchModal() {
+    const modal = document.getElementById("quickFetchModal");
+    if (!modal) return;
+    modal.classList.remove("hidden");
+    document.body.style.overflow = "hidden";
+    const resultBox = document.getElementById("quickFetchResult");
+    if (resultBox) {
+        resultBox.classList.add("hidden");
+        resultBox.textContent = "";
+    }
+    const input = document.getElementById("quickFetchLinks");
+    if (input) input.focus();
+}
+
+function closeQuickFetchModal() {
+    const modal = document.getElementById("quickFetchModal");
+    if (!modal) return;
+    modal.classList.add("hidden");
+    document.body.style.overflow = "";
+}
+
+async function submitQuickFetch() {
+    const linksInput = document.getElementById("quickFetchLinks");
+    const subfolderInput = document.getElementById("quickFetchSubfolder");
+    const organizeInput = document.getElementById("quickFetchOrganize");
+    const resultBox = document.getElementById("quickFetchResult");
+
+    const linksText = (linksInput ? linksInput.value : "").trim();
+    if (!linksText) {
+        showAlert("downloadAlert", "Please enter at least one Telegram link.", "warning");
+        return;
+    }
+
+    setButtonLoading("quickFetchSubmitBtn", true, "Fetching...");
+
+    try {
+        const response = await authFetch("/files/quick-fetch", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                links: linksText,
+                subfolder: (subfolderInput && subfolderInput.value.trim()) || null,
+                organize_by: (organizeInput && organizeInput.value) || null,
+            }),
+        });
+
+        if (!response) return;
+        const data = await response.json();
+
+        if (response.ok && data.status === "success") {
+            showAlert("downloadAlert", data.message, "success");
+            if (resultBox) {
+                resultBox.classList.remove("hidden");
+                resultBox.className = "p-3 rounded-xl border border-green-500/30 bg-green-500/10 text-green-300 text-xs font-mono";
+                resultBox.innerHTML = `<div>✓ ${escapeHtml(data.message)}</div><div class="text-[11px] text-gray-400 mt-1">Queued items: ${data.queued.length}${data.failed.length ? ` | Failed: ${data.failed.length}` : ''}</div>`;
+            }
+            if (linksInput) linksInput.value = "";
+            document.getElementById("downloadProgress")?.classList.remove("hidden");
+            startProgressMonitoring();
+            setTimeout(() => {
+                closeQuickFetchModal();
+            }, 1200);
+        } else {
+            const err = data.detail || data.message || "Failed to process links";
+            showAlert("downloadAlert", err, "error");
+            if (resultBox) {
+                resultBox.classList.remove("hidden");
+                resultBox.className = "p-3 rounded-xl border border-red-500/30 bg-red-500/10 text-red-300 text-xs font-mono";
+                resultBox.textContent = `Error: ${err}`;
+            }
+        }
+    } catch (e) {
+        showAlert("downloadAlert", "Network error: " + e.message, "error");
+    } finally {
+        setButtonLoading("quickFetchSubmitBtn", false);
+    }
+}
+
+// ==========================================
+// FEATURE 1: Watch Rules Modal & CRUD
+// ==========================================
+
+function openWatchRulesModal() {
+    const modal = document.getElementById("watchRulesModal");
+    if (!modal) return;
+    modal.classList.remove("hidden");
+    document.body.style.overflow = "hidden";
+    loadWatchRules();
+}
+
+function closeWatchRulesModal() {
+    const modal = document.getElementById("watchRulesModal");
+    if (!modal) return;
+    modal.classList.add("hidden");
+    document.body.style.overflow = "";
+}
+
+async function loadWatchRules() {
+    const container = document.getElementById("watchRulesContainer");
+    const countEl = document.getElementById("watchRulesCount");
+    if (!container) return;
+
+    container.innerHTML = '<div class="text-center py-6 text-gray-500 text-xs"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Loading rules...</div>';
+
+    try {
+        const response = await authFetch("/api/watch-rules");
+        if (!response) return;
+        const data = await response.json();
+        const rules = data.rules || [];
+        if (countEl) countEl.textContent = rules.length;
+
+        if (rules.length === 0) {
+            container.innerHTML = `
+                <div class="p-6 text-center text-gray-500 bg-gray-900/40 rounded-xl border border-gray-800">
+                    <i class="fa-solid fa-tower-broadcast text-3xl mb-2 opacity-30"></i>
+                    <p class="text-xs">No active watch rules configured yet.</p>
+                    <p class="text-[11px] text-gray-600 mt-1">Add a channel above to auto-watch and download new media.</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = rules.map(rule => `
+            <div class="p-3 bg-gray-900/80 border border-gray-800 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-gray-700 transition-colors">
+                <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="font-bold text-sm text-white font-mono">${escapeHtml(rule.channel)}</span>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${rule.enabled ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-gray-800 text-gray-400 border border-gray-700'}">
+                            ${rule.enabled ? 'Active' : 'Paused'}
+                        </span>
+                        ${rule.subfolder ? `<span class="text-[11px] text-yellow-400 font-mono bg-yellow-400/10 px-1.5 py-0.5 rounded border border-yellow-400/20"><i class="fa-solid fa-folder mr-1"></i>${escapeHtml(rule.subfolder)}</span>` : ''}
+                        ${rule.organize_by ? `<span class="text-[10px] text-blue-400 font-mono bg-blue-400/10 px-1.5 py-0.5 rounded border border-blue-400/20"><i class="fa-solid fa-sitemap mr-1"></i>${escapeHtml(rule.organize_by)}</span>` : ''}
+                    </div>
+                    <div class="flex items-center gap-3 text-[11px] text-gray-400 mt-1.5 flex-wrap">
+                        ${rule.file_extensions ? `<span><strong class="text-gray-300">Ext:</strong> ${escapeHtml(rule.file_extensions)}</span>` : ''}
+                        ${rule.keywords ? `<span><strong class="text-gray-300">KW:</strong> ${escapeHtml(rule.keywords)}</span>` : ''}
+                        ${rule.min_size_mb || rule.max_size_mb ? `<span><strong class="text-gray-300">Size:</strong> ${rule.min_size_mb || 0} - ${rule.max_size_mb || '∞'} MB</span>` : ''}
+                        <span class="text-gray-500"><i class="fa-solid fa-check-double mr-1"></i>Matches: ${rule.match_count || 0}</span>
+                    </div>
+                </div>
+                <div class="flex items-center gap-1.5 flex-shrink-0 self-end sm:self-center">
+                    <button onclick="scanWatchRule('${escapeHtml(rule.id)}')"
+                        class="px-2 py-1 bg-amber-500/15 border border-black text-amber-400 hover:bg-amber-500 hover:text-black rounded-lg text-xs font-bold transition-all"
+                        title="Scan recent 50 messages now">
+                        <i class="fa-solid fa-magnifying-glass text-[10px] mr-1"></i>Scan
+                    </button>
+                    <button onclick="toggleWatchRule('${escapeHtml(rule.id)}', ${!rule.enabled})"
+                        class="px-2 py-1 ${rule.enabled ? 'bg-yellow-500/15 text-yellow-400 hover:bg-yellow-500 hover:text-black' : 'bg-green-500/15 text-green-400 hover:bg-green-500 hover:text-black'} border border-black rounded-lg text-xs font-bold transition-all"
+                        title="${rule.enabled ? 'Pause' : 'Enable'} rule">
+                        <i class="fa-solid ${rule.enabled ? 'fa-pause' : 'fa-play'} text-[10px]"></i>
+                    </button>
+                    <button onclick="deleteWatchRule('${escapeHtml(rule.id)}')"
+                        class="px-2 py-1 bg-red-500/15 border border-black text-red-400 hover:bg-red-500 hover:text-white rounded-lg text-xs font-bold transition-all"
+                        title="Delete rule">
+                        <i class="fa-solid fa-trash-can text-[10px]"></i>
+                    </button>
+                </div>
+            </div>
+        `).join("");
+    } catch (e) {
+        console.error("Error loading watch rules:", e);
+        container.innerHTML = '<div class="text-center py-6 text-red-400 text-xs">Failed to load watch rules.</div>';
+    }
+}
+
+async function createWatchRule() {
+    const channelInput = document.getElementById("watchRuleChannel");
+    const subfolderInput = document.getElementById("watchRuleSubfolder");
+    const extensionsInput = document.getElementById("watchRuleExtensions");
+    const keywordsInput = document.getElementById("watchRuleKeywords");
+    const minSizeInput = document.getElementById("watchRuleMinSize");
+    const maxSizeInput = document.getElementById("watchRuleMaxSize");
+    const organizeInput = document.getElementById("watchRuleOrganize");
+
+    const channel = (channelInput ? channelInput.value : "").trim();
+    if (!channel) {
+        showAlert("downloadAlert", "Target channel is required.", "warning");
+        return;
+    }
+
+    const payload = {
+        channel: channel,
+        subfolder: (subfolderInput && subfolderInput.value.trim()) || null,
+        file_extensions: (extensionsInput && extensionsInput.value.trim()) || null,
+        keywords: (keywordsInput && keywordsInput.value.trim()) || null,
+        min_size_mb: minSizeInput && minSizeInput.value ? parseFloat(minSizeInput.value) : null,
+        max_size_mb: maxSizeInput && maxSizeInput.value ? parseFloat(maxSizeInput.value) : null,
+        organize_by: (organizeInput && organizeInput.value) || null,
+        enabled: true
+    };
+
+    try {
+        const response = await authFetch("/api/watch-rules", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+        if (!response) return;
+        const data = await response.json();
+        if (response.ok && data.status === "success") {
+            showAlert("downloadAlert", "Watch rule added successfully!", "success");
+            if (channelInput) channelInput.value = "";
+            if (subfolderInput) subfolderInput.value = "";
+            if (extensionsInput) extensionsInput.value = "";
+            if (keywordsInput) keywordsInput.value = "";
+            if (minSizeInput) minSizeInput.value = "";
+            if (maxSizeInput) maxSizeInput.value = "";
+            loadWatchRules();
+        } else {
+            showAlert("downloadAlert", data.detail || "Failed to create watch rule", "error");
+        }
+    } catch (e) {
+        showAlert("downloadAlert", "Error: " + e.message, "error");
+    }
+}
+
+async function toggleWatchRule(ruleId, enabled) {
+    try {
+        const response = await authFetch(`/api/watch-rules/${encodeURIComponent(ruleId)}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ enabled: enabled })
+        });
+        if (!response) return;
+        loadWatchRules();
+    } catch (e) {
+        showAlert("downloadAlert", "Error: " + e.message, "error");
+    }
+}
+
+async function deleteWatchRule(ruleId) {
+    if (!confirm("Are you sure you want to delete this watch rule?")) return;
+    try {
+        const response = await authFetch(`/api/watch-rules/${encodeURIComponent(ruleId)}`, {
+            method: "DELETE"
+        });
+        if (!response) return;
+        loadWatchRules();
+    } catch (e) {
+        showAlert("downloadAlert", "Error: " + e.message, "error");
+    }
+}
+
+async function scanWatchRule(ruleId) {
+    showAlert("downloadAlert", "Scanning channel for matching files...", "info");
+    try {
+        const response = await authFetch(`/api/watch-rules/${encodeURIComponent(ruleId)}/scan?limit=50`, {
+            method: "POST"
+        });
+        if (!response) return;
+        const data = await response.json();
+        if (response.ok && data.status === "success") {
+            showAlert("downloadAlert", data.message, "success");
+            loadWatchRules();
+            startProgressMonitoring();
+        } else {
+            showAlert("downloadAlert", data.detail || data.message || "Scan failed", "error");
+        }
+    } catch (e) {
+        showAlert("downloadAlert", "Error: " + e.message, "error");
+    }
 }

@@ -10,6 +10,7 @@ import uuid
 from app.config import Config
 from app.services.telegram_service import TelegramService
 from app.utils.state_manager import StateManager
+from app.utils.path_utils import resolve_destination_dir
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,7 @@ class DownloadService:
         self.active_download_tasks = {}
         self.transitioning_items = set() # Items being picked from queue but not yet active
         self.collection_tasks = set()
+        self._background_tasks = set()
         self._queue_processing = False
         self._stop_queue = False 
         self._queue_event = asyncio.Event()
@@ -49,14 +51,43 @@ class DownloadService:
 
         return sanitize_filename(raw_name)
 
+    def _get_media_type(self, message) -> str:
+        """Extract media category for type-based folder routing."""
+        if not message or not getattr(message, "media", None):
+            return "file"
+        if isinstance(message.media, MessageMediaPhoto):
+            return "photo"
+        if isinstance(message.media, MessageMediaDocument):
+            doc = message.media.document
+            mime = getattr(doc, "mime_type", "") or ""
+            attrs = getattr(doc, "attributes", []) or []
+            if mime.startswith("video/") or any(isinstance(x, DocumentAttributeVideo) for x in attrs):
+                return "video"
+            if mime.startswith("audio/") or any(isinstance(x, DocumentAttributeAudio) for x in attrs):
+                return "audio"
+            return "document"
+        return "file"
+
+    async def _send_completion_webhook(self, payload: Dict[str, Any]) -> None:
+        """Send completion webhook to media server / notifier (Jellyfin, Plex, Ntfy, etc.)."""
+        webhook_url = getattr(Config, "COMPLETION_WEBHOOK_URL", None)
+        if not webhook_url:
+            return
+        import httpx
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                res = await client.post(webhook_url, json=payload)
+                logger.info(f"Completion webhook delivered to {webhook_url}: HTTP {res.status_code}")
+        except Exception as e:
+            logger.warning(f"Failed to deliver completion webhook to {webhook_url}: {e}")
+
     async def _download_queued_item(self, item: Dict[str, Any]):
-        """Download a single item from the queue"""
+        """Download a single item from the queue with subfolder routing"""
         file_id = item.get("id")
         session_id = item.get("session_id")
         try:
             channel = item["channel"]
             message_id = item["message_id"]
-            target_dir = Config.SAVE_PATH
             
             logger.info(f"Processing queued item: {channel}/{message_id} ({file_id})")
             
@@ -67,8 +98,24 @@ class DownloadService:
                 self.state_manager.update_queue_item_status(file_id, "failed")
                 return
 
+            media_type = self._get_media_type(message)
+            target_dir = resolve_destination_dir(
+                subfolder=item.get("subfolder"),
+                organize_by=item.get("organize_by"),
+                channel_name=str(channel).lstrip("@-"),
+                media_type=media_type
+            )
+
             # Download using the robust method - passing session_id and channel
-            result = await self.download_single_file(message, target_dir, file_id, session_id=session_id, channel_identifier=channel)
+            result = await self.download_single_file(
+                message, 
+                target_dir, 
+                file_id, 
+                session_id=session_id, 
+                channel_identifier=channel,
+                subfolder=item.get("subfolder"),
+                organize_by=item.get("organize_by")
+            )
             
             if result:
                 # Already removed from queue, just log success
@@ -244,7 +291,14 @@ class DownloadService:
             self._stop_queue = False
             asyncio.create_task(self.process_queue())
 
-    def _reset_session_state(self, channel_username: str, total_count: int, session_id: str):
+    def _reset_session_state(
+        self, 
+        channel_username: str, 
+        total_count: int, 
+        session_id: str,
+        subfolder: Optional[str] = None,
+        organize_by: Optional[str] = None
+    ):
         """Initialize state for a new download session"""
         # Cancel any existing active tasks BEFORE resetting state
         # This prevents the "Session changed" error when old tasks try to update progress
@@ -269,12 +323,20 @@ class DownloadService:
             "started_at": datetime.now().isoformat(),
             "total": total_count,
             "progress": 0, # Reset progress counter
-            "concurrent_downloads": {}
+            "concurrent_downloads": {},
+            "subfolder": subfolder,
+            "organize_by": organize_by
         })
 
-    async def download_selected_files(self, channel_username: str, message_ids: List[int]) -> str:
+    async def download_selected_files(
+        self, 
+        channel_username: str, 
+        message_ids: List[int],
+        subfolder: Optional[str] = None,
+        organize_by: Optional[str] = None
+    ) -> str:
         """Add selected files to queue in background"""
-        logger.info(f"Preparing to queue {len(message_ids)} selected files")
+        logger.info(f"Preparing to queue {len(message_ids)} selected files (subfolder={subfolder})")
         
         # Check if there's an active session we can add to
         status = self.state_manager.get_status()
@@ -292,7 +354,13 @@ class DownloadService:
         else:
             # Start new session
             session_id = str(uuid.uuid4())
-            self._reset_session_state(channel_username, len(message_ids), session_id)
+            self._reset_session_state(
+                channel_username, 
+                len(message_ids), 
+                session_id,
+                subfolder=subfolder,
+                organize_by=organize_by
+            )
         
         # Start processor immediately so UI shows "active" or "initializing" state
         self.start_queue_processor()
@@ -332,7 +400,9 @@ class DownloadService:
                         "priority": 0,
                         "status": "queued",
                         "session_id": session_id,
-                        "retry_count": 0
+                        "retry_count": 0,
+                        "subfolder": subfolder,
+                        "organize_by": organize_by
                     })
 
                 # Clear scanning status
@@ -363,13 +433,26 @@ class DownloadService:
         
         return session_id
 
-    async def download_all_files(self, channel_username: str, limit: int, filter_type: Optional[str] = None) -> str:
+    async def download_all_files(
+        self, 
+        channel_username: str, 
+        limit: int, 
+        filter_type: Optional[str] = None,
+        subfolder: Optional[str] = None,
+        organize_by: Optional[str] = None
+    ) -> str:
         """Queue all files from channel in background"""
-        logger.info(f"Preparing to queue files from {channel_username}, limit={limit}")
+        logger.info(f"Preparing to queue files from {channel_username}, limit={limit}, subfolder={subfolder}")
         session_id = str(uuid.uuid4())
         
         # Initialize state with 0 total (will be updated during collection)
-        self._reset_session_state(channel_username, 0, session_id)
+        self._reset_session_state(
+            channel_username, 
+            0, 
+            session_id,
+            subfolder=subfolder,
+            organize_by=organize_by
+        )
         
         # Start processor immediately so UI shows "active" state while scanning
         self.start_queue_processor()
@@ -425,7 +508,9 @@ class DownloadService:
                                  "priority": 0,
                                  "status": "queued",
                                  "session_id": session_id,
-                                 "retry_count": 0
+                                 "retry_count": 0,
+                                 "subfolder": subfolder,
+                                 "organize_by": organize_by
                             })
                             count += 1
                             
@@ -490,7 +575,9 @@ class DownloadService:
         file_id: str, 
         max_retries: int = 3, 
         session_id: Optional[str] = None, 
-        channel_identifier: Optional[str] = None
+        channel_identifier: Optional[str] = None,
+        subfolder: Optional[str] = None,
+        organize_by: Optional[str] = None
     ) -> Optional[str]:
         """Download file to .incomplete staging and atomically move to final path upon completion."""
         os.makedirs(target_dir, exist_ok=True)
@@ -506,15 +593,19 @@ class DownloadService:
             if strategy == "skip":
                 if expected_size > 0 and os.path.getsize(destination_path) == expected_size:
                     logger.info(f"Duplicate file found with identical size for {file_name}. Skipping download.")
+                    rel_path = os.path.relpath(destination_path, Config.SAVE_PATH)
                     await self.state_manager.mark_file_completed(file_id, {
                         "name": file_name,
                         "path": destination_path,
+                        "relative_path": rel_path,
                         "size": expected_size,
                         "percentage": 100,
                         "completed_at": datetime.now().isoformat(),
                         "session_id": session_id,
                         "message_id": message.id,
-                        "channel": channel_identifier
+                        "channel": channel_identifier,
+                        "subfolder": subfolder,
+                        "organize_by": organize_by
                     })
                     return destination_path
             elif strategy == "rename":
@@ -582,7 +673,10 @@ class DownloadService:
                     "progress": initial_progress,
                     "total": initial_total or expected_size,
                     "percentage": initial_percentage,
-                    "retry_attempt": attempt + 1 if attempt > 0 else None
+                    "retry_attempt": attempt + 1 if attempt > 0 else None,
+                    "subfolder": subfolder,
+                    "organize_by": organize_by,
+                    "target_dir": target_dir
                 }
                 self.state_manager.save_state()
 
@@ -637,18 +731,32 @@ class DownloadService:
                         # Atomic transition from staging to final directory
                         os.replace(staging_path, destination_path)
                         final_size = os.path.getsize(destination_path)
+                        rel_path = os.path.relpath(destination_path, Config.SAVE_PATH)
                         
                         file_data = {
                             "name": file_name,
                             "path": destination_path,
+                            "relative_path": rel_path,
                             "size": final_size,
                             "percentage": 100,
                             "completed_at": datetime.now().isoformat(),
                             "session_id": session_id,
                             "message_id": message.id,
-                            "channel": channel_identifier
+                            "channel": channel_identifier,
+                            "subfolder": subfolder,
+                            "organize_by": organize_by
                         }
                         await self.state_manager.mark_file_completed(file_id, file_data)
+
+                        # Trigger completion webhook if configured
+                        if getattr(Config, "COMPLETION_WEBHOOK_URL", None):
+                            task = asyncio.create_task(self._send_completion_webhook({
+                                "event": "file_completed",
+                                **file_data
+                            }))
+                            self._background_tasks.add(task)
+                            task.add_done_callback(self._background_tasks.discard)
+
                         return destination_path
 
                 except Exception as e:
@@ -725,7 +833,9 @@ class DownloadService:
                 "progress": cdata.get("progress", 0),
                 "total": cdata.get("total", 0),
                 "percentage": cdata.get("percentage", 0),
-                "cancelled_at": datetime.now().isoformat()
+                "cancelled_at": datetime.now().isoformat(),
+                "subfolder": cdata.get("subfolder"),
+                "organize_by": cdata.get("organize_by")
             }
 
         # Update state cleanly
@@ -808,7 +918,9 @@ class DownloadService:
                             "priority": 1, # Higher priority for resumed items
                             "status": "queued",
                             "session_id": session_id,
-                            "retry_count": 0
+                            "retry_count": 0,
+                            "subfolder": status.get("subfolder"),
+                            "organize_by": status.get("organize_by")
                         })
                         
                         # Stop if we found enough remaining files to satisfy the original 'total'
@@ -836,9 +948,15 @@ class DownloadService:
         
         return {"status": "success", "message": "Resume task started"}
 
-    async def download_single(self, channel_username: str, message_id: int):
+    async def download_single(
+        self, 
+        channel_username: str, 
+        message_id: int, 
+        subfolder: Optional[str] = None, 
+        organize_by: Optional[str] = None
+    ):
         """Add a single file to the queue and start processor"""
-        logger.info(f"Adding single file {message_id} from {channel_username} to queue")
+        logger.info(f"Adding single file {message_id} from {channel_username} to queue (subfolder={subfolder})")
         
         # PROACTIVE RESET: Clear cancelled flag immediately so UI updates
         # This must happen before any awaits to ensure immediate state persistence
@@ -880,7 +998,9 @@ class DownloadService:
                 "priority": 2, 
                 "status": "queued",
                 "session_id": session_id,
-                "retry_count": 0
+                "retry_count": 0,
+                "subfolder": subfolder,
+                "organize_by": organize_by
             }
             
             self.state_manager.add_to_queue([item])
@@ -892,6 +1012,47 @@ class DownloadService:
             asyncio.create_task(self._update_placeholder_metadata(channel_username, message_id, file_id))
         else:
             logger.info(f"File {message_id} is already active or in queue")
+
+    async def quick_fetch_links(
+        self, 
+        links: List[str], 
+        subfolder: Optional[str] = None, 
+        organize_by: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Parse multiple Telegram links and queue them for download."""
+        from app.utils.link_parser import parse_telegram_links
+        parsed_items = parse_telegram_links(links)
+        if not parsed_items:
+            return {"status": "error", "message": "No valid Telegram links found. Use https://t.me/channel/123 or https://t.me/c/1234567890/456"}
+
+        MAX_QUICK_FETCH_LINKS = 100
+        if len(parsed_items) > MAX_QUICK_FETCH_LINKS:
+            return {
+                "status": "error",
+                "message": f"Too many links provided ({len(parsed_items)}). Maximum limit is {MAX_QUICK_FETCH_LINKS} links per request."
+            }
+
+        queued_items = []
+        skipped_items = []
+        for channel_ident, msg_id in parsed_items:
+            channel_str = f"@{channel_ident}" if isinstance(channel_ident, str) and not channel_ident.startswith("@") and not channel_ident.lstrip("-").isdigit() else str(channel_ident)
+            if self.state_manager.is_file_active_or_queued(channel_str, msg_id):
+                skipped_items.append(f"{channel_str}/{msg_id}")
+                continue
+            await self.download_single(channel_str, msg_id, subfolder=subfolder, organize_by=organize_by)
+            queued_items.append(f"{channel_str}/{msg_id}")
+
+        msg = f"Queued {len(queued_items)} link(s)"
+        if skipped_items:
+            msg += f" (skipped {len(skipped_items)} already active/queued)"
+        return {
+            "status": "success",
+            "message": msg,
+            "queued_count": len(queued_items),
+            "skipped_count": len(skipped_items),
+            "queued": queued_items,
+            "failed": []
+        }
 
     async def _update_placeholder_metadata(self, channel_username: str, message_id: int, file_id: str):
         """Fetch real metadata for a placeholder item in queue"""
@@ -950,7 +1111,9 @@ class DownloadService:
                 "progress": data.get("progress", 0),
                 "total": data.get("total", 0),
                 "percentage": data.get("percentage", 0),
-                "cancelled_at": datetime.now().isoformat()
+                "cancelled_at": datetime.now().isoformat(),
+                "subfolder": data.get("subfolder"),
+                "organize_by": data.get("organize_by")
             }
             
             # Decrement session total so UI doesn't wait for "phantom" files
@@ -1031,7 +1194,9 @@ class DownloadService:
                 "retry_count": 0,
                 "progress": item_data.get("progress", 0),
                 "total": item_data.get("total", 0),
-                "percentage": item_data.get("percentage", 0)
+                "percentage": item_data.get("percentage", 0),
+                "subfolder": item_data.get("subfolder"),
+                "organize_by": item_data.get("organize_by")
             }
 
             if status.get("total", 0) > 0:

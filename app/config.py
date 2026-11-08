@@ -2,7 +2,7 @@ import os
 import secrets
 import logging
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 _config_logger = logging.getLogger(__name__)
 
@@ -66,7 +66,7 @@ def _load_or_create_secret_key() -> str:
 
 class Config:
     """Application configuration"""
-    VERSION = "4.0.1"
+    VERSION = "4.1.0"
     # Telegram API Configuration
     API_ID = os.getenv("API_ID")
     API_HASH = os.getenv("API_HASH")
@@ -102,6 +102,8 @@ class Config:
     SESSION_DIR = os.path.abspath('sessions')
     SESSION_FILE = os.path.join(SESSION_DIR, 'telegram_session')
     STATE_FILE = os.path.join(SESSION_DIR, 'download_state.json')
+    WATCH_RULES_FILE = os.path.join(SESSION_DIR, 'watch_rules.json')
+    COMPLETION_WEBHOOK_URL: Optional[str] = os.getenv("COMPLETION_WEBHOOK_URL", "").strip() or None
 
     # Server Configuration
     HOST = os.getenv("HOST", "0.0.0.0")
