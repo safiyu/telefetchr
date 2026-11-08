@@ -2,6 +2,10 @@
 
 All epic victories and mysterious bugs that somehow became features are here.
 
+## [4.2.6] - 2026-11-09
+### Fixed
+- Channel card layout: content no longer spreads apart in the taller top row; the destination block fills the space and buttons stay at the bottom.
+
 ## [4.2.5] - 2026-11-09
 ### Changed
 - Taller Top Row: Channel selection and Downloads cards now take about half of the page height on desktop (`46vh`), with the Downloads list scrolling inside.
