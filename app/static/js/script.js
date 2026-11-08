@@ -442,16 +442,6 @@ async function loadDiskInfo() {
                 metricEl.textContent = `${freeStr} free of ${totalStr}`;
             }
 
-            const mobileMetricEl = document.getElementById('diskMetricMobile');
-            if (mobileMetricEl) {
-                mobileMetricEl.textContent = `${freeStr}`;
-            }
-
-            const headerPill = document.getElementById('diskWidgetHeader');
-            if (headerPill) {
-                headerPill.title = `Storage: ${data.path || '/downloads'} • ${freeStr} free of ${totalStr} (${usedPct}% used)`;
-            }
-
             const barEl = document.getElementById('diskProgressBar');
             if (barEl) {
                 barEl.style.width = `${Math.min(100, Math.max(2, usedPct))}%`;
@@ -471,12 +461,6 @@ async function loadDiskInfo() {
     } catch (err) {
         console.debug('Failed to load disk info:', err);
     }
-}
-
-function showStorageToast() {
-    const headerPill = document.getElementById('diskWidgetHeader');
-    const msg = headerPill?.title || "Storage information updated";
-    showAlert(null, msg, 'info');
 }
 
 // --- Searchable Channel Dropdown Combobox ---

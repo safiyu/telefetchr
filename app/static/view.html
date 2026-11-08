@@ -341,14 +341,8 @@
                 </div>
             </div>
 
-            <!-- Right: Status, Compact Storage Pill, User Actions -->
+            <!-- Right: Status & User Actions -->
             <div id="statusBadge" class="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-                <!-- Smart Compact Storage Pill (Responsive, unobtrusive) -->
-                <div id="diskWidgetHeader" onclick="showStorageToast()" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gray-900/90 border border-black text-[10px] sm:text-xs text-yellow-300 font-mono font-medium shadow-[1.5px_1.5px_0px_#000] cursor-pointer hover:border-yellow-400/50 hover:bg-gray-800 transition-all" title="Storage free space (click for details)">
-                    <i class="fa-solid fa-hard-drive text-yellow-400 text-[11px] sm:text-xs"></i>
-                    <span id="diskMetricMobile" class="whitespace-nowrap">-- GB</span>
-                </div>
-
                 <!-- Connection Status -->
                 <div id="connectionStatus" class="flex items-center">
                     <span class="relative flex h-2 w-2 sm:h-2.5 sm:w-2.5">
@@ -722,7 +716,7 @@
         </div>
     </main>
 
-    <script src="/static/js/script.js?v=43"></script>
+    <script src="/static/js/script.js?v=44"></script>
     <!-- Toast Container -->
     <div id="toastContainer"
         class="fixed bottom-8 left-4 right-4 sm:bottom-auto sm:top-6 sm:right-6 sm:left-auto flex flex-col items-center sm:items-end gap-3 pointer-events-none transition-all duration-300"
