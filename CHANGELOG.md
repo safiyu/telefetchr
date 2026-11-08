@@ -2,6 +2,10 @@
 
 All epic victories and mysterious bugs that somehow became features are here.
 
+## [4.2.8] - 2026-11-09
+### Changed
+- Slightly reduced the top row height (46vh to 40vh) to give the Scanned Files list more room.
+
 ## [4.2.7] - 2026-11-09
 ### Changed
 - Redesigned the Channel Selection card to fill the taller top row: larger inputs, a titled Destination section, a full-width save path bar and a wide disk usage bar.
