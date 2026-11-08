@@ -2,6 +2,11 @@
 
 All epic victories and mysterious bugs that somehow became features are here.
 
+## [4.2.3] - 2026-11-08
+### Changed
+- Compact Download Activity Items: Shortened "Auto Download" badge tag to "Auto" and reduced font size across all tags (channel, source, subfolder, status) to `text-[9px]`.
+- Reduced Vertical Space: Streamlined activity row padding, title truncation, compact action buttons, and sleek 6px progress bar to maximize visible downloads per screen.
+
 ## [4.2.2] - 2026-11-08
 ### Fixed
 - Fixed Viewport Height: Locked desktop view to exact viewport height (`lg:h-screen lg:overflow-hidden`) with zero window scrolling.
