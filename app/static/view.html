@@ -710,8 +710,8 @@
                     <!-- Left Column: Source Controls & Scan Filters Card (7 cols) -->
                     <div class="lg:col-span-7 flex flex-col min-w-0">
                         <!-- Main Controls -->
-                        <div class="glass-card p-3 sm:p-4 flex-1 flex flex-col gap-3">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-2.5 mb-2">
+                        <div class="glass-card p-4 flex-1 flex flex-col gap-3.5">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                         <div class="sm:col-span-2 relative" id="channelPickerWrapper">
                             <div class="flex items-center justify-between mb-1">
                                 <label class="block text-gray-400 text-[10px] font-semibold uppercase tracking-wider">
@@ -731,10 +731,10 @@
                             <!-- Custom Searchable Combobox Trigger -->
                             <div class="relative">
                                 <button type="button" id="channelDropdownBtn" onclick="toggleChannelDropdown(event)"
-                                    class="w-full pl-9 pr-8 py-2 rounded-lg bg-gray-900 border border-gray-700 text-left text-white flex items-center justify-between focus:ring-2 focus:ring-amber-500 transition-all cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,0.2)]">
+                                    class="w-full pl-9 pr-8 py-3 rounded-lg bg-gray-900 border border-gray-700 text-left text-white flex items-center justify-between focus:ring-2 focus:ring-amber-500 transition-all cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,0.2)]">
                                     <div class="flex items-center gap-2 min-w-0">
                                         <i class="fa-brands fa-telegram absolute left-3 top-1/2 -translate-y-1/2 text-amber-400 text-sm flex-shrink-0"></i>
-                                        <span id="channelSelectedLabel" class="truncate text-xs font-medium text-gray-300">Select a channel...</span>
+                                        <span id="channelSelectedLabel" class="truncate text-sm font-medium text-gray-300">Select a channel...</span>
                                     </div>
                                     <i id="channelDropdownChevron" class="fa-solid fa-chevron-down text-gray-400 text-[10px] transition-transform duration-200"></i>
                                 </button>
@@ -769,20 +769,20 @@
                         </div>
 
                         <div>
-                            <label class="block text-gray-400 text-[10px] font-semibold uppercase tracking-wider mb-1">Limit</label>
+                            <label class="block text-gray-400 text-[10px] font-semibold uppercase tracking-wider mb-1.5">Limit</label>
                             <div class="relative">
                                 <i class="fa-solid fa-list-ol absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs"></i>
                                 <input type="number" id="fileLimit" value="10" min="1" max="1000"
-                                    class="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-gray-700 bg-gray-900 focus:ring-2 focus:ring-amber-500 outline-none transition-all">
+                                    class="w-full pl-9 pr-3 py-3 text-sm rounded-lg border border-gray-700 bg-gray-900 focus:ring-2 focus:ring-amber-500 outline-none transition-all">
                             </div>
                         </div>
 
                         <div>
-                            <label class="block text-gray-400 text-[10px] font-semibold uppercase tracking-wider mb-1">Type</label>
+                            <label class="block text-gray-400 text-[10px] font-semibold uppercase tracking-wider mb-1.5">Type</label>
                             <div class="relative">
                                 <i class="fa-solid fa-filter absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs"></i>
                                 <select id="fileType"
-                                    class="w-full pl-9 pr-7 py-2 text-xs rounded-lg border border-gray-700 bg-gray-900 appearance-none cursor-pointer focus:ring-2 focus:ring-amber-500 outline-none transition-all">
+                                    class="w-full pl-9 pr-7 py-3 text-sm rounded-lg border border-gray-700 bg-gray-900 appearance-none cursor-pointer focus:ring-2 focus:ring-amber-500 outline-none transition-all">
                                     <option value="">All Files</option>
                                     <option value="video">Videos</option>
                                     <option value="audio">Audio</option>
@@ -853,35 +853,32 @@
                         </div>
                     </div>
 
-                    <!-- Destination & Storage Info Bar (Compact) -->
-                    <div class="flex-1 p-3 bg-gray-900/60 rounded-xl border border-gray-800 text-xs flex flex-col justify-around gap-2">
-                        <!-- Subfolder Routing & Organization -->
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <!-- Destination Section -->
+                    <div class="flex-1 p-3 bg-gray-900/60 rounded-xl border border-gray-800 text-xs flex flex-col justify-center gap-3.5">
+                        <div class="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                            <i class="fa-solid fa-folder-tree"></i> Destination
+                            <span class="flex-1 border-t border-gray-800"></span>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
-                                <label class="block text-gray-400 text-[10px] font-semibold uppercase tracking-wider mb-1">
-                                    <i class="fa-solid fa-folder-tree mr-1 text-amber-400"></i> Target Subfolder
-                                </label>
+                                <label class="block text-gray-400 text-[10px] font-semibold uppercase tracking-wider mb-1.5">Target Subfolder</label>
                                 <div class="flex items-center gap-1.5">
-                                    <div class="relative flex-1">
-                                        <select id="targetSubfolder" onchange="updatePathPreview('targetSubfolder', 'organizeBy', 'dashboardPathPreview')"
-                                            class="w-full px-2.5 py-1.5 text-xs rounded-lg border border-gray-700 bg-gray-900 text-white focus:ring-1 focus:ring-amber-500 outline-none">
-                                            <option value="">📁 Root (/)</option>
-                                        </select>
-                                    </div>
+                                    <select id="targetSubfolder" onchange="updatePathPreview('targetSubfolder', 'organizeBy', 'dashboardPathPreview')"
+                                        class="flex-1 min-w-0 px-3 py-2.5 text-sm rounded-lg border border-gray-700 bg-gray-900 text-white focus:ring-1 focus:ring-amber-500 outline-none">
+                                        <option value="">📁 Root (/)</option>
+                                    </select>
                                     <button type="button" onclick="promptCreateSubfolder('targetSubfolder')"
-                                        class="px-2 py-1.5 bg-amber-500/15 border border-black text-amber-400 hover:bg-amber-500 hover:text-black rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 flex-shrink-0"
+                                        class="px-3 py-2.5 bg-amber-500/15 border border-black text-amber-400 hover:bg-amber-500 hover:text-black rounded-lg text-xs font-bold transition-all flex items-center gap-1 flex-shrink-0"
                                         title="Create New Folder">
-                                        <i class="fa-solid fa-folder-plus text-[10px]"></i>
+                                        <i class="fa-solid fa-folder-plus"></i>
                                         <span class="hidden sm:inline">New</span>
                                     </button>
                                 </div>
                             </div>
                             <div>
-                                <label class="block text-gray-400 text-[10px] font-semibold uppercase tracking-wider mb-1">
-                                    <i class="fa-solid fa-sitemap mr-1 text-amber-400"></i> Auto-Organize By
-                                </label>
+                                <label class="block text-gray-400 text-[10px] font-semibold uppercase tracking-wider mb-1.5">Auto-Organize By</label>
                                 <select id="organizeBy" onchange="updatePathPreview('targetSubfolder', 'organizeBy', 'dashboardPathPreview')"
-                                    class="w-full px-2.5 py-1.5 text-xs rounded-lg border border-gray-700 bg-gray-900 focus:ring-1 focus:ring-amber-500 outline-none">
+                                    class="w-full px-3 py-2.5 text-sm rounded-lg border border-gray-700 bg-gray-900 focus:ring-1 focus:ring-amber-500 outline-none">
                                     <option value="">No Auto-Organization (Direct to destination)</option>
                                     <option value="channel">Channel Name / ID (e.g. @channel/...)</option>
                                     <option value="media_type">Media Type (videos/, audio/, documents/, photos/)</option>
@@ -889,23 +886,22 @@
                             </div>
                         </div>
 
-                        <!-- Unified Save Path & Disk Metric Bar -->
-                        <div class="pt-1.5 border-t border-gray-800/80 flex flex-wrap items-center justify-between gap-2 text-[10px] font-mono text-gray-400">
-                            <div class="flex items-center gap-1.5 min-w-0">
-                                <span id="diskPathText" class="hidden">/downloads</span>
-                                <span class="text-gray-500 flex items-center gap-1 flex-shrink-0">
-                                    <i class="fa-solid fa-folder-open text-amber-400"></i> Save Path:
-                                </span>
-                                <span id="dashboardPathPreview" class="text-amber-300 font-semibold truncate bg-gray-950 px-1.5 py-0.5 rounded border border-gray-800">/downloads/</span>
+                        <!-- Save path -->
+                        <div class="flex items-center gap-2 px-3 py-2 bg-gray-950 rounded-lg border border-gray-800 text-[11px] font-mono min-w-0">
+                            <span id="diskPathText" class="hidden">/downloads</span>
+                            <i class="fa-solid fa-folder-open text-amber-400 flex-shrink-0"></i>
+                            <span class="text-gray-500 flex-shrink-0">Save to</span>
+                            <span id="dashboardPathPreview" class="text-amber-300 font-semibold truncate">/downloads/</span>
+                        </div>
+
+                        <!-- Disk usage -->
+                        <div class="flex items-center gap-3 text-[11px] font-mono text-gray-400">
+                            <div class="flex items-center gap-1.5 flex-shrink-0">
+                                <i class="fa-solid fa-hard-drive text-gray-500"></i>
+                                <span id="diskMetricText" class="text-yellow-300 font-semibold whitespace-nowrap">-- GB free</span>
                             </div>
-                            <div class="flex items-center gap-2 flex-shrink-0">
-                                <div class="flex items-center gap-1 text-gray-400">
-                                    <i class="fa-solid fa-hard-drive text-gray-500 text-[10px]"></i>
-                                    <span id="diskMetricText" class="text-yellow-300 font-semibold font-mono whitespace-nowrap">-- GB free</span>
-                                </div>
-                                <div class="w-20 sm:w-24 bg-gray-950 h-1.5 rounded-full overflow-hidden border border-black/60 flex-shrink-0 relative" title="Disk Usage">
-                                    <div id="diskProgressBar" class="h-full transition-all duration-500 rounded-full" style="width: 0%; background-color: #fbbf24; background-image: linear-gradient(90deg, #f59e0b, #fbbf24);"></div>
-                                </div>
+                            <div class="flex-1 bg-gray-950 h-2.5 rounded-full overflow-hidden border border-black/60 relative" title="Disk Usage">
+                                <div id="diskProgressBar" class="h-full transition-all duration-500 rounded-full" style="width: 0%; background-color: #fbbf24; background-image: linear-gradient(90deg, #f59e0b, #fbbf24);"></div>
                             </div>
                         </div>
                     </div>
@@ -913,16 +909,16 @@
                     <!-- Action Buttons -->
                     <div class="flex flex-col sm:flex-row gap-2.5 mt-auto">
                         <button onclick="listFiles()" id="scanBtn"
-                            class="flex-1 py-2 px-4 rounded-xl btn-yellow-hover text-xs flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none">
+                            class="flex-1 py-3 px-4 rounded-xl btn-yellow-hover text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none">
                             <i class="fa-solid fa-magnifying-glass"></i> <span>Scan Files</span>
                         </button>
                         <button onclick="downloadAll()" id="addAllBtn"
-                            class="flex-1 py-2 px-4 rounded-xl btn-yellow-hover text-xs flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none">
+                            class="flex-1 py-3 px-4 rounded-xl btn-yellow-hover text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none">
                             <i class="fa-solid fa-cloud-arrow-down"></i> <span>Download All</span>
                         </button>
 
                         <button onclick="cancelDownload()" id="stopAllBtn"
-                            class="hidden flex-1 py-2 px-4 rounded-xl btn-red text-xs flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none">
+                            class="hidden flex-1 py-3 px-4 rounded-xl btn-red text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none">
                             <i class="fa-solid fa-stop"></i> <span>Stop All</span>
                         </button>
                     </div>
@@ -1140,7 +1136,7 @@
         </div>
     </main>
 
-    <script src="/static/js/script.js?v=54"></script>
+    <script src="/static/js/script.js?v=55"></script>
     <!-- Toast Container -->
     <div id="toastContainer"
         class="fixed bottom-8 left-4 right-4 sm:bottom-auto sm:top-6 sm:right-6 sm:left-auto flex flex-col items-center sm:items-end gap-3 pointer-events-none transition-all duration-300"

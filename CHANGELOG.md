@@ -2,6 +2,10 @@
 
 All epic victories and mysterious bugs that somehow became features are here.
 
+## [4.2.7] - 2026-11-09
+### Changed
+- Redesigned the Channel Selection card to fill the taller top row: larger inputs, a titled Destination section, a full-width save path bar and a wide disk usage bar.
+
 ## [4.2.6] - 2026-11-09
 ### Fixed
 - Channel card layout: content no longer spreads apart in the taller top row; the destination block fills the space and buttons stay at the bottom.
