@@ -878,6 +878,31 @@ async def test_cancellation_tracks_partial_progress_and_allows_retry() -> None:
     assert any(q["id"] == "file_part_1" and q["status"] == "queued" for q in queue_items)
 
 
+def test_get_current_user_query_token_auth() -> None:
+    from app.services.auth_service import AuthService
+    from app.utils import auth_dependencies
+    from fastapi import Request
+
+    auth_svc = AuthService()
+    auth_dependencies.set_auth_service(auth_svc)
+
+    token = auth_svc.create_access_token({"sub": "remote_user"})
+
+    # Test via query string on an untrusted remote IP
+    scope = {
+        "type": "http",
+        "method": "GET",
+        "path": "/files/serve/test.mp4",
+        "query_string": f"token={token}".encode("ascii"),
+        "headers": [],
+        "client": ("198.51.100.25", 54321),  # Untrusted external IP
+    }
+    req = Request(scope)
+    user = asyncio.run(auth_dependencies.get_current_user(req, credentials=None))
+    assert user == "remote_user"
+
+
+
 
 
 

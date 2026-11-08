@@ -47,6 +47,12 @@ function getAuthHeaders() {
     return token ? { 'Authorization': `Bearer ${token}` } : {};
 }
 
+function getFileServeUrl(fileName) {
+    const token = getAuthToken();
+    const base = `/files/serve/${encodeURIComponent(fileName)}`;
+    return token ? `${base}?token=${encodeURIComponent(token)}` : base;
+}
+
 // --- XSS escaping helpers -------------------------------------------------
 // Untrusted values (Telegram file names, channel names, user display names)
 // must never be interpolated raw into HTML or inline event handlers. Use
@@ -2254,11 +2260,12 @@ function renderActivityRow(item) {
             ${timeStr ? `<span class="text-gray-500 text-[10px]">· Finished at ${timeStr}</span>` : ''}
         `;
 
+        const serveUrl = getFileServeUrl(fileName);
         actionsHtml = `
-            <a href="/files/serve/${encodeURIComponent(fileName)}" target="_blank" 
+            <a href="${serveUrl}" onclick="this.href=getFileServeUrl(${jsStr(fileName)})" target="_blank" download="${escapeHtml(fileName)}"
                 class="w-7 h-7 rounded-lg bg-gray-700/50 hover:bg-yellow-400 hover:text-black text-gray-300 flex items-center justify-center text-xs transition-all border border-black/50" 
-                title="Open / Download File">
-                <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                title="Download to Device">
+                <i class="fa-solid fa-download text-[10px]"></i>
             </a>
             <button onclick="clearIndividualProgress(${jsStr(fileId)})" 
                 class="w-7 h-7 rounded-lg btn-red flex items-center justify-center text-xs focus:outline-none" 

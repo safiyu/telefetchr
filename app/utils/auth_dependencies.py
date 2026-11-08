@@ -129,20 +129,37 @@ def get_client_ip(request: Request) -> str:
 
 async def get_current_user(
     request: Request,
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    token: Optional[str] = None
 ) -> str:
-    """Authenticate user via trusted subnet bypass or Bearer JWT token."""
+    """Authenticate user via trusted subnet bypass, Bearer JWT token, or query parameter."""
     # Check for trusted IP bypass (spoofing-safe client resolution)
     client_ip = get_client_ip(request)
     if is_trusted_ip(client_ip):
         return Config.ADMIN_USERNAME
 
+    raw_token = None
+    if credentials:
+        raw_token = credentials.credentials
+    elif token:
+        raw_token = token
+    elif "token" in request.query_params:
+        raw_token = request.query_params.get("token")
+
     # Standard token validation
-    if not credentials:
+    if not raw_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    return await auth_service.get_current_user(credentials)
+    token_data = auth_service.verify_token(raw_token)
+    if token_data.username is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return token_data.username
