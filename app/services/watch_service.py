@@ -298,5 +298,5 @@ class WatchService:
                 "queued_count": queued_count
             }
         except Exception as e:
-            logger.error(f"Error scanning rule {rule_id}: {e}")
-            return {"status": "error", "message": str(e)}
+            logger.exception(f"Error scanning rule {rule_id} (channel={channel!r})")
+            return {"status": "error", "message": f"{type(e).__name__}: {e}"}

@@ -2,6 +2,10 @@
 
 All epic victories and mysterious bugs that somehow became features are here.
 
+## [4.2.9] - 2026-11-09
+### Fixed
+- Auto Download rule scan now shows the real server error (instead of a generic "Server error (400)") and the backend logs the full traceback with the channel.
+
 ## [4.2.8] - 2026-11-09
 ### Changed
 - Slightly reduced the top row height (46vh to 40vh) to give the Scanned Files list more room.

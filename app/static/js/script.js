@@ -352,8 +352,8 @@ async function authFetch(url, options = {}) {
 
         // IMPORTANT FIX: Allow login endpoints to return error responses
         // so they can be handled by the calling function
-        if (url.includes('/login/')) {
-            return response; // Return the response even if not ok
+        if (url.includes('/login/') || options.rawErrors) {
+            return response; // Return the response even if not ok so the caller can show the server's message
         }
 
         // Check for other error status codes
@@ -3012,16 +3012,18 @@ async function scanWatchRule(ruleId) {
     showAlert("downloadAlert", "Scanning channel for matching files...", "info");
     try {
         const response = await authFetch(`/api/watch-rules/${encodeURIComponent(ruleId)}/scan?limit=50`, {
-            method: "POST"
+            method: "POST",
+            rawErrors: true
         });
         if (!response) return;
-        const data = await response.json();
+        let data = {};
+        try { data = await response.json(); } catch (_) { /* non-JSON error body */ }
         if (response.ok && data.status === "success") {
             showAlert("downloadAlert", data.message, "success");
             loadWatchRules();
             startProgressMonitoring();
         } else {
-            showAlert("downloadAlert", data.detail || data.message || "Scan failed", "error");
+            showAlert("downloadAlert", `Scan failed (${response.status}): ${data.detail || data.message || "unknown error"}`, "error");
         }
     } catch (e) {
         showAlert("downloadAlert", "Error: " + e.message, "error");
