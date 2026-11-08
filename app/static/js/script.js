@@ -734,13 +734,19 @@ async function checkStatus() {
                     <span class="relative inline-flex rounded-full h-2.5 w-2.5 sm:h-3 sm:w-3 bg-green-500"></span>
                 </span>
                 <span class="hidden lg:inline ml-1.5 text-xs font-medium text-green-400">Connected</span>`;
-            userInfo.innerHTML = `<p><i class="fa-solid fa-user text-[10px] opacity-70 mr-1.5" title="Logged in user"></i> ${escapeHtml(data.user.first_name)} (@${escapeHtml(data.user.username || "N/A")})</p>`;
+            const userDisplay = data.user.username ? `@${data.user.username}` : (data.user.first_name || "Account");
+            if (userInfo) userInfo.textContent = userDisplay;
+            const userMenuHandle = document.getElementById("userMenuHandle");
+            if (userMenuHandle) userMenuHandle.textContent = userDisplay;
             loginSection.classList.add("hidden");
             downloadSection.classList.remove("hidden");
 
             // Load data when authenticated
             loadChannels();
             loadDiskInfo();
+            loadFolders();
+            loadWatchRules();
+            checkWebhookStatus();
             refreshProgress();
         } else if (data.status === "not_authenticated" || data.status === "disconnected") {
             connectionStatus.className = "flex items-center";
@@ -2142,6 +2148,9 @@ function renderActivityRow(item) {
                         </div>
                         <div class="flex flex-wrap items-center gap-2 text-xs text-gray-400">
                             ${channelName ? `<span class="bg-gray-900 px-1.5 py-0.5 rounded text-[10px] font-mono text-gray-400 border border-black/40 truncate max-w-[120px]">${escapeHtml(channelName)}</span>` : ''}
+                            ${item.source === 'auto_watch' ? `<span class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-500/20 text-blue-300 border border-blue-500/30 flex items-center gap-1" title="Automated background download triggered by Watch Rule"><i class="fa-solid fa-tower-broadcast text-[8px]"></i> Auto-Watch</span>` : ''}
+                            ${item.source === 'quick_fetch' ? `<span class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1" title="Direct link queued via Quick Fetch"><i class="fa-solid fa-bolt text-[8px]"></i> Quick Fetch</span>` : ''}
+                            ${item.subfolder ? `<span class="px-1.5 py-0.5 rounded text-[10px] font-mono text-yellow-300 bg-yellow-500/10 border border-yellow-500/20 flex items-center gap-1" title="Saved to subfolder"><i class="fa-solid fa-folder text-[8px]"></i> ${escapeHtml(item.subfolder)}</span>` : ''}
                             <span class="row-badge">${badgeHtml}</span>
                             <span class="row-details flex items-center gap-2">${detailsHtml}</span>
                         </div>
@@ -2343,6 +2352,7 @@ function populateFolderSelects(folders, selectedFolderToSet = null, targetSelect
             select.value = "";
         }
     });
+    updateAllPathPreviews();
 }
 
 function promptCreateSubfolder(targetSelectId) {
@@ -2379,6 +2389,7 @@ async function submitCreateSubfolder() {
             closeNewFolderModal();
             showAlert('downloadAlert', data.message || `Folder '${data.folder}' created.`, 'success');
             await loadFolders(data.folder, currentFolderSelectTarget);
+            updateAllPathPreviews();
         } else {
             showAlert('downloadAlert', data.detail || 'Failed to create folder', 'error');
         }
@@ -2388,8 +2399,112 @@ async function submitCreateSubfolder() {
 }
 
 // ==========================================
+// Live Path Previews
+// ==========================================
+
+function updatePathPreview(subfolderSelectId, organizeSelectId, previewElId) {
+    const subfolderEl = document.getElementById(subfolderSelectId);
+    const organizeEl = document.getElementById(organizeSelectId);
+    const previewEl = document.getElementById(previewElId);
+    if (!previewEl) return;
+
+    const sub = subfolderEl ? subfolderEl.value.trim() : '';
+    const org = organizeEl ? organizeEl.value : '';
+
+    let path = '/downloads';
+    if (sub) {
+        path += '/' + sub.replace(/^\/+|\/+$/g, '');
+    }
+    if (org === 'channel') {
+        path += '/@channel';
+    } else if (org === 'media_type') {
+        path += '/videos';
+    }
+    path += '/filename.mp4';
+    previewEl.textContent = path;
+}
+
+function updateAllPathPreviews() {
+    updatePathPreview('targetSubfolder', 'organizeBy', 'dashboardPathPreview');
+    updatePathPreview('quickFetchSubfolder', 'quickFetchOrganize', 'quickFetchPathPreview');
+    updatePathPreview('watchRuleSubfolder', 'watchRuleOrganize', 'watchRulePathPreview');
+}
+
+// ==========================================
+// View Switcher & Header Navigation
+// ==========================================
+
+function switchMainView(viewName) {
+    const searchContent = document.getElementById("searchTabContent");
+    const watchView = document.getElementById("watchRulesView");
+    const navBtnSearch = document.getElementById("navBtnSearch");
+    const navBtnWatch = document.getElementById("navBtnWatch");
+
+    if (viewName === "watch") {
+        searchContent?.classList.add("hidden");
+        watchView?.classList.remove("hidden");
+
+        if (navBtnWatch) {
+            navBtnWatch.className = "px-3.5 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 border border-black bg-blue-500 text-white shadow-[2px_2px_0px_#000]";
+        }
+        if (navBtnSearch) {
+            navBtnSearch.className = "px-3.5 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 border border-transparent text-gray-400 hover:text-white hover:bg-gray-800";
+        }
+        loadWatchRules();
+        checkWebhookStatus();
+    } else {
+        watchView?.classList.add("hidden");
+        searchContent?.classList.remove("hidden");
+
+        if (navBtnSearch) {
+            navBtnSearch.className = "px-3.5 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 border border-black bg-amber-400 text-black shadow-[2px_2px_0px_#000]";
+        }
+        if (navBtnWatch) {
+            navBtnWatch.className = "px-3.5 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 border border-transparent text-gray-400 hover:text-white hover:bg-gray-800";
+        }
+    }
+}
+
+// User Menu Dropdown
+function toggleUserMenu(event) {
+    if (event) event.stopPropagation();
+    const panel = document.getElementById("userMenuPanel");
+    const chevron = document.getElementById("userMenuChevron");
+    if (!panel) return;
+    const isHidden = panel.classList.contains("hidden");
+    if (isHidden) {
+        panel.classList.remove("hidden");
+        if (chevron) chevron.style.transform = "rotate(180deg)";
+    } else {
+        closeUserMenu();
+    }
+}
+
+function closeUserMenu() {
+    const panel = document.getElementById("userMenuPanel");
+    const chevron = document.getElementById("userMenuChevron");
+    if (panel) panel.classList.add("hidden");
+    if (chevron) chevron.style.transform = "";
+}
+
+window.addEventListener("click", (e) => {
+    const userMenuContainer = document.getElementById("userInfoActions");
+    if (userMenuContainer && !userMenuContainer.contains(e.target)) {
+        closeUserMenu();
+    }
+});
+
+// ==========================================
 // FEATURE 3: Direct Link / Quick Fetch Modal
 // ==========================================
+
+function updateQuickFetchLinkCount() {
+    const textarea = document.getElementById("quickFetchLinks");
+    const countEl = document.getElementById("quickFetchLinkCount");
+    if (!textarea || !countEl) return;
+    const lines = textarea.value.split("\n").map(l => l.trim()).filter(Boolean);
+    countEl.textContent = `${lines.length} link${lines.length === 1 ? '' : 's'} entered`;
+}
 
 function openQuickFetchModal() {
     const modal = document.getElementById("quickFetchModal");
@@ -2397,13 +2512,17 @@ function openQuickFetchModal() {
     modal.classList.remove("hidden");
     document.body.style.overflow = "hidden";
     loadFolders();
+    updateAllPathPreviews();
     const resultBox = document.getElementById("quickFetchResult");
     if (resultBox) {
         resultBox.classList.add("hidden");
         resultBox.textContent = "";
     }
     const input = document.getElementById("quickFetchLinks");
-    if (input) input.focus();
+    if (input) {
+        input.focus();
+        updateQuickFetchLinkCount();
+    }
 }
 
 function closeQuickFetchModal() {
@@ -2445,22 +2564,37 @@ async function submitQuickFetch() {
             showAlert("downloadAlert", data.message, "success");
             if (resultBox) {
                 resultBox.classList.remove("hidden");
-                resultBox.className = "p-3 rounded-xl border border-green-500/30 bg-green-500/10 text-green-300 text-xs font-mono";
-                resultBox.innerHTML = `<div>✓ ${escapeHtml(data.message)}</div><div class="text-[11px] text-gray-400 mt-1">Queued items: ${data.queued.length}${data.failed.length ? ` | Failed: ${data.failed.length}` : ''}</div>`;
+                resultBox.className = "p-3.5 rounded-xl border border-green-500/40 bg-green-500/10 text-white text-xs space-y-2 animate-fade-in";
+                
+                let details = `<div class="font-bold text-green-300 flex items-center gap-1.5"><i class="fa-solid fa-circle-check"></i> ${escapeHtml(data.message)}</div>`;
+                if (data.queued && data.queued.length > 0) {
+                    details += `<div class="mt-2 space-y-1"><div class="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Queued for Download:</div>`;
+                    data.queued.forEach(q => {
+                        details += `<div class="font-mono text-[11px] text-green-200 bg-gray-900/80 px-2.5 py-1 rounded-lg border border-green-500/20 flex items-center gap-1.5"><i class="fa-solid fa-check text-[9px] text-green-400"></i> ${escapeHtml(q)}</div>`;
+                    });
+                    details += `</div>`;
+                }
+                if (data.skipped_count > 0) {
+                    details += `<div class="text-[11px] text-gray-400 mt-1"><i class="fa-solid fa-info-circle mr-1 text-amber-400"></i> ${data.skipped_count} link(s) skipped (already active or queued).</div>`;
+                }
+                resultBox.innerHTML = details;
             }
             if (linksInput) linksInput.value = "";
+            updateQuickFetchLinkCount();
             document.getElementById("downloadProgress")?.classList.remove("hidden");
             startProgressMonitoring();
             setTimeout(() => {
                 closeQuickFetchModal();
-            }, 1200);
+                switchMainView("search");
+                document.getElementById("downloadProgress")?.scrollIntoView({ behavior: 'smooth' });
+            }, 1800);
         } else {
             const err = data.detail || data.message || "Failed to process links";
             showAlert("downloadAlert", err, "error");
             if (resultBox) {
                 resultBox.classList.remove("hidden");
-                resultBox.className = "p-3 rounded-xl border border-red-500/30 bg-red-500/10 text-red-300 text-xs font-mono";
-                resultBox.textContent = `Error: ${err}`;
+                resultBox.className = "p-3.5 rounded-xl border border-red-500/40 bg-red-500/10 text-red-200 text-xs font-mono";
+                resultBox.innerHTML = `<div class="font-bold text-red-300 flex items-center gap-1.5"><i class="fa-solid fa-circle-exclamation"></i> Error</div><div class="mt-1">${escapeHtml(err)}</div>`;
             }
         }
     } catch (e) {
@@ -2471,8 +2605,11 @@ async function submitQuickFetch() {
 }
 
 // ==========================================
-// FEATURE 1: Watch Rules Modal & CRUD
+// FEATURE 1: Watch Rules View & Modal CRUD
 // ==========================================
+
+let currentEditingRuleId = null;
+let currentRulesCache = [];
 
 function populateWatchRuleChannels() {
     const select = document.getElementById("watchRuleChannel");
@@ -2529,87 +2666,259 @@ function onWatchRuleFileTypeChange(val) {
 }
 
 function openWatchRulesModal() {
-    const modal = document.getElementById("watchRulesModal");
-    if (!modal) return;
-    modal.classList.remove("hidden");
-    document.body.style.overflow = "hidden";
-    populateWatchRuleChannels();
-    loadFolders();
-    loadWatchRules();
+    switchMainView("watch");
 }
 
 function closeWatchRulesModal() {
-    const modal = document.getElementById("watchRulesModal");
+    switchMainView("search");
+}
+
+function openWatchRuleModal(ruleId = null) {
+    const modal = document.getElementById("watchRuleModal");
+    if (!modal) return;
+
+    currentEditingRuleId = ruleId;
+    const editIdInput = document.getElementById("watchRuleEditId");
+    if (editIdInput) editIdInput.value = ruleId || "";
+    
+    populateWatchRuleChannels();
+    loadFolders();
+
+    const titleEl = document.getElementById("watchRuleModalTitle");
+    const btnTextEl = document.getElementById("saveWatchRuleBtnText");
+
+    if (ruleId && currentRulesCache.length > 0) {
+        const rule = currentRulesCache.find(r => r.id === ruleId);
+        if (rule) {
+            if (titleEl) titleEl.textContent = "Edit Channel Watch Rule";
+            if (btnTextEl) btnTextEl.textContent = "Update Watch Rule";
+
+            const channelSelect = document.getElementById("watchRuleChannel");
+            const customChannelInput = document.getElementById("watchRuleCustomChannel");
+            const subfolderInput = document.getElementById("watchRuleSubfolder");
+            const fileTypeSelect = document.getElementById("watchRuleFileType");
+            const extensionsInput = document.getElementById("watchRuleExtensions");
+            const keywordsInput = document.getElementById("watchRuleKeywords");
+            const minSizeInput = document.getElementById("watchRuleMinSize");
+            const maxSizeInput = document.getElementById("watchRuleMaxSize");
+            const organizeInput = document.getElementById("watchRuleOrganize");
+
+            let matchedOpt = false;
+            if (channelSelect) {
+                for (let i = 0; i < channelSelect.options.length; i++) {
+                    if (channelSelect.options[i].value === rule.channel) {
+                        channelSelect.value = rule.channel;
+                        matchedOpt = true;
+                        break;
+                    }
+                }
+                if (!matchedOpt) {
+                    channelSelect.value = "__custom__";
+                    if (customChannelInput) {
+                        customChannelInput.value = rule.channel;
+                        customChannelInput.classList.remove("hidden");
+                    }
+                } else if (customChannelInput) {
+                    customChannelInput.classList.add("hidden");
+                }
+            }
+
+            if (subfolderInput) subfolderInput.value = rule.subfolder || "";
+            if (organizeInput) organizeInput.value = rule.organize_by || "";
+            if (keywordsInput) keywordsInput.value = rule.keywords || "";
+            if (minSizeInput) minSizeInput.value = rule.min_size_mb !== null && rule.min_size_mb !== undefined ? rule.min_size_mb : "";
+            if (maxSizeInput) maxSizeInput.value = rule.max_size_mb !== null && rule.max_size_mb !== undefined ? rule.max_size_mb : "";
+
+            if (fileTypeSelect && extensionsInput) {
+                const ext = (rule.file_extensions || "").toLowerCase().trim();
+                if (!ext) {
+                    fileTypeSelect.value = "all";
+                    extensionsInput.classList.add("hidden");
+                } else if (ext.includes("mp4") && ext.includes("mkv")) {
+                    fileTypeSelect.value = "video";
+                    extensionsInput.classList.add("hidden");
+                } else if (ext.includes("mp3") && ext.includes("flac")) {
+                    fileTypeSelect.value = "audio";
+                    extensionsInput.classList.add("hidden");
+                } else if (ext.includes("pdf") && ext.includes("zip")) {
+                    fileTypeSelect.value = "document";
+                    extensionsInput.classList.add("hidden");
+                } else if (ext.includes("jpg") && ext.includes("png")) {
+                    fileTypeSelect.value = "photo";
+                    extensionsInput.classList.add("hidden");
+                } else {
+                    fileTypeSelect.value = "custom";
+                    extensionsInput.value = rule.file_extensions;
+                    extensionsInput.classList.remove("hidden");
+                }
+            }
+        }
+    } else {
+        if (titleEl) titleEl.textContent = "Add Channel Watch Rule";
+        if (btnTextEl) btnTextEl.textContent = "Save Watch Rule";
+
+        const channelSelect = document.getElementById("watchRuleChannel");
+        if (channelSelect) channelSelect.value = "";
+        const customChannelInput = document.getElementById("watchRuleCustomChannel");
+        if (customChannelInput) {
+            customChannelInput.value = "";
+            customChannelInput.classList.add("hidden");
+        }
+        const fileTypeSelect = document.getElementById("watchRuleFileType");
+        if (fileTypeSelect) fileTypeSelect.value = "all";
+        const extensionsInput = document.getElementById("watchRuleExtensions");
+        if (extensionsInput) {
+            extensionsInput.value = "";
+            extensionsInput.classList.add("hidden");
+        }
+        const keywordsInput = document.getElementById("watchRuleKeywords");
+        if (keywordsInput) keywordsInput.value = "";
+        const minSizeInput = document.getElementById("watchRuleMinSize");
+        if (minSizeInput) minSizeInput.value = "";
+        const maxSizeInput = document.getElementById("watchRuleMaxSize");
+        if (maxSizeInput) maxSizeInput.value = "";
+        const subfolderInput = document.getElementById("watchRuleSubfolder");
+        if (subfolderInput) subfolderInput.value = "";
+        const organizeInput = document.getElementById("watchRuleOrganize");
+        if (organizeInput) organizeInput.value = "";
+    }
+
+    updatePathPreview('watchRuleSubfolder', 'watchRuleOrganize', 'watchRulePathPreview');
+    modal.classList.remove("hidden");
+    document.body.style.overflow = "hidden";
+}
+
+function closeWatchRuleModal() {
+    const modal = document.getElementById("watchRuleModal");
     if (!modal) return;
     modal.classList.add("hidden");
     document.body.style.overflow = "";
+    currentEditingRuleId = null;
 }
 
 async function loadWatchRules() {
     const container = document.getElementById("watchRulesContainer");
-    const countEl = document.getElementById("watchRulesCount");
     if (!container) return;
 
-    container.innerHTML = '<div class="text-center py-6 text-gray-500 text-xs"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Loading rules...</div>';
+    container.innerHTML = '<div class="text-center py-8 text-gray-500 text-xs"><i class="fa-solid fa-spinner fa-spin text-lg text-amber-400 mb-2 block"></i>Loading watch rules...</div>';
 
     try {
         const response = await authFetch("/api/watch-rules");
         if (!response) return;
         const data = await response.json();
         const rules = data.rules || [];
-        if (countEl) countEl.textContent = rules.length;
+        currentRulesCache = rules;
+
+        const activeRulesCount = rules.filter(r => r.enabled).length;
+        const totalMatchesCount = rules.reduce((acc, r) => acc + (r.match_count || 0), 0);
+
+        const countBadges = ["watchRulesCountBadge", "navWatchCountBadge", "watchRulesCount", "headerWatchersCount"];
+        countBadges.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = id === "headerWatchersCount" || id === "navWatchCountBadge" ? activeRulesCount : rules.length;
+        });
+
+        const activeRulesMetrics = document.getElementById("metricsActiveRules");
+        if (activeRulesMetrics) activeRulesMetrics.textContent = activeRulesCount;
+
+        const totalMatchesMetrics = document.getElementById("metricsTotalMatches");
+        if (totalMatchesMetrics) totalMatchesMetrics.textContent = totalMatchesCount;
+
+        const headerBeacon = document.getElementById("headerWatchersBadge");
+        if (headerBeacon) {
+            headerBeacon.classList.toggle("hidden", activeRulesCount === 0);
+        }
 
         if (rules.length === 0) {
             container.innerHTML = `
-                <div class="p-6 text-center text-gray-500 bg-gray-900/40 rounded-xl border border-gray-800">
-                    <i class="fa-solid fa-tower-broadcast text-3xl mb-2 opacity-30"></i>
-                    <p class="text-xs">No active watch rules configured yet.</p>
-                    <p class="text-[11px] text-gray-600 mt-1">Add a channel above to auto-watch and download new media.</p>
+                <div class="p-8 text-center bg-gray-900/40 rounded-2xl border-2 border-dashed border-gray-800 space-y-3">
+                    <div class="w-12 h-12 mx-auto rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-tower-broadcast"></i>
+                    </div>
+                    <div class="max-w-md mx-auto">
+                        <p class="text-sm font-bold text-white">No active channel watchers yet</p>
+                        <p class="text-xs text-gray-400 mt-1">Add a Telegram channel rule to automatically monitor and download incoming media in real-time as soon as it is posted.</p>
+                    </div>
+                    <button type="button" onclick="openWatchRuleModal()" class="px-4 py-2 rounded-xl btn-yellow-hover text-xs font-bold inline-flex items-center gap-2 mt-2">
+                        <i class="fa-solid fa-plus-circle"></i> Create Your First Rule
+                    </button>
                 </div>
             `;
             return;
         }
 
-        container.innerHTML = rules.map(rule => `
-            <div class="p-3 bg-gray-900/80 border border-gray-800 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-gray-700 transition-colors">
-                <div class="min-w-0 flex-1">
-                    <div class="flex items-center gap-2 flex-wrap">
-                        <span class="font-bold text-sm text-white font-mono">${escapeHtml(rule.channel)}</span>
-                        <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${rule.enabled ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-gray-800 text-gray-400 border border-gray-700'}">
-                            ${rule.enabled ? 'Active' : 'Paused'}
-                        </span>
-                        ${rule.subfolder ? `<span class="text-[11px] text-yellow-400 font-mono bg-yellow-400/10 px-1.5 py-0.5 rounded border border-yellow-400/20"><i class="fa-solid fa-folder mr-1"></i>${escapeHtml(rule.subfolder)}</span>` : ''}
-                        ${rule.organize_by ? `<span class="text-[10px] text-blue-400 font-mono bg-blue-400/10 px-1.5 py-0.5 rounded border border-blue-400/20"><i class="fa-solid fa-sitemap mr-1"></i>${escapeHtml(rule.organize_by)}</span>` : ''}
+        container.innerHTML = rules.map(rule => {
+            const lastMatchStr = rule.last_matched_at ? new Date(rule.last_matched_at).toLocaleString() : 'Never';
+
+            return `
+            <div class="p-4 bg-gray-900/90 border-2 border-black rounded-xl hover:border-gray-700 transition-all shadow-[2px_2px_0px_#000] space-y-3">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <!-- Channel & Status -->
+                    <div class="flex items-center gap-3 min-w-0">
+                        <div class="w-10 h-10 rounded-xl bg-gray-950 border border-black flex items-center justify-center text-base text-blue-400 shadow-[1px_1px_0px_#000] flex-shrink-0">
+                            <i class="fa-brands fa-telegram"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="font-bold text-sm text-white font-mono truncate max-w-[220px]" title="${escapeHtml(rule.channel)}">${escapeHtml(rule.channel)}</span>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${rule.enabled ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-gray-800 text-gray-400 border border-gray-700'}">
+                                    ${rule.enabled ? 'Active' : 'Paused'}
+                                </span>
+                            </div>
+                            <p class="text-[11px] text-gray-400 truncate mt-0.5">Automated 24/7 Channel Watcher</p>
+                        </div>
                     </div>
-                    <div class="flex items-center gap-3 text-[11px] text-gray-400 mt-1.5 flex-wrap">
-                        ${rule.file_extensions ? `<span><strong class="text-gray-300">Ext:</strong> ${escapeHtml(rule.file_extensions)}</span>` : ''}
-                        ${rule.keywords ? `<span><strong class="text-gray-300">KW:</strong> ${escapeHtml(rule.keywords)}</span>` : ''}
-                        ${rule.min_size_mb || rule.max_size_mb ? `<span><strong class="text-gray-300">Size:</strong> ${rule.min_size_mb || 0} - ${rule.max_size_mb || '∞'} MB</span>` : ''}
-                        <span class="text-gray-500"><i class="fa-solid fa-check-double mr-1"></i>Matches: ${rule.match_count || 0}</span>
+
+                    <!-- Actions -->
+                    <div class="flex items-center gap-2 self-end sm:self-center flex-shrink-0">
+                        <button onclick="scanWatchRule('${escapeHtml(rule.id)}')"
+                            class="px-2.5 py-1.5 bg-amber-500/15 border border-black text-amber-400 hover:bg-amber-500 hover:text-black rounded-lg text-xs font-bold transition-all shadow-[1px_1px_0px_#000] flex items-center gap-1.5"
+                            title="Retroactively scan recent 50 messages now">
+                            <i class="fa-solid fa-magnifying-glass text-[10px]"></i>
+                            <span>Scan (50)</span>
+                        </button>
+                        <button onclick="openWatchRuleModal('${escapeHtml(rule.id)}')"
+                            class="px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white border border-black rounded-lg text-xs font-bold transition-all shadow-[1px_1px_0px_#000] flex items-center gap-1.5"
+                            title="Edit rule settings">
+                            <i class="fa-solid fa-pen text-[10px]"></i>
+                            <span>Edit</span>
+                        </button>
+                        <button onclick="toggleWatchRule('${escapeHtml(rule.id)}', ${!rule.enabled})"
+                            class="px-2.5 py-1.5 ${rule.enabled ? 'bg-yellow-500/15 text-yellow-400 hover:bg-yellow-500 hover:text-black' : 'bg-green-500/15 text-green-400 hover:bg-green-500 hover:text-black'} border border-black rounded-lg text-xs font-bold transition-all shadow-[1px_1px_0px_#000]"
+                            title="${rule.enabled ? 'Pause' : 'Enable'} rule">
+                            <i class="fa-solid ${rule.enabled ? 'fa-pause' : 'fa-play'} text-[10px]"></i>
+                        </button>
+                        <button onclick="deleteWatchRule('${escapeHtml(rule.id)}')"
+                            class="w-8 h-8 rounded-lg btn-red flex items-center justify-center text-xs focus:outline-none"
+                            title="Delete rule">
+                            <i class="fa-solid fa-trash-can text-[10px]"></i>
+                        </button>
                     </div>
                 </div>
-                <div class="flex items-center gap-1.5 flex-shrink-0 self-end sm:self-center">
-                    <button onclick="scanWatchRule('${escapeHtml(rule.id)}')"
-                        class="px-2 py-1 bg-amber-500/15 border border-black text-amber-400 hover:bg-amber-500 hover:text-black rounded-lg text-xs font-bold transition-all"
-                        title="Scan recent 50 messages now">
-                        <i class="fa-solid fa-magnifying-glass text-[10px] mr-1"></i>Scan
-                    </button>
-                    <button onclick="toggleWatchRule('${escapeHtml(rule.id)}', ${!rule.enabled})"
-                        class="px-2 py-1 ${rule.enabled ? 'bg-yellow-500/15 text-yellow-400 hover:bg-yellow-500 hover:text-black' : 'bg-green-500/15 text-green-400 hover:bg-green-500 hover:text-black'} border border-black rounded-lg text-xs font-bold transition-all"
-                        title="${rule.enabled ? 'Pause' : 'Enable'} rule">
-                        <i class="fa-solid ${rule.enabled ? 'fa-pause' : 'fa-play'} text-[10px]"></i>
-                    </button>
-                    <button onclick="deleteWatchRule('${escapeHtml(rule.id)}')"
-                        class="px-2 py-1 bg-red-500/15 border border-black text-red-400 hover:bg-red-500 hover:text-white rounded-lg text-xs font-bold transition-all"
-                        title="Delete rule">
-                        <i class="fa-solid fa-trash-can text-[10px]"></i>
-                    </button>
+
+                <!-- Criteria Tag Chips -->
+                <div class="flex flex-wrap items-center gap-1.5 pt-2 border-t border-gray-800 text-xs">
+                    ${rule.subfolder ? `<span class="bg-yellow-500/10 border border-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded text-[10px] font-mono"><i class="fa-solid fa-folder mr-1"></i>${escapeHtml(rule.subfolder)}</span>` : '<span class="bg-gray-800 text-gray-400 px-2 py-0.5 rounded text-[10px] font-mono">📁 Root</span>'}
+                    ${rule.organize_by ? `<span class="bg-blue-500/10 border border-blue-500/20 text-blue-300 px-2 py-0.5 rounded text-[10px] font-mono"><i class="fa-solid fa-sitemap mr-1"></i>${escapeHtml(rule.organize_by)}</span>` : ''}
+                    ${rule.file_extensions ? `<span class="bg-purple-500/10 border border-purple-500/20 text-purple-300 px-2 py-0.5 rounded text-[10px] font-mono"><i class="fa-solid fa-file mr-1"></i>${escapeHtml(rule.file_extensions)}</span>` : '<span class="bg-gray-800 text-gray-400 px-2 py-0.5 rounded text-[10px] font-mono">Any File</span>'}
+                    ${rule.keywords ? `<span class="bg-green-500/10 border border-green-500/20 text-green-300 px-2 py-0.5 rounded text-[10px] font-mono"><i class="fa-solid fa-tag mr-1"></i>${escapeHtml(rule.keywords)}</span>` : ''}
+                    ${rule.min_size_mb || rule.max_size_mb ? `<span class="bg-gray-950 border border-gray-800 text-gray-300 px-2 py-0.5 rounded text-[10px] font-mono"><i class="fa-solid fa-weight-hanging mr-1"></i>${rule.min_size_mb || 0} - ${rule.max_size_mb || '∞'} MB</span>` : ''}
+                </div>
+
+                <!-- Activity Stats Footer -->
+                <div class="flex items-center justify-between text-[11px] text-gray-400 pt-1 border-t border-gray-800/60 font-mono">
+                    <span class="flex items-center gap-1 text-gray-300">
+                        <i class="fa-solid fa-circle-check text-green-400 text-[10px]"></i>
+                        <span>${rule.match_count || 0} auto-download${rule.match_count === 1 ? '' : 's'}</span>
+                    </span>
+                    <span class="text-gray-500">Last triggered: ${escapeHtml(lastMatchStr)}</span>
                 </div>
             </div>
-        `).join("");
+            `;
+        }).join("");
     } catch (e) {
         console.error("Error loading watch rules:", e);
-        container.innerHTML = '<div class="text-center py-6 text-red-400 text-xs">Failed to load watch rules.</div>';
+        container.innerHTML = '<div class="text-center py-8 text-red-400 text-xs">Failed to load watch rules.</div>';
     }
 }
 
@@ -2657,35 +2966,32 @@ async function createWatchRule() {
         enabled: true
     };
 
+    setButtonLoading("saveWatchRuleBtn", true, currentEditingRuleId ? "Updating..." : "Saving...");
+
     try {
-        const response = await authFetch("/api/watch-rules", {
-            method: "POST",
+        const url = currentEditingRuleId 
+            ? `/api/watch-rules/${encodeURIComponent(currentEditingRuleId)}`
+            : "/api/watch-rules";
+        const method = currentEditingRuleId ? "PUT" : "POST";
+
+        const response = await authFetch(url, {
+            method: method,
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload)
         });
         if (!response) return;
         const data = await response.json();
         if (response.ok && data.status === "success") {
-            showAlert("downloadAlert", "Watch rule added successfully!", "success");
-            if (channelSelect) channelSelect.value = "";
-            if (customChannelInput) {
-                customChannelInput.value = "";
-                customChannelInput.classList.add("hidden");
-            }
-            if (fileTypeSelect) fileTypeSelect.value = "all";
-            if (extensionsInput) {
-                extensionsInput.value = "";
-                extensionsInput.classList.add("hidden");
-            }
-            if (keywordsInput) keywordsInput.value = "";
-            if (minSizeInput) minSizeInput.value = "";
-            if (maxSizeInput) maxSizeInput.value = "";
+            showAlert("downloadAlert", currentEditingRuleId ? "Watch rule updated successfully!" : "Watch rule added successfully!", "success");
+            closeWatchRuleModal();
             loadWatchRules();
         } else {
-            showAlert("downloadAlert", data.detail || "Failed to create watch rule", "error");
+            showAlert("downloadAlert", data.detail || data.message || "Failed to save watch rule", "error");
         }
     } catch (e) {
         showAlert("downloadAlert", "Error: " + e.message, "error");
+    } finally {
+        setButtonLoading("saveWatchRuleBtn", false);
     }
 }
 
@@ -2704,16 +3010,22 @@ async function toggleWatchRule(ruleId, enabled) {
 }
 
 async function deleteWatchRule(ruleId) {
-    if (!confirm("Are you sure you want to delete this watch rule?")) return;
-    try {
-        const response = await authFetch(`/api/watch-rules/${encodeURIComponent(ruleId)}`, {
-            method: "DELETE"
-        });
-        if (!response) return;
-        loadWatchRules();
-    } catch (e) {
-        showAlert("downloadAlert", "Error: " + e.message, "error");
-    }
+    showConfirmModal(
+        "Delete Watch Rule",
+        "Are you sure you want to delete this channel watch rule? Background monitoring for this channel will stop immediately.",
+        async () => {
+            try {
+                const response = await authFetch(`/api/watch-rules/${encodeURIComponent(ruleId)}`, {
+                    method: "DELETE"
+                });
+                if (!response) return;
+                showAlert("downloadAlert", "Watch rule deleted.", "info");
+                loadWatchRules();
+            } catch (e) {
+                showAlert("downloadAlert", "Error: " + e.message, "error");
+            }
+        }
+    );
 }
 
 async function scanWatchRule(ruleId) {
@@ -2733,5 +3045,101 @@ async function scanWatchRule(ruleId) {
         }
     } catch (e) {
         showAlert("downloadAlert", "Error: " + e.message, "error");
+    }
+}
+
+// ==========================================
+// Webhook Notifications Modal & Testing
+// ==========================================
+
+async function checkWebhookStatus() {
+    try {
+        const response = await authFetch("/api/webhook/status");
+        if (!response || !response.ok) return;
+        const data = await response.json();
+        const badge = document.getElementById("metricsWebhookStatus");
+        if (badge) {
+            badge.textContent = data.configured ? "Configured" : "Not Set";
+            badge.className = data.configured ? "text-xs font-semibold text-green-400" : "text-xs font-semibold text-gray-500";
+        }
+    } catch (err) {
+        console.error("Error checking webhook status:", err);
+    }
+}
+
+async function openWebhookModal() {
+    const modal = document.getElementById("webhookModal");
+    if (!modal) return;
+    modal.classList.remove("hidden");
+    document.body.style.overflow = "hidden";
+
+    const badge = document.getElementById("webhookStatusBadge");
+    const display = document.getElementById("webhookUrlDisplay");
+    const resultBox = document.getElementById("webhookTestResult");
+    if (resultBox) {
+        resultBox.classList.add("hidden");
+        resultBox.textContent = "";
+    }
+
+    try {
+        const response = await authFetch("/api/webhook/status");
+        if (!response) return;
+        const data = await response.json();
+        if (data.configured) {
+            if (badge) {
+                badge.textContent = "Active / Configured";
+                badge.className = "px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-green-500/20 text-green-400 border border-green-500/30";
+            }
+            if (display) {
+                display.textContent = data.url;
+            }
+        } else {
+            if (badge) {
+                badge.textContent = "Not Configured";
+                badge.className = "px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-yellow-500/20 text-yellow-400 border border-yellow-500/30";
+            }
+            if (display) {
+                display.textContent = "No COMPLETION_WEBHOOK_URL set in environment variables.";
+            }
+        }
+    } catch (err) {
+        if (display) display.textContent = "Error checking status: " + err.message;
+    }
+}
+
+function closeWebhookModal() {
+    const modal = document.getElementById("webhookModal");
+    if (!modal) return;
+    modal.classList.add("hidden");
+    document.body.style.overflow = "";
+}
+
+async function testWebhook() {
+    const resultBox = document.getElementById("webhookTestResult");
+    setButtonLoading("webhookTestBtn", true, "Sending...");
+
+    try {
+        const response = await authFetch("/api/webhook/test", { method: "POST" });
+        if (!response) return;
+        const data = await response.json();
+
+        if (resultBox) {
+            resultBox.classList.remove("hidden");
+            if (response.ok && data.status === "success") {
+                resultBox.className = "p-3 rounded-xl border border-green-500/30 bg-green-500/10 text-green-300 text-xs font-mono animate-fade-in";
+                resultBox.innerHTML = `✓ ${escapeHtml(data.message)}`;
+            } else {
+                resultBox.className = "p-3 rounded-xl border border-red-500/30 bg-red-500/10 text-red-300 text-xs font-mono animate-fade-in";
+                resultBox.innerHTML = `✕ Error: ${escapeHtml(data.detail || data.message || "Webhook test failed")}`;
+            }
+        }
+    } catch (err) {
+        if (resultBox) {
+            resultBox.classList.remove("hidden");
+            resultBox.className = "p-3 rounded-xl border border-red-500/30 bg-red-500/10 text-red-300 text-xs font-mono animate-fade-in";
+            resultBox.textContent = `✕ Network error: ${err.message}`;
+        }
+    } finally {
+        setButtonLoading("webhookTestBtn", false);
     }
 }

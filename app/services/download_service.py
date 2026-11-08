@@ -114,7 +114,9 @@ class DownloadService:
                 session_id=session_id, 
                 channel_identifier=channel,
                 subfolder=item.get("subfolder"),
-                organize_by=item.get("organize_by")
+                organize_by=item.get("organize_by"),
+                source=item.get("source"),
+                rule_id=item.get("rule_id")
             )
             
             if result:
@@ -577,7 +579,9 @@ class DownloadService:
         session_id: Optional[str] = None, 
         channel_identifier: Optional[str] = None,
         subfolder: Optional[str] = None,
-        organize_by: Optional[str] = None
+        organize_by: Optional[str] = None,
+        source: Optional[str] = None,
+        rule_id: Optional[str] = None
     ) -> Optional[str]:
         """Download file to .incomplete staging and atomically move to final path upon completion."""
         os.makedirs(target_dir, exist_ok=True)
@@ -605,7 +609,9 @@ class DownloadService:
                         "message_id": message.id,
                         "channel": channel_identifier,
                         "subfolder": subfolder,
-                        "organize_by": organize_by
+                        "organize_by": organize_by,
+                        "source": source,
+                        "rule_id": rule_id
                     })
                     return destination_path
             elif strategy == "rename":
@@ -676,6 +682,8 @@ class DownloadService:
                     "retry_attempt": attempt + 1 if attempt > 0 else None,
                     "subfolder": subfolder,
                     "organize_by": organize_by,
+                    "source": source,
+                    "rule_id": rule_id,
                     "target_dir": target_dir
                 }
                 self.state_manager.save_state()
@@ -744,7 +752,9 @@ class DownloadService:
                             "message_id": message.id,
                             "channel": channel_identifier,
                             "subfolder": subfolder,
-                            "organize_by": organize_by
+                            "organize_by": organize_by,
+                            "source": source,
+                            "rule_id": rule_id
                         }
                         await self.state_manager.mark_file_completed(file_id, file_data)
 
@@ -835,7 +845,9 @@ class DownloadService:
                 "percentage": cdata.get("percentage", 0),
                 "cancelled_at": datetime.now().isoformat(),
                 "subfolder": cdata.get("subfolder"),
-                "organize_by": cdata.get("organize_by")
+                "organize_by": cdata.get("organize_by"),
+                "source": cdata.get("source"),
+                "rule_id": cdata.get("rule_id")
             }
 
         # Update state cleanly
@@ -953,10 +965,12 @@ class DownloadService:
         channel_username: str, 
         message_id: int, 
         subfolder: Optional[str] = None, 
-        organize_by: Optional[str] = None
+        organize_by: Optional[str] = None,
+        source: Optional[str] = None,
+        rule_id: Optional[str] = None
     ):
         """Add a single file to the queue and start processor"""
-        logger.info(f"Adding single file {message_id} from {channel_username} to queue (subfolder={subfolder})")
+        logger.info(f"Adding single file {message_id} from {channel_username} to queue (subfolder={subfolder}, source={source})")
         
         # PROACTIVE RESET: Clear cancelled flag immediately so UI updates
         # This must happen before any awaits to ensure immediate state persistence
@@ -1000,7 +1014,9 @@ class DownloadService:
                 "session_id": session_id,
                 "retry_count": 0,
                 "subfolder": subfolder,
-                "organize_by": organize_by
+                "organize_by": organize_by,
+                "source": source,
+                "rule_id": rule_id
             }
             
             self.state_manager.add_to_queue([item])
@@ -1039,7 +1055,13 @@ class DownloadService:
             if self.state_manager.is_file_active_or_queued(channel_str, msg_id):
                 skipped_items.append(f"{channel_str}/{msg_id}")
                 continue
-            await self.download_single(channel_str, msg_id, subfolder=subfolder, organize_by=organize_by)
+            await self.download_single(
+                channel_str, 
+                msg_id, 
+                subfolder=subfolder, 
+                organize_by=organize_by,
+                source="quick_fetch"
+            )
             queued_items.append(f"{channel_str}/{msg_id}")
 
         msg = f"Queued {len(queued_items)} link(s)"
@@ -1113,7 +1135,9 @@ class DownloadService:
                 "percentage": data.get("percentage", 0),
                 "cancelled_at": datetime.now().isoformat(),
                 "subfolder": data.get("subfolder"),
-                "organize_by": data.get("organize_by")
+                "organize_by": data.get("organize_by"),
+                "source": data.get("source"),
+                "rule_id": data.get("rule_id")
             }
             
             # Decrement session total so UI doesn't wait for "phantom" files

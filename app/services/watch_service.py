@@ -268,7 +268,9 @@ class WatchService:
             channel_id,
             message.id,
             subfolder=subfolder,
-            organize_by=organize_by
+            organize_by=organize_by,
+            source="auto_watch",
+            rule_id=rule.get("id")
         )
 
         with self._lock:

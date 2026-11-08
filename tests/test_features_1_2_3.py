@@ -257,7 +257,9 @@ async def test_watch_service_on_new_message(watch_service):
         "@auto_channel",
         555,
         subfolder="",
-        organize_by=None
+        organize_by=None,
+        source="auto_watch",
+        rule_id=rule["id"]
     )
 
 
@@ -600,6 +602,50 @@ async def test_folders_api_list_and_create(test_app, tmp_path, monkeypatch):
         # Reject path traversal
         res = await client.post("/api/folders", json={"name": "../escaped_dir"})
         assert res.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_api_webhook_endpoints(test_app):
+    """Verify GET /api/webhook/status and POST /api/webhook/test."""
+    import httpx
+    from app.api.routes import set_services
+    from app.config import Config
+
+    tg_mock = MagicMock()
+    dl_mock = MagicMock()
+    state_mock = MagicMock()
+    auth_mock = MagicMock()
+    ws_mock = MagicMock()
+
+    set_services(tg_mock, dl_mock, state_mock, auth_mock, ws_mock)
+    transport = httpx.ASGITransport(app=test_app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        # 1. When not configured
+        with patch("app.api.routes.Config.COMPLETION_WEBHOOK_URL", None):
+            res = await client.get("/api/webhook/status")
+            assert res.status_code == 200
+            assert res.json() == {"configured": False, "url": None}
+
+            res_test = await client.post("/api/webhook/test")
+            assert res_test.status_code == 400
+
+        # 2. When configured
+        with patch("app.api.routes.Config.COMPLETION_WEBHOOK_URL", "https://media.server/webhook"):
+            res = await client.get("/api/webhook/status")
+            assert res.status_code == 200
+            assert res.json()["configured"] is True
+
+            mock_resp = MagicMock()
+            mock_resp.status_code = 200
+            mock_instance = AsyncMock()
+            mock_instance.post = AsyncMock(return_value=mock_resp)
+            mock_instance.__aenter__.return_value = mock_instance
+
+            with patch("app.api.routes.httpx.AsyncClient", return_value=mock_instance):
+                res_test = await client.post("/api/webhook/test")
+                assert res_test.status_code == 200
+                assert res_test.json()["status"] == "success"
+
 
 
 @pytest.mark.asyncio

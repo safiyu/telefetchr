@@ -2,7 +2,20 @@
 
 All epic victories and mysterious bugs that somehow became features are here.
 
-## [4.1.2] - 2026-11-08
+## [4.1.3] - 2026-11-08
+### Added
+- Dedicated Watch Rules Screen: Replaced crammed modal with a first-class screen featuring live listener status, metrics (active rules, auto-ingested files), and rich rule cards with channel avatars, status toggles, criteria tags, and direct actions.
+- Full Watch Rule Editing: Added edit dialog support to modify criteria, target subfolder, and organization on existing rules via `PUT /api/watch-rules/{rule_id}`.
+- Primary View Navigation Bar: Integrated a top-level segmented view switcher between "Search & Download" and "Watch Rules", plus a prominent "Quick Fetch" ingestion button.
+- Real-Time Watcher Beacon: Added live pulsing watcher badge in header displaying active rule count with one-click navigation to watch rules.
+- Safe User Account Menu: Isolated "Delete Session" and "Logout" into an elegant dropdown menu to prevent accidental session termination.
+- Dynamic Live Destination Previews: Added real-time monospace path breadcrumb previews (`/downloads/Subfolder/media_type/filename.ext`) across Search, Quick Fetch, and Watch Rules.
+- Media Server Webhook Diagnostics: Added `GET /api/webhook/status` and `POST /api/webhook/test` endpoints with in-app test trigger and status indicator for Jellyfin, Plex, Sonarr/Radarr, and Ntfy integrations.
+- Activity Feed Origin & Routing Badges: Added visual badges identifying automated downloads (`Auto-Watch`, `Quick Fetch`) and custom destination subfolders on activity cards.
+
+### Fixed
+- Quick Fetch Results Display: Replaced raw monospace dump with structured per-link status feedback showing queued, skipped duplicate, and failed links.
+- Quick Fetch Link Counter: Added real-time link counter and accepted format guidance pills.
 ### Fixed
 - Real-Time Watch Rule Download Updates: Added continuous adaptive background polling (`pollProgress`) that checks `/download-progress` every 2.5 seconds when idle (5 seconds in background tab) and 1 second during active downloads, so incoming automated downloads triggered by Telegram watch rules appear on the UI in real time without requiring manual page refreshes.
 

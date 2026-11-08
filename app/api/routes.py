@@ -2,7 +2,8 @@ import os
 import shutil
 import logging
 import urllib.parse
-from datetime import timedelta
+import httpx
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, Dict, Any
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends, Request, Query
@@ -949,3 +950,65 @@ async def get_about(current_user: str = Depends(get_current_user)):
         "version": Config.VERSION,
         "changelog": changelog_content
     }
+
+
+# ==========================================
+# Webhook Status & Test Endpoints
+# ==========================================
+
+@router.get("/api/webhook/status")
+async def get_webhook_status(current_user: str = Depends(get_current_user)):
+    """Check if completion webhook URL is configured and active."""
+    url = getattr(Config, "COMPLETION_WEBHOOK_URL", None)
+    if not url:
+        return {"configured": False, "url": None}
+    
+    # Mask credentials if present
+    masked = url
+    try:
+        from urllib.parse import urlparse
+        parsed = urlparse(url)
+        if parsed.username or parsed.password:
+            netloc = parsed.hostname or ""
+            if parsed.port:
+                netloc += f":{parsed.port}"
+            masked = f"{parsed.scheme}://***:***@{netloc}{parsed.path}"
+    except Exception:
+        masked = "***"
+
+    return {
+        "configured": True, 
+        "url": masked
+    }
+
+
+@router.post("/api/webhook/test")
+async def test_webhook(current_user: str = Depends(get_current_user)):
+    """Dispatch an immediate test payload to the configured COMPLETION_WEBHOOK_URL."""
+    url = getattr(Config, "COMPLETION_WEBHOOK_URL", None)
+    if not url:
+        raise HTTPException(status_code=400, detail="COMPLETION_WEBHOOK_URL is not configured in environment.")
+    
+    import httpx
+    payload = {
+        "event": "test_notification",
+        "name": "telefetchr_integration_test.mp4",
+        "relative_path": "telefetchr_integration_test.mp4",
+        "size": 10485760,
+        "percentage": 100,
+        "completed_at": datetime.now().isoformat(),
+        "channel": "@telefetchr",
+        "message": "TeleFetchr media server webhook test ping."
+    }
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            resp = await client.post(url, json=payload)
+            return {
+                "status": "success",
+                "status_code": resp.status_code,
+                "message": f"Webhook test dispatched. Target server returned HTTP {resp.status_code}."
+            }
+    except Exception as e:
+        logger.error(f"Webhook test failed: {e}")
+        raise HTTPException(status_code=502, detail=f"Failed to reach webhook URL: {str(e)}")
+
