@@ -414,6 +414,7 @@ window.addEventListener('DOMContentLoaded', () => {
     // If the server bypasses auth for this IP, checkStatus will work.
     checkStatus();
     fetchVersion();
+    loadFolders();
 });
 
 async function fetchVersion() {
@@ -502,6 +503,8 @@ async function loadChannels() {
         }
 
         renderChannelOptions(rawChannels);
+        populateWatchRuleChannels();
+        loadFolders();
     } catch (error) {
         console.error("Error loading channels:", error);
     }
@@ -891,9 +894,36 @@ function toggleFilters() {
 
 function clearFilters() {
     document.getElementById("searchQuery").value = "";
-    document.getElementById("fileExtension").value = "";
+    const extInput = document.getElementById("fileExtension");
+    if (extInput) {
+        extInput.value = "";
+        extInput.classList.add("hidden");
+    }
+    const typeSelect = document.getElementById("fileTypeSelect");
+    if (typeSelect) typeSelect.value = "";
     document.getElementById("minSize").value = "";
     document.getElementById("maxSize").value = "";
+}
+
+function onDashboardFileTypeChange(val) {
+    const extInput = document.getElementById("fileExtension");
+    if (!extInput) return;
+    const map = {
+        '': '',
+        'video': 'mp4, mkv, avi, mov, webm',
+        'audio': 'mp3, flac, wav, m4a, aac',
+        'document': 'pdf, epub, docx, txt',
+        'archive': 'zip, rar, 7z, tar, gz',
+        'photo': 'jpg, png, webp, gif',
+    };
+    if (val === 'custom') {
+        extInput.classList.remove('hidden');
+        extInput.value = '';
+        extInput.focus();
+    } else {
+        extInput.classList.add('hidden');
+        extInput.value = map[val] !== undefined ? map[val] : '';
+    }
 }
 
 async function listFiles() {
@@ -2289,6 +2319,101 @@ function parseChangelog(markdown) {
 }
 
 // ==========================================
+// Folder Picker & Management
+// ==========================================
+
+let availableFolders = [];
+let currentFolderSelectTarget = 'targetSubfolder';
+
+async function loadFolders(selectedFolderToSet = null, targetSelectId = null) {
+    try {
+        const response = await authFetch("/api/folders");
+        if (!response || !response.ok) return;
+        const data = await response.json();
+        availableFolders = data.folders || [];
+        populateFolderSelects(availableFolders, selectedFolderToSet, targetSelectId);
+    } catch (err) {
+        console.error("Error loading folders:", err);
+    }
+}
+
+function populateFolderSelects(folders, selectedFolderToSet = null, targetSelectId = null) {
+    const selectIds = ["targetSubfolder", "quickFetchSubfolder", "watchRuleSubfolder"];
+    selectIds.forEach(id => {
+        const select = document.getElementById(id);
+        if (!select) return;
+
+        const prevValue = select.value;
+        const targetValue = (targetSelectId && targetSelectId === id && selectedFolderToSet !== null)
+            ? selectedFolderToSet
+            : (selectedFolderToSet !== null && !targetSelectId ? selectedFolderToSet : prevValue);
+
+        select.innerHTML = '<option value="">📁 Root (/)</option>';
+        folders.forEach(f => {
+            const opt = document.createElement("option");
+            opt.value = f;
+            opt.textContent = `📁 ${f}`;
+            select.appendChild(opt);
+        });
+
+        if (targetValue && !folders.includes(targetValue)) {
+            const opt = document.createElement("option");
+            opt.value = targetValue;
+            opt.textContent = `📁 ${targetValue}`;
+            select.appendChild(opt);
+        }
+
+        if (targetValue) {
+            select.value = targetValue;
+        } else {
+            select.value = "";
+        }
+    });
+}
+
+function promptCreateSubfolder(targetSelectId) {
+    currentFolderSelectTarget = targetSelectId || 'targetSubfolder';
+    const modal = document.getElementById('newFolderModal');
+    const input = document.getElementById('newFolderNameInput');
+    if (input) input.value = '';
+    if (modal) modal.classList.remove('hidden');
+    if (input) setTimeout(() => input.focus(), 60);
+}
+
+function closeNewFolderModal() {
+    const modal = document.getElementById('newFolderModal');
+    if (modal) modal.classList.add('hidden');
+}
+
+async function submitCreateSubfolder() {
+    const input = document.getElementById('newFolderNameInput');
+    const name = input ? input.value.trim() : '';
+    if (!name) {
+        showAlert('downloadAlert', 'Please enter a folder name.', 'warning');
+        return;
+    }
+
+    try {
+        const response = await authFetch('/api/folders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name })
+        });
+        if (!response) return;
+        const data = await response.json();
+        if (response.ok && data.status === 'success') {
+            closeNewFolderModal();
+            showAlert('downloadAlert', data.message || `Folder '${data.folder}' created.`, 'success');
+            await loadFolders(data.folder, currentFolderSelectTarget);
+        } else {
+            showAlert('downloadAlert', data.detail || 'Failed to create folder', 'error');
+        }
+    } catch (err) {
+        showAlert('downloadAlert', 'Error creating folder: ' + err.message, 'error');
+    }
+}
+
+// ==========================================
 // FEATURE 3: Direct Link / Quick Fetch Modal
 // ==========================================
 
@@ -2297,6 +2422,7 @@ function openQuickFetchModal() {
     if (!modal) return;
     modal.classList.remove("hidden");
     document.body.style.overflow = "hidden";
+    loadFolders();
     const resultBox = document.getElementById("quickFetchResult");
     if (resultBox) {
         resultBox.classList.add("hidden");
@@ -2374,11 +2500,67 @@ async function submitQuickFetch() {
 // FEATURE 1: Watch Rules Modal & CRUD
 // ==========================================
 
+function populateWatchRuleChannels() {
+    const select = document.getElementById("watchRuleChannel");
+    if (!select) return;
+
+    const currentVal = select.value;
+    select.innerHTML = '<option value="">Select a channel to watch...</option>';
+    if (Array.isArray(rawChannels)) {
+        rawChannels.forEach(c => {
+            const val = c.username ? `@${c.username}` : String(c.id);
+            const opt = document.createElement("option");
+            opt.value = val;
+            opt.textContent = `${c.name || c.username || c.id} (${val})`;
+            select.appendChild(opt);
+        });
+    }
+    const customOpt = document.createElement("option");
+    customOpt.value = "__custom__";
+    customOpt.textContent = "Custom Channel (@username or Chat ID)...";
+    select.appendChild(customOpt);
+
+    if (currentVal) select.value = currentVal;
+}
+
+function onWatchRuleChannelChange(val) {
+    const customInput = document.getElementById("watchRuleCustomChannel");
+    if (!customInput) return;
+    if (val === "__custom__") {
+        customInput.classList.remove("hidden");
+        customInput.focus();
+    } else {
+        customInput.classList.add("hidden");
+    }
+}
+
+function onWatchRuleFileTypeChange(val) {
+    const extInput = document.getElementById("watchRuleExtensions");
+    if (!extInput) return;
+    const map = {
+        'all': '',
+        'video': 'mp4, mkv, avi, mov, webm',
+        'audio': 'mp3, flac, wav, m4a, aac',
+        'document': 'pdf, zip, rar, 7z, epub',
+        'photo': 'jpg, jpeg, png, webp',
+    };
+    if (val === 'custom') {
+        extInput.classList.remove('hidden');
+        extInput.value = '';
+        extInput.focus();
+    } else {
+        extInput.classList.add('hidden');
+        extInput.value = map[val] !== undefined ? map[val] : '';
+    }
+}
+
 function openWatchRulesModal() {
     const modal = document.getElementById("watchRulesModal");
     if (!modal) return;
     modal.classList.remove("hidden");
     document.body.style.overflow = "hidden";
+    populateWatchRuleChannels();
+    loadFolders();
     loadWatchRules();
 }
 
@@ -2458,24 +2640,42 @@ async function loadWatchRules() {
 }
 
 async function createWatchRule() {
-    const channelInput = document.getElementById("watchRuleChannel");
+    const channelSelect = document.getElementById("watchRuleChannel");
+    const customChannelInput = document.getElementById("watchRuleCustomChannel");
     const subfolderInput = document.getElementById("watchRuleSubfolder");
+    const fileTypeSelect = document.getElementById("watchRuleFileType");
     const extensionsInput = document.getElementById("watchRuleExtensions");
     const keywordsInput = document.getElementById("watchRuleKeywords");
     const minSizeInput = document.getElementById("watchRuleMinSize");
     const maxSizeInput = document.getElementById("watchRuleMaxSize");
     const organizeInput = document.getElementById("watchRuleOrganize");
 
-    const channel = (channelInput ? channelInput.value : "").trim();
+    let channel = (channelSelect ? channelSelect.value : "").trim();
+    if (channel === "__custom__") {
+        channel = (customChannelInput ? customChannelInput.value : "").trim();
+    }
     if (!channel) {
         showAlert("downloadAlert", "Target channel is required.", "warning");
         return;
     }
 
+    let file_extensions = "";
+    if (fileTypeSelect && fileTypeSelect.value === "custom") {
+        file_extensions = (extensionsInput ? extensionsInput.value : "").trim();
+    } else if (fileTypeSelect && fileTypeSelect.value !== "all") {
+        const map = {
+            'video': 'mp4, mkv, avi, mov, webm',
+            'audio': 'mp3, flac, wav, m4a, aac',
+            'document': 'pdf, zip, rar, 7z, epub',
+            'photo': 'jpg, jpeg, png, webp',
+        };
+        file_extensions = map[fileTypeSelect.value] || "";
+    }
+
     const payload = {
         channel: channel,
         subfolder: (subfolderInput && subfolderInput.value.trim()) || null,
-        file_extensions: (extensionsInput && extensionsInput.value.trim()) || null,
+        file_extensions: file_extensions || null,
         keywords: (keywordsInput && keywordsInput.value.trim()) || null,
         min_size_mb: minSizeInput && minSizeInput.value ? parseFloat(minSizeInput.value) : null,
         max_size_mb: maxSizeInput && maxSizeInput.value ? parseFloat(maxSizeInput.value) : null,
@@ -2493,9 +2693,16 @@ async function createWatchRule() {
         const data = await response.json();
         if (response.ok && data.status === "success") {
             showAlert("downloadAlert", "Watch rule added successfully!", "success");
-            if (channelInput) channelInput.value = "";
-            if (subfolderInput) subfolderInput.value = "";
-            if (extensionsInput) extensionsInput.value = "";
+            if (channelSelect) channelSelect.value = "";
+            if (customChannelInput) {
+                customChannelInput.value = "";
+                customChannelInput.classList.add("hidden");
+            }
+            if (fileTypeSelect) fileTypeSelect.value = "all";
+            if (extensionsInput) {
+                extensionsInput.value = "";
+                extensionsInput.classList.add("hidden");
+            }
             if (keywordsInput) keywordsInput.value = "";
             if (minSizeInput) minSizeInput.value = "";
             if (maxSizeInput) maxSizeInput.value = "";

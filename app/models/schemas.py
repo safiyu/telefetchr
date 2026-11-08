@@ -84,3 +84,7 @@ class FileInfo(BaseModel):
 
 class QueueReorderRequest(BaseModel):
     queue_ids: List[str]
+
+
+class CreateFolderRequest(BaseModel):
+    name: str

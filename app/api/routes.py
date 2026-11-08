@@ -17,7 +17,8 @@ from app.models.schemas import (
     DownloadSelectedRequest,
     QuickFetchRequest,
     WatchRuleCreateRequest,
-    WatchRuleUpdateRequest
+    WatchRuleUpdateRequest,
+    CreateFolderRequest
 )
 from app.services.telegram_service import TelegramService
 from app.services.download_service import DownloadService
@@ -486,6 +487,57 @@ async def scan_watch_rule(rule_id: str, limit: int = Query(50, ge=1, le=500), cu
     if result.get("status") == "error":
         raise HTTPException(status_code=400, detail=result.get("message"))
     return result
+
+
+# Folder Management Endpoints
+
+@router.get("/api/folders")
+async def list_folders(current_user: str = Depends(get_current_user)):
+    """List all available subfolders in Config.SAVE_PATH for folder picking."""
+    try:
+        base_dir = Path(Config.SAVE_PATH).resolve()
+        folders = []
+        if base_dir.exists():
+            for root, dirs, _ in os.walk(base_dir):
+                # Filter out hidden or incomplete directories in-place
+                dirs[:] = [d for d in dirs if not d.startswith(".") and d != ".incomplete"]
+                rel_path = os.path.relpath(root, base_dir)
+                if rel_path != ".":
+                    folders.append(rel_path.replace("\\", "/"))
+        folders.sort(key=lambda x: x.lower())
+        return {"status": "success", "base_path": str(base_dir), "folders": folders}
+    except Exception as e:
+        logger.error(f"Error listing folders: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/folders")
+async def create_folder(request: CreateFolderRequest, current_user: str = Depends(get_current_user)):
+    """Create a new subfolder in Config.SAVE_PATH safely."""
+    raw_name = request.name.strip()
+    if not raw_name:
+        raise HTTPException(status_code=400, detail="Folder name cannot be empty")
+    try:
+        clean_sub = sanitize_subfolder(raw_name)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if not clean_sub:
+        raise HTTPException(status_code=400, detail="Invalid folder name")
+
+    base_dir = Path(Config.SAVE_PATH).resolve()
+    target_path = (base_dir / clean_sub).resolve()
+
+    if not target_path.is_relative_to(base_dir):
+        raise HTTPException(status_code=403, detail="Path traversal forbidden")
+
+    try:
+        target_path.mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        logger.error(f"Error creating folder {clean_sub}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create folder: {str(e)}")
+
+    return {"status": "success", "folder": clean_sub, "message": f"Folder '{clean_sub}' created successfully"}
 
 
 @router.get("/download-progress")

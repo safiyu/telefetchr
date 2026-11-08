@@ -542,12 +542,23 @@
 
                         <div>
                             <label
-                                class="block text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">Extension</label>
+                                class="block text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">File Type / Extension</label>
                             <div class="relative">
                                 <i class="fa-solid fa-file absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
-                                <input type="text" id="fileExtension" placeholder="e.g. .mp4"
-                                    class="w-full pl-11 pr-4 py-3 rounded-lg border border-gray-700 bg-gray-900 focus:ring-2 focus:ring-amber-500 outline-none transition-all">
+                                <select id="fileTypeSelect" onchange="onDashboardFileTypeChange(this.value)"
+                                    class="w-full pl-11 pr-8 py-3 rounded-lg border border-gray-700 bg-gray-900 text-white focus:ring-2 focus:ring-amber-500 outline-none transition-all appearance-none cursor-pointer">
+                                    <option value="">All File Types</option>
+                                    <option value="video">Videos (mp4, mkv, avi, mov, webm)</option>
+                                    <option value="audio">Audio (mp3, flac, wav, m4a, aac)</option>
+                                    <option value="document">Documents (pdf, epub, docx, txt)</option>
+                                    <option value="archive">Archives (zip, rar, 7z, tar, gz)</option>
+                                    <option value="photo">Photos (jpg, png, webp, gif)</option>
+                                    <option value="custom">Custom Extension...</option>
+                                </select>
+                                <i class="fa-solid fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none text-xs"></i>
                             </div>
+                            <input type="text" id="fileExtension" placeholder="e.g. mp4 or mkv, avi"
+                                class="hidden mt-2 w-full px-4 py-2 text-xs rounded-lg border border-amber-500/50 bg-gray-900 text-white focus:ring-2 focus:ring-amber-500 outline-none">
                         </div>
 
                         <div>
@@ -597,10 +608,22 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2.5 border-t border-gray-800/80">
                             <div>
                                 <label class="block text-gray-400 text-[11px] font-semibold uppercase tracking-wider mb-1">
-                                    <i class="fa-solid fa-folder-tree mr-1 text-amber-400"></i> Target Subfolder (Optional)
+                                    <i class="fa-solid fa-folder-tree mr-1 text-amber-400"></i> Target Subfolder
                                 </label>
-                                <input type="text" id="targetSubfolder" placeholder="e.g. Movies/2026 or Series/Season 1"
-                                    class="w-full px-3 py-1.5 text-xs rounded-lg border border-gray-700 bg-gray-900 focus:ring-1 focus:ring-amber-500 outline-none">
+                                <div class="flex items-center gap-1.5">
+                                    <div class="relative flex-1">
+                                        <select id="targetSubfolder"
+                                            class="w-full px-3 py-1.5 text-xs rounded-lg border border-gray-700 bg-gray-900 text-white focus:ring-1 focus:ring-amber-500 outline-none">
+                                            <option value="">📁 Root (/)</option>
+                                        </select>
+                                    </div>
+                                    <button type="button" onclick="promptCreateSubfolder('targetSubfolder')"
+                                        class="px-2.5 py-1.5 bg-amber-500/15 border border-black text-amber-400 hover:bg-amber-500 hover:text-black rounded-lg text-xs font-bold transition-all flex items-center gap-1 flex-shrink-0"
+                                        title="Create New Folder">
+                                        <i class="fa-solid fa-folder-plus text-[11px]"></i>
+                                        <span class="hidden sm:inline">New</span>
+                                    </button>
+                                </div>
                             </div>
                             <div>
                                 <label class="block text-gray-400 text-[11px] font-semibold uppercase tracking-wider mb-1">
@@ -902,8 +925,17 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label class="block text-gray-400 text-xs font-semibold uppercase tracking-wider mb-1">Target Subfolder</label>
-                            <input type="text" id="quickFetchSubfolder" placeholder="Optional subfolder..."
-                                class="w-full px-3 py-2 text-xs rounded-lg border border-gray-700 bg-gray-900 text-white focus:ring-1 focus:ring-amber-500 outline-none">
+                            <div class="flex items-center gap-1.5">
+                                <select id="quickFetchSubfolder"
+                                    class="w-full px-3 py-2 text-xs rounded-lg border border-gray-700 bg-gray-900 text-white focus:ring-1 focus:ring-amber-500 outline-none">
+                                    <option value="">📁 Root (/)</option>
+                                </select>
+                                <button type="button" onclick="promptCreateSubfolder('quickFetchSubfolder')"
+                                    class="px-2.5 py-2 bg-amber-500/15 border border-black text-amber-400 hover:bg-amber-500 hover:text-black rounded-lg text-xs font-bold transition-all flex items-center gap-1 flex-shrink-0"
+                                    title="Create New Folder">
+                                    <i class="fa-solid fa-folder-plus text-xs"></i>
+                                </button>
+                            </div>
                         </div>
                         <div>
                             <label class="block text-gray-400 text-xs font-semibold uppercase tracking-wider mb-1">Auto-Organize</label>
@@ -966,18 +998,40 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
                                 <label class="block text-gray-400 text-[11px] font-semibold uppercase mb-1">Target Channel *</label>
-                                <input type="text" id="watchRuleChannel" placeholder="@channel_username or chat ID"
+                                <select id="watchRuleChannel" onchange="onWatchRuleChannelChange(this.value)"
                                     class="w-full px-3 py-1.5 text-xs rounded-lg border border-gray-700 bg-gray-900 text-white outline-none">
+                                    <option value="">Select a channel to watch...</option>
+                                </select>
+                                <input type="text" id="watchRuleCustomChannel" placeholder="Enter @username or chat ID"
+                                    class="hidden mt-1.5 w-full px-3 py-1.5 text-xs rounded-lg border border-amber-500/50 bg-gray-900 text-white outline-none">
                             </div>
                             <div>
-                                <label class="block text-gray-400 text-[11px] font-semibold uppercase mb-1">Subfolder</label>
-                                <input type="text" id="watchRuleSubfolder" placeholder="e.g. Watched/Tech"
-                                    class="w-full px-3 py-1.5 text-xs rounded-lg border border-gray-700 bg-gray-900 text-white outline-none">
+                                <label class="block text-gray-400 text-[11px] font-semibold uppercase mb-1">Target Subfolder</label>
+                                <div class="flex items-center gap-1.5">
+                                    <select id="watchRuleSubfolder"
+                                        class="w-full px-3 py-1.5 text-xs rounded-lg border border-gray-700 bg-gray-900 text-white outline-none">
+                                        <option value="">📁 Root (/)</option>
+                                    </select>
+                                    <button type="button" onclick="promptCreateSubfolder('watchRuleSubfolder')"
+                                        class="px-2.5 py-1.5 bg-amber-500/15 border border-black text-amber-400 hover:bg-amber-500 hover:text-black rounded-lg text-xs font-bold transition-all flex items-center gap-1 flex-shrink-0"
+                                        title="Create New Folder">
+                                        <i class="fa-solid fa-folder-plus text-xs"></i>
+                                    </button>
+                                </div>
                             </div>
                             <div>
-                                <label class="block text-gray-400 text-[11px] font-semibold uppercase mb-1">File Extensions (comma-separated)</label>
+                                <label class="block text-gray-400 text-[11px] font-semibold uppercase mb-1">File Type / Category</label>
+                                <select id="watchRuleFileType" onchange="onWatchRuleFileTypeChange(this.value)"
+                                    class="w-full px-3 py-1.5 text-xs rounded-lg border border-gray-700 bg-gray-900 text-white outline-none">
+                                    <option value="all">All Media Files (Any type)</option>
+                                    <option value="video">Videos (mp4, mkv, avi, mov, webm)</option>
+                                    <option value="audio">Audio / Music (mp3, flac, wav, m4a, aac)</option>
+                                    <option value="document">Documents & Archives (pdf, zip, rar, 7z, epub)</option>
+                                    <option value="photo">Photos & Images (jpg, jpeg, png, webp)</option>
+                                    <option value="custom">Custom Extensions...</option>
+                                </select>
                                 <input type="text" id="watchRuleExtensions" placeholder="e.g. mp4, mkv, pdf"
-                                    class="w-full px-3 py-1.5 text-xs rounded-lg border border-gray-700 bg-gray-900 text-white outline-none">
+                                    class="hidden mt-1.5 w-full px-3 py-1.5 text-xs rounded-lg border border-amber-500/50 bg-gray-900 text-white outline-none">
                             </div>
                             <div>
                                 <label class="block text-gray-400 text-[11px] font-semibold uppercase mb-1">Keywords / Regex</label>
@@ -1030,6 +1084,44 @@
                     <button onclick="closeWatchRulesModal()"
                         class="px-4 py-2 rounded-xl bg-gray-800 text-gray-300 hover:text-white text-xs font-bold transition-all">
                         Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Folder Modal -->
+    <div id="newFolderModal" class="fixed inset-0 z-[1000000] hidden overflow-y-auto" role="dialog" aria-modal="true">
+        <div class="flex min-h-screen items-center justify-center p-4 text-center sm:p-0">
+            <div class="fixed inset-0 bg-gray-950/80 backdrop-blur-sm transition-opacity" onclick="closeNewFolderModal()"></div>
+            <div class="relative transform overflow-hidden rounded-2xl bg-gray-900 border-2 border-black p-6 text-left shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-all sm:my-8 sm:w-full sm:max-w-md animate-scale-in">
+                <div class="flex items-center justify-between pb-3 mb-4 border-b border-gray-800">
+                    <h3 class="text-base font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-folder-plus text-amber-400"></i> Create New Subfolder
+                    </h3>
+                    <button onclick="closeNewFolderModal()" class="text-gray-400 hover:text-white transition-colors">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                </div>
+                <div class="space-y-3">
+                    <p class="text-xs text-gray-400">
+                        Enter a subfolder name (e.g. <span class="text-amber-400 font-mono">Movies/2026</span> or <span class="text-amber-400 font-mono">Series</span>). It will be created under your download save directory.
+                    </p>
+                    <div>
+                        <label class="block text-gray-300 text-xs font-semibold mb-1">Folder Name / Path</label>
+                        <input type="text" id="newFolderNameInput" placeholder="e.g. Movies/Action"
+                            class="w-full px-3 py-2 text-sm rounded-xl border border-gray-700 bg-gray-950 text-white focus:ring-2 focus:ring-amber-500 outline-none"
+                            onkeydown="if(event.key === 'Enter') submitCreateSubfolder()">
+                    </div>
+                </div>
+                <div class="mt-5 flex gap-2 justify-end">
+                    <button type="button" onclick="closeNewFolderModal()"
+                        class="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-bold transition-all">
+                        Cancel
+                    </button>
+                    <button type="button" onclick="submitCreateSubfolder()"
+                        class="px-4 py-2 rounded-xl btn-yellow-hover text-xs font-bold flex items-center gap-1.5">
+                        <i class="fa-solid fa-check"></i> Create Folder
                     </button>
                 </div>
             </div>

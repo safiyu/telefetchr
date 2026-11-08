@@ -242,7 +242,8 @@ class TelegramService:
 
                     if file_extension:
                         ext = file_info.file_name.split('.')[-1].lower() if '.' in file_info.file_name else ''
-                        if ext != file_extension.lower().lstrip('.'):
+                        allowed_exts = [e.strip().lower().lstrip('.') for e in file_extension.split(',') if e.strip()]
+                        if allowed_exts and ext not in allowed_exts:
                             continue
 
                     files.append(file_info)

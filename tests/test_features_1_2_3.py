@@ -6,6 +6,7 @@
 import os
 import sys
 import json
+from datetime import datetime
 from pathlib import Path
 
 os.environ.setdefault("SECRET_KEY", "telefetchr-test-key-12345")
@@ -551,5 +552,95 @@ async def test_subfolder_traversal_endpoint_validation(test_app):
             "subfolder": "../../escape"
         })
         assert res.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_folders_api_list_and_create(test_app, tmp_path, monkeypatch):
+    """Test GET /api/folders and POST /api/folders."""
+    from app.config import Config
+    resolved_tmp = tmp_path.resolve()
+    monkeypatch.setattr(Config, "SAVE_PATH", str(resolved_tmp))
+    monkeypatch.setattr("app.api.routes.Config.SAVE_PATH", str(resolved_tmp))
+
+    tg_mock = MagicMock()
+    dl_mock = MagicMock()
+    state_mock = MagicMock()
+    auth_mock = MagicMock()
+    ws_mock = MagicMock()
+
+    set_services(tg_mock, dl_mock, state_mock, auth_mock, ws_mock)
+    transport = httpx.ASGITransport(app=test_app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        # Initially empty
+        res = await client.get("/api/folders")
+        assert res.status_code == 200
+        data = res.json()
+        assert data["status"] == "success"
+        assert data["folders"] == []
+
+        # Create valid subfolder
+        res = await client.post("/api/folders", json={"name": "Series/Season 1"})
+        assert res.status_code == 200
+        data = res.json()
+        assert data["status"] == "success"
+        assert data["folder"] == "Series/Season 1"
+        assert (resolved_tmp / "Series" / "Season 1").is_dir()
+
+        # List folders should now return Series and Series/Season 1
+        res = await client.get("/api/folders")
+        assert res.status_code == 200
+        folders = res.json()["folders"]
+        assert "Series" in folders
+        assert "Series/Season 1" in folders
+
+        # Reject empty name
+        res = await client.post("/api/folders", json={"name": "   "})
+        assert res.status_code == 400
+
+        # Reject path traversal
+        res = await client.post("/api/folders", json={"name": "../escaped_dir"})
+        assert res.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_telegram_service_multi_extension_filter():
+    """Verify telegram_service multi-extension filtering matches comma-separated extensions."""
+    from app.services.telegram_service import TelegramService
+    from telethon.tl.types import MessageMediaDocument, Document, DocumentAttributeFilename
+    from unittest.mock import MagicMock
+
+    tg = TelegramService()
+    tg.is_connected = MagicMock(return_value=True)
+
+    def make_doc_msg(msg_id, filename):
+        msg = MagicMock()
+        msg.id = msg_id
+        msg.date = datetime.now()
+        attr = DocumentAttributeFilename(file_name=filename)
+        doc = MagicMock(spec=Document)
+        doc.size = 1024
+        doc.attributes = [attr]
+        media = MessageMediaDocument(document=doc, nopremium=False, spoiler=False, ttl_seconds=None)
+        msg.media = media
+        return msg
+
+    msg_mp4 = make_doc_msg(1, "video1.mp4")
+    msg_mkv = make_doc_msg(2, "video2.mkv")
+    msg_pdf = make_doc_msg(3, "doc.pdf")
+
+    async def mock_iter(channel, limit=None, **kwargs):
+        for m in [msg_mp4, msg_mkv, msg_pdf]:
+            yield m
+
+    tg.client = MagicMock()
+    tg.client.iter_messages = mock_iter
+
+    # Test filtering video files with comma-separated list
+    files = await tg.list_files("@test", limit=10, file_extension="mp4, mkv")
+    names = [f.file_name for f in files]
+    assert "video1.mp4" in names
+    assert "video2.mkv" in names
+    assert "doc.pdf" not in names
+
 
 

@@ -2,6 +2,13 @@
 
 All epic victories and mysterious bugs that somehow became features are here.
 
+## [4.1.1] - 2026-11-08
+### Added
+- Dynamic Folder Picker & Management: Replaced subfolder free-text inputs with dynamic dropdown pickers populated from `SAVE_PATH`, plus an interactive dialog to create new subfolders on the fly across Dashboard, Quick Fetch, and Watch Rules.
+- Channel & File Type Dropdowns: Replaced free-text input fields for Watch Rule channels and file types with rich dropdowns, channel dialog selectors with custom handle fallback, and media preset filters (Videos, Audio, Documents, Archives, Photos).
+- Comma-Separated Multi-Extension Filtering: Upgraded Telegram file listing to filter multiple extensions simultaneously.
+- Folder Management API: Added `GET /api/folders` and `POST /api/folders` with path-traversal validation.
+
 ## [4.1.0] - 2026-11-08
 ### Added
 - Auto-Watch & Auto-Download Rules: Background Telegram event listener (`events.NewMessage`) and rule engine matching incoming media by channel, file extensions, keywords/regex, and min/max file size with automatic queue ingestion and retroactive channel scans.
