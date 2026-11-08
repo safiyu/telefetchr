@@ -4,7 +4,7 @@ import asyncio
 import json
 from datetime import datetime
 from typing import List, Optional, Dict, Any
-from telethon.tl.types import MessageMediaDocument, MessageMediaPhoto
+from telethon.tl.types import MessageMediaDocument, MessageMediaPhoto, DocumentAttributeVideo, DocumentAttributeAudio
 import uuid
 
 from app.config import Config
@@ -383,15 +383,33 @@ class DownloadService:
                 chunk_size = 5 # Start with very small chunk for immediate feedback
                 current_chunk = []
                 
-                async for message in await self.telegram_service.iter_messages(channel_username, limit):
+                if filter_type:
+                    try:
+                        messages_iter = await self.telegram_service.iter_messages(channel_username, limit, filter_type=filter_type)
+                    except TypeError:
+                        messages_iter = await self.telegram_service.iter_messages(channel_username, limit)
+                else:
+                    messages_iter = await self.telegram_service.iter_messages(channel_username, limit)
+
+                async for message in messages_iter:
                     if message.media:
                         should_download = False
-                        if isinstance(message.media, MessageMediaDocument):
-                            if not filter_type or filter_type == 'document':
-                                should_download = True
-                        elif isinstance(message.media, MessageMediaPhoto):
-                            if not filter_type or filter_type == 'photo':
-                                should_download = True
+                        if not filter_type or filter_type.lower() == 'all':
+                            should_download = True
+                        elif filter_type.lower() == 'photo':
+                            should_download = isinstance(message.media, MessageMediaPhoto)
+                        elif filter_type.lower() == 'video':
+                            if isinstance(message.media, MessageMediaDocument):
+                                mime = getattr(getattr(message.media, 'document', None), 'mime_type', '') or ''
+                                has_video_attr = any(isinstance(x, DocumentAttributeVideo) for x in getattr(getattr(message.media, 'document', None), 'attributes', []))
+                                should_download = mime.startswith('video/') or has_video_attr
+                        elif filter_type.lower() == 'audio':
+                            if isinstance(message.media, MessageMediaDocument):
+                                mime = getattr(getattr(message.media, 'document', None), 'mime_type', '') or ''
+                                has_audio_attr = any(isinstance(x, DocumentAttributeAudio) for x in getattr(getattr(message.media, 'document', None), 'attributes', []))
+                                should_download = mime.startswith('audio/') or has_audio_attr
+                        elif filter_type.lower() == 'document':
+                            should_download = isinstance(message.media, MessageMediaDocument)
 
                         if should_download:
                             if self.state_manager.is_file_active_or_queued(channel_username, message.id):
@@ -763,7 +781,7 @@ class DownloadService:
                         # Extract from fid: single_MESSAGEID or file_SESSIONID_MESSAGEID
                         mid = int(fid.split("_")[-1])
                         completed_ids.add(mid)
-                    except: 
+                    except Exception: 
                         # Fallback: check if stored in metadata
                         if "message_id" in info:
                             completed_ids.add(info["message_id"])

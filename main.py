@@ -49,26 +49,33 @@ auth_service: AuthService = None
 
 
 def cleanup_old_logs(log_file_path: str, max_age_days: int = 30):
-    """Remove log lines older than max_age_days from the active log file."""
+    """Remove log lines older than max_age_days from the active log file without memory bloat."""
     if not os.path.exists(log_file_path):
         return
-    from datetime import datetime, timedelta
-    cutoff = datetime.now() - timedelta(days=max_age_days)
-    kept_lines = []
+    tmp_path = f"{log_file_path}.clean"
     try:
-        with open(log_file_path, 'r', encoding='utf-8') as f:
-            for line in f:
+        # If file is larger than 15MB, leave it to RotatingFileHandler
+        if os.path.getsize(log_file_path) > 15 * 1024 * 1024:
+            return
+        from datetime import datetime, timedelta
+        cutoff = datetime.now() - timedelta(days=max_age_days)
+        with open(log_file_path, 'r', encoding='utf-8', errors='ignore') as src, \
+             open(tmp_path, 'w', encoding='utf-8') as dst:
+            for line in src:
                 try:
-                    timestamp_str = line.split(' | ')[0].strip()
-                    line_time = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S,%f")
+                    parts = line.split(' | ', 1)
+                    line_time = datetime.strptime(parts[0].strip(), "%Y-%m-%d %H:%M:%S,%f")
                     if line_time >= cutoff:
-                        kept_lines.append(line)
+                        dst.write(line)
                 except (ValueError, IndexError):
-                    kept_lines.append(line)
-        with open(log_file_path, 'w', encoding='utf-8') as f:
-            f.writelines(kept_lines)
+                    dst.write(line)
+        os.replace(tmp_path, log_file_path)
     except Exception:
-        pass
+        if os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except Exception:
+                pass
 
 
 @asynccontextmanager

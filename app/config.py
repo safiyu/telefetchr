@@ -70,7 +70,8 @@ class Config:
     # Telegram API Configuration
     API_ID = os.getenv("API_ID")
     API_HASH = os.getenv("API_HASH")
-    PHONE_NUMBER = f'+{os.getenv("PHONE_NUMBER")}'
+    _raw_phone = (os.getenv("PHONE_NUMBER") or "").strip()
+    PHONE_NUMBER = (_raw_phone if _raw_phone.startswith("+") else f"+{_raw_phone}") if _raw_phone else None
 
     # Download Configuration
     MAX_CONCURRENT_DOWNLOADS = 1
@@ -135,6 +136,10 @@ class Config:
             "(e.g. python -c \"import secrets; print(secrets.token_urlsafe(16))\")."
         )
     
+    # Logging & Debug routes
+    LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO").upper()
+    ENABLE_DEBUG_ROUTES: bool = os.getenv("ENABLE_DEBUG_ROUTES", "false").lower() in ("true", "1", "yes")
+
     # Trusted Subnets for Auth Bypass (comma-separated CIDRs)
     # Example: "192.168.1.0/24,10.0.0.0/8"
     TRUSTED_SUBNETS = [s.strip() for s in os.getenv("TRUSTED_SUBNETS", "").split(",") if s.strip()]

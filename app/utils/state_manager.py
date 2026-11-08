@@ -147,6 +147,14 @@ class StateManager:
         temporary file, explicit fsync, and atomic rename (os.replace).
         Throttles high-frequency writes unless force=True.
         """
+        try:
+            loop = asyncio.get_running_loop()
+            if loop.is_running():
+                self.schedule_progress_save(force=force)
+                return
+        except RuntimeError:
+            pass
+
         now = time.time()
         # High-frequency disk write throttling (skip if not forced and saved recently)
         if not force and (now - self._last_save_time < 1.5):

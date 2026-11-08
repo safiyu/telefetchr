@@ -5,7 +5,6 @@ cryptg
 pydantic
 PyYAML==6.0.1
 python-multipart==0.0.6
-aiofiles==23.2.1
 python-jose[cryptography]==3.3.0
 bcrypt==4.0.1
 python-dotenv==1.0.0

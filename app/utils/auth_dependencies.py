@@ -139,12 +139,12 @@ async def get_current_user(
         return Config.ADMIN_USERNAME
 
     raw_token = None
-    if credentials:
+    if credentials and hasattr(credentials, "credentials"):
         raw_token = credentials.credentials
-    elif token:
-        raw_token = token
-    elif "token" in request.query_params:
-        raw_token = request.query_params.get("token")
+    elif "access_token" in request.cookies:
+        raw_token = request.cookies.get("access_token")
+    elif (token or "token" in request.query_params) and request.url.path.startswith("/files/serve/"):
+        raw_token = token or request.query_params.get("token")
 
     # Standard token validation
     if not raw_token:
@@ -154,7 +154,8 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    token_data = auth_service.verify_token(raw_token)
+    active_auth = auth_service or AuthService()
+    token_data = active_auth.verify_token(raw_token)
     if token_data.username is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

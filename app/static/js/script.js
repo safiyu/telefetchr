@@ -1197,165 +1197,7 @@ function formatTime(seconds) {
     return `${h}h ${remM}m`;
 }
 
-function createProgressBar(
-    fileId,
-    fileName,
-    isComplete = false,
-    percentage = 0,
-    current = 0,
-    total = 0,
-    retryAttempt = null,
-    lastUpdate = null,
-    speed = 0,
-    eta = 0,
-    isQueued = false
-) {
-    // fileId is interpolated into an id attribute below; progressElId()
-    // strips characters that are not legal in an HTML identifier so it cannot
-    // break out of the attribute or inject markup.
-    const progressId = progressElId(fileId);
-    let retryBadge = '';
-    let stallWarning = '';
-
-    // Format speed and ETA
-    const speedText = speed > 0 ? `${formatBytes(speed)}/s` : '';
-    const etaText = eta > 0 ? `ETA: ${formatTime(eta)}` : '';
-
-    if (retryAttempt && retryAttempt > 1) {
-        retryBadge = `<span class="text-xs px-2 py-1 rounded bg-yellow-500 bg-opacity-20 text-yellow-300 ml-2 border border-black" style="box-shadow: 2px 2px 0px rgba(0,0,0,0.2)">Retry ${retryAttempt}/3</span>`;
-    }
-
-    // Check if download appears stalled
-    if (lastUpdate && !isComplete) {
-        try {
-            const lastUpdateTime = new Date(lastUpdate);
-            const timeSinceUpdate = (Date.now() - lastUpdateTime) / 1000; // seconds
-            if (timeSinceUpdate > 10) {
-                stallWarning = `<span class="text-xs px-2 py-1 rounded bg-yellow-600 bg-opacity-20 text-yellow-600 ml-2 border border-black" style="box-shadow: 2px 2px 0px rgba(0,0,0,0.2)"><i class="fa-solid fa-triangle-exclamation"></i> Stalled ${Math.floor(timeSinceUpdate)}s</span>`;
-            }
-        } catch (e) {
-            console.error('Error checking stall status:', e);
-        }
-    }
-
-    let html = `
-        <div id="${progressId}" class="file-progress-block relative overflow-hidden group">
-            <!-- Comic Panel effect background -->
-            <div class="absolute inset-0 bg-gray-800 border-2 border-black rounded-xl" style="box-shadow: 4px 4px 0px rgba(0,0,0,0.4)"></div>
-            
-            <div class="relative p-5 z-10">
-                <div class="flex justify-between items-start mb-4">
-                    <div class="flex items-center gap-4 overflow-hidden">
-                        <div class="w-12 h-12 rounded-lg bg-yellow-400 bg-opacity-10 flex items-center justify-center flex-shrink-0 text-yellow-400 border-2 border-black" style="box-shadow: 2px 2px 0px rgba(0,0,0,0.2)">
-                             <i class="fa-solid fa-file-arrow-down text-xl"></i>
-                        </div>
-                        <div class="min-w-0">
-                            <div class="file-name text-white font-medium line-clamp-2" title="${escapeHtml(fileName)}">
-                                ${escapeHtml(fileName)}
-                            </div>
-                            <div class="progress-badges flex items-center gap-2 mt-0.5">
-                                ${retryBadge}
-                                ${stallWarning}
-                                ${isQueued ? `<span class="text-xs text-yellow-500 flex items-center gap-1 font-bold uppercase italic"><i class="fa-solid fa-hourglass-start text-[10px]"></i> Queued!</span>` : ''}
-                                ${!isComplete && !isQueued && !retryBadge && !stallWarning ? `<span class="text-xs text-yellow-300 font-bold flex items-center gap-1 uppercase"><i class="fa-solid fa-bolt text-[10px]"></i> <span class="speed-val">${speedText}</span></span>` : ''}
-                            </div>
-                        </div>
-                    </div>
-                    
-                    ${isComplete ? `
-                        <button onclick="clearIndividualProgress(${jsStr(fileId)})" class="w-8 h-8 flex items-center justify-center btn-red rounded-xl focus:outline-none" title="Clear History">
-                            <i class="fa-solid fa-xmark text-sm"></i>
-                        </button>
-                    ` : `
-                        <div class="flex flex-col items-end gap-1">
-                            <div class="flex items-center gap-2">
-                                <span class="progress-percentage text-lg font-bold text-white header-gradient">${isQueued ? '0' : percentage}%</span>
-                                <button onclick="cancelIndividualDownload(${jsStr(fileId)})" 
-                                    class="w-8 h-8 flex items-center justify-center ${isQueued ? 'btn-orange-hover' : 'btn-red'} rounded-xl focus:outline-none" 
-                                    title="${isQueued ? 'Remove from Queue' : 'Cancel Download'}">
-                                    <i class="fa-solid ${isQueued ? 'fa-trash-can' : 'fa-stop'} text-xs"></i>
-                                </button>
-                            </div>
-                            <div class="progress-eta text-xs text-gray-400 font-medium tracking-wide">${etaText}</div>
-                        </div>
-                    `}
-                </div>
-
-                <!-- Progress Track -->
-                <div class="h-4 w-full bg-gray-900 border-2 border-black rounded-full overflow-hidden mb-3 relative" style="box-shadow: inset 2px 2px 4px rgba(0,0,0,0.5)">
-                    <div class="progress-inner h-full transition-all duration-500 ease-out relative ${isComplete ? 'bg-green-500' : 'bg-yellow-400 progress-bar-glow'}" 
-                         style="width: ${percentage}%; background-color: ${isComplete ? '' : '#fbbf24'}; border-right: ${isComplete ? 'none' : '2px solid black'};">
-                    </div>
-                </div>
-
-                <div class="flex justify-between items-center text-xs text-gray-400 font-medium">
-                    <span class="progress-size-text">${isQueued ? 'Awaiting start...' : `${formatBytes(current)} <span class="opacity-50 mx-1">/</span> ${formatBytes(total)}`}</span>
-                    <span class="progress-status">
-                    ${isComplete
-            ? '<span class="text-green-400 font-bold flex items-center gap-1.5"><i class="fa-solid fa-circle-check"></i> Complete</span>'
-            : isQueued
-                ? '<span class="text-yellow-400 text-opacity-70 font-medium flex items-center gap-1.5"><i class="fa-solid fa-clock"></i> Queued</span>'
-                : retryAttempt > 1
-                    ? '<span class="text-yellow-400 font-bold flex items-center gap-1.5"><i class="fa-solid fa-spinner fa-spin"></i> Retrying...</span>'
-                    : '<span class="text-blue-400 font-bold flex items-center gap-1.5"><i class="fa-solid fa-spinner fa-spin"></i> Downloading</span>'
-        }
-                    </span>
-                </div>
-            </div>
-        </div>
-    `;
-    return html;
-}
-
-function createCancelledProgressBar(
-    fileId,
-    fileName,
-    percentage = 0,
-    current = 0,
-    total = 0
-) {
-    const progressId = progressElId(fileId, "cancelled");
-
-    let html = `
-        <div id="${progressId}" class="relative overflow-hidden group opacity-80">
-            <!-- Glass effect background with red tint -->
-            <div class="absolute inset-0 bg-red-900 bg-opacity-10 backdrop-blur-sm border-2 border-red-500 border-opacity-20 rounded-xl" style="box-shadow: 3px 3px 0px rgba(0,0,0,0.2)"></div>
-            
-            <div class="relative p-4 z-10">
-                <div class="flex justify-between items-start mb-3">
-                    <div class="flex items-center gap-3 overflow-hidden">
-                        <div class="w-10 h-10 rounded-lg bg-red-500 bg-opacity-10 flex items-center justify-center flex-shrink-0 text-red-400 border border-black" style="box-shadow: 2px 2px 0px rgba(0,0,0,0.2)">
-                             <i class="fa-solid fa-ban text-xl"></i>
-                        </div>
-                        <div class="min-w-0">
-                            <div class="file-name text-gray-300 font-medium line-clamp-2 line-through decoration-red-500 decoration-opacity-50" title="${escapeHtml(fileName)}">
-                                ${escapeHtml(fileName)}
-                            </div>
-                            <div class="flex items-center gap-2 mt-0.5">
-                                <span class="text-xs text-red-400 flex items-center gap-1 font-bold uppercase"><i class="fa-solid fa-circle-stop text-[10px]"></i> Cancelled</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <button onclick="clearIndividualProgress(${jsStr(fileId)})" class="w-7 h-7 flex items-center justify-center btn-red rounded-xl focus:outline-none" title="Dismiss">
-                        <i class="fa-solid fa-xmark text-xs"></i>
-                    </button>
-                </div>
-
-                <!-- Progress Track -->
-                <div class="h-2 w-full bg-gray-700 bg-opacity-50 border border-black rounded-full overflow-hidden mb-2">
-                    <div class="h-full rounded-full bg-red-500 bg-opacity-50" style="width: ${percentage}%; border-right: 1.5px solid black;"></div>
-                </div>
-
-                <div class="flex justify-between items-center text-xs text-gray-400 font-medium">
-                    <span>${formatBytes(current)} of ${formatBytes(total)}</span>
-                    <span class="text-red-400">Stopped at ${percentage}%</span>
-                </div>
-            </div>
-        </div>
-    `;
-    return html;
-}
+// Legacy progress bar creators removed - replaced by unified renderActivityRow
 
 async function downloadSelected(channel) {
     if (selectedFiles.size === 0) {
@@ -1439,7 +1281,7 @@ async function downloadSingle(messageId, channel) {
         document.getElementById("stopAllBtn").classList.remove("hidden");
 
         const response = await authFetch(
-            `/files/download/${messageId}?channel_username=${channel}`,
+            `/files/download/${encodeURIComponent(messageId)}?channel_username=${encodeURIComponent(channel)}`,
             {
                 method: "POST",
             }
@@ -1564,38 +1406,12 @@ async function cancelDownload() {
                 progressMonitoringInterval = null;
             }
 
-            // Clear active and queue containers
-            const activeContainer = document.getElementById("activeDownloadContainer");
-            const queueContainer = document.getElementById("queueContainer");
-            if (activeContainer) activeContainer.innerHTML = '';
-            if (queueContainer) queueContainer.innerHTML = '';
-
-            const overallText = document.getElementById("overallText");
-            if (overallText) {
-                overallText.textContent = "";
-            }
-
-            // Hide sections
-            document.getElementById("activeSection")?.classList.add("hidden");
-            document.getElementById("queueSection")?.classList.add("hidden");
-
-            // Reset title and icon to cancelled state
-            const progressTitle = document.getElementById("activeTitle");
-            if (progressTitle) {
-                progressTitle.innerHTML = '<i id="activeIcon" class="fa-solid fa-circle-xmark text-red-500"></i> Download Session Cancelled';
-            }
-
-            // Hide progress section if no history exists
-            const historyContainer = document.getElementById("historyContainer");
-            if (!historyContainer || historyContainer.children.length === 0) {
-                document.getElementById("downloadProgress").classList.add("hidden");
-            }
-
             selectedFiles.clear();
             updateSelectedCount();
             deselectAllFiles();
 
-            document.getElementById("stopAllBtn").classList.add("hidden");
+            document.getElementById("stopAllBtn")?.classList.add("hidden");
+            await refreshProgress();
         } else {
             showAlert("downloadAlert", data.detail || data.message, "error");
         }
@@ -1774,9 +1590,9 @@ function showAlert(_elementId, message, type) {
     const toast = document.createElement("div");
     // Comic Speech Bubble design: ink borders + hard shadow + kapow animation + color coding
     toast.className = `flex flex-col px-5 py-4 comic-toast animate-kapow text-white ${typeClass} ${animationClass} pointer-events-auto mt-4 transition-all duration-300 transform z-[99999] flex-shrink-0 relative`;
-    toast.style.setProperty("width", "400px", "important");
-    toast.style.setProperty("min-width", "400px", "important");
-    toast.style.setProperty("max-width", "400px", "important");
+    toast.style.setProperty("width", "min(400px, calc(100vw - 2rem))", "important");
+    toast.style.setProperty("min-width", "min(320px, calc(100vw - 2rem))", "important");
+    toast.style.setProperty("max-width", "calc(100vw - 2rem)", "important");
     toast.style.setProperty("margin-bottom", "15px", "important");
 
     toast.innerHTML = `

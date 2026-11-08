@@ -1,13 +1,11 @@
 import logging
 from datetime import datetime
-from typing import Optional, List, Callable
+from typing import Optional, List, Callable, Any
 import math
 import os
 import asyncio
-import aiofiles
 from telethon import TelegramClient, utils
 from telethon.tl.types import MessageMediaDocument, MessageMediaPhoto, Channel, User, InputMessagesFilterVideo, InputMessagesFilterDocument, InputMessagesFilterPhotos, InputMessagesFilterMusic
-from telethon.network import ConnectionTcpMTProxyRandomizedIntermediate
 
 from app.config import Config
 from app.models.schemas import FileInfo
@@ -137,14 +135,27 @@ class TelegramService:
                     "id": entity.id,
                     "username": f"@{entity.username}" if entity.username else None
                 })
-            elif isinstance(entity, Channel) and entity.username:
+            elif isinstance(entity, Channel):
                 channels.append({
                     "name": tidy_display_name(dialog.name),
-                    "id": entity.id,
-                    "username": f"@{entity.username}"
+                    "id": dialog.id,
+                    "username": f"@{entity.username}" if entity.username else None
                 })
 
         return bots + channels
+
+    @staticmethod
+    def _resolve_peer(channel_identifier: Any) -> Any:
+        """Parse numeric IDs (e.g. -100..., 123456) or usernames for Telethon peer resolution."""
+        if isinstance(channel_identifier, str):
+            clean = channel_identifier.strip()
+            if (clean.startswith("-") and clean[1:].isdigit()) or clean.isdigit():
+                try:
+                    return int(clean)
+                except ValueError:
+                    return clean
+            return clean
+        return channel_identifier
 
     async def list_files(
         self,
@@ -166,13 +177,13 @@ class TelegramService:
         if date_from:
             try:
                 date_from_dt = datetime.fromisoformat(date_from.replace('Z', '+00:00'))
-            except:
+            except Exception:
                 logger.warning(f"Invalid date_from format: {date_from}")
 
         if date_to:
             try:
                 date_to_dt = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
-            except:
+            except Exception:
                 logger.warning(f"Invalid date_to format: {date_to}")
 
         api_filter = None
@@ -186,7 +197,8 @@ class TelegramService:
             elif filter_type.lower() == 'audio':
                 api_filter = InputMessagesFilterMusic
 
-        async for message in self.client.iter_messages(channel_username, limit=limit * 2, filter=api_filter):
+        peer = self._resolve_peer(channel_username)
+        async for message in self.client.iter_messages(peer, limit=limit * 2, filter=api_filter):
             if message.media:
                 file_info = None
 
@@ -243,8 +255,8 @@ class TelegramService:
     async def get_messages(self, channel_username: str, message_ids: List[int]):
         """Get specific messages by IDs in bulk"""
         try:
-            # Telethon natively supports fetching a list of IDs
-            messages = await self.client.get_messages(channel_username, ids=message_ids)
+            peer = self._resolve_peer(channel_username)
+            messages = await self.client.get_messages(peer, ids=message_ids)
             
             # Message collection can return None for individual IDs if they don't exist
             # Filter out None and those without media
@@ -260,11 +272,24 @@ class TelegramService:
 
     async def get_message(self, channel_username: str, message_id: int):
         """Get a single message"""
-        return await self.client.get_messages(channel_username, ids=message_id)
+        peer = self._resolve_peer(channel_username)
+        return await self.client.get_messages(peer, ids=message_id)
 
-    async def iter_messages(self, channel_username: str, limit: int):
-        """Iterate through channel messages"""
-        return self.client.iter_messages(channel_username, limit=limit)
+    async def iter_messages(self, channel_username: str, limit: int, filter_type: Optional[str] = None):
+        """Iterate through channel messages with optional media filter"""
+        peer = self._resolve_peer(channel_username)
+        api_filter = None
+        if filter_type:
+            ft = filter_type.lower()
+            if ft == 'video':
+                api_filter = InputMessagesFilterVideo
+            elif ft == 'document':
+                api_filter = InputMessagesFilterDocument
+            elif ft == 'photo':
+                api_filter = InputMessagesFilterPhotos
+            elif ft == 'audio':
+                api_filter = InputMessagesFilterMusic
+        return self.client.iter_messages(peer, limit=limit, filter=api_filter)
 
     async def download_media(self, message, file_path: str, progress_callback=None):
         """Download media from message with optimized settings"""
@@ -299,6 +324,8 @@ class TelegramService:
         if not hasattr(self.client, "_get_dc") or not getattr(self.client, "session", None):
             return None
 
+        senders = []
+        orig_init_query = getattr(getattr(self.client, "_init_request", None), "query", None)
         try:
             dc = await self.client._get_dc(dc_id)
             is_current_dc = (dc_id == self.client.session.dc_id)
@@ -317,8 +344,8 @@ class TelegramService:
                 await s.connect(conn)
                 return s
 
-            senders = []
             first_sender = await _connect_single(auth_key)
+            senders.append(first_sender)
 
             if not is_current_dc and not auth_key:
                 logger.info(f"Exporting auth to DC {dc_id} for multi-connection parallel transfer")
@@ -328,8 +355,6 @@ class TelegramService:
                 await first_sender.send(req)
                 auth_key = first_sender.auth_key
 
-            senders.append(first_sender)
-
             if count > 1:
                 remaining = await asyncio.gather(*[_connect_single(auth_key) for _ in range(count - 1)])
                 senders.extend(remaining)
@@ -338,7 +363,15 @@ class TelegramService:
             return senders
         except Exception as e:
             logger.warning(f"Could not establish multi-connection sender pool (falling back to single connection): {e}")
+            for s in senders:
+                try:
+                    await s.disconnect()
+                except Exception:
+                    pass
             return None
+        finally:
+            if orig_init_query is not None and hasattr(self.client, "_init_request"):
+                self.client._init_request.query = orig_init_query
 
     async def download_media_parallel(
         self, 
@@ -442,9 +475,15 @@ class TelegramService:
         else:
             fd = os.open(file_path, os.O_RDWR, 0o644)
 
-        def save_meta() -> None:
+        last_meta_save = [datetime.now()]
+
+        def save_meta(force: bool = False) -> None:
             if not resume:
                 return
+            now = datetime.now()
+            if not force and (now - last_meta_save[0]).total_seconds() < 2.0:
+                return
+            last_meta_save[0] = now
             try:
                 tmp_meta = f"{meta_path}.tmp.{os.getpid()}"
                 with open(tmp_meta, "w", encoding="utf-8") as f:
@@ -460,7 +499,7 @@ class TelegramService:
 
         # Save initial metadata when starting a fresh resumable download
         if resume and not is_resuming:
-            save_meta()
+            save_meta(force=True)
 
         downloaded_bytes = sum(max(0, p["current"] - p["start"]) for p in partitions)
         lock = asyncio.Lock()
@@ -502,53 +541,61 @@ class TelegramService:
             if use_dedicated_sender:
                 sender = senders[worker_id]
                 from telethon.tl import functions as tl_functions, types as tl_types
-                while current_offset < end_byte:
-                    chunk_to_request = min(request_chunk_size, end_byte - current_offset)
-                    aligned_limit = math.ceil(chunk_to_request / 4096) * 4096
-                    req = tl_functions.upload.GetFileRequest(
-                        input_location,
-                        offset=current_offset,
-                        limit=aligned_limit
-                    )
-                    result = await self.client._call(sender, req)
-                    if isinstance(result, tl_types.upload.FileCdnRedirect):
-                        raise RuntimeError("CDN redirect in parallel transfer")
+                try:
+                    while current_offset < end_byte:
+                        chunk_to_request = min(request_chunk_size, end_byte - current_offset)
+                        aligned_limit = math.ceil(chunk_to_request / 4096) * 4096
+                        req = tl_functions.upload.GetFileRequest(
+                            input_location,
+                            offset=current_offset,
+                            limit=aligned_limit
+                        )
+                        result = await self.client._call(sender, req)
+                        if isinstance(result, tl_types.upload.FileCdnRedirect):
+                            logger.warning(f"Worker {worker_id} hit CDN redirect; falling back to iter_download")
+                            break
 
-                    chunk = getattr(result, "bytes", b"")
-                    if not chunk:
-                        break
+                        chunk = getattr(result, "bytes", b"")
+                        if not chunk:
+                            break
 
-                    remaining = end_byte - current_offset
-                    chunk_len = len(chunk)
-                    if chunk_len > remaining:
-                        chunk = chunk[:remaining]
-                        chunk_len = remaining
+                        remaining = end_byte - current_offset
+                        chunk_len = len(chunk)
+                        if chunk_len > remaining:
+                            chunk = chunk[:remaining]
+                            chunk_len = remaining
 
-                    if chunk_len == 0:
-                        break
+                        if chunk_len == 0:
+                            break
 
-                    # Direct seek-free write at current offset using os.pwrite
-                    await loop.run_in_executor(None, os.pwrite, fd, chunk, current_offset)
-                    current_offset += chunk_len
-                    partitions[worker_id]["current"] = current_offset
+                        # Direct seek-free write at current offset using os.pwrite
+                        await loop.run_in_executor(None, os.pwrite, fd, chunk, current_offset)
+                        current_offset += chunk_len
+                        partitions[worker_id]["current"] = current_offset
 
-                    async with lock:
-                        downloaded_bytes += chunk_len
-                        if progress_callback:
-                            now = datetime.now()
-                            elapsed = (now - last_callback_time[0]).total_seconds()
-                            if elapsed >= Config.DOWNLOAD_REQUEST_DELAY or downloaded_bytes >= file_size:
-                                progress_callback(min(downloaded_bytes, file_size), file_size)
-                                last_callback_time[0] = now
-                                save_meta()
+                        async with lock:
+                            downloaded_bytes += chunk_len
+                            if progress_callback:
+                                now = datetime.now()
+                                elapsed = (now - last_callback_time[0]).total_seconds()
+                                if elapsed >= Config.DOWNLOAD_REQUEST_DELAY or downloaded_bytes >= file_size:
+                                    progress_callback(min(downloaded_bytes, file_size), file_size)
+                                    last_callback_time[0] = now
+                                    save_meta()
 
-                    if current_offset >= end_byte:
-                        break
-            else:
+                        if current_offset >= end_byte:
+                            break
+                except Exception as ex:
+                    logger.warning(f"Worker {worker_id} sender error ({ex}); falling back to iter_download from offset {current_offset}")
+
+            # Non-dedicated sender path or fallback for remaining partition
+            if current_offset < end_byte:
                 chunk_limit = math.ceil((end_byte - start_byte) / request_chunk_size)
+                if current_offset > start_byte:
+                    chunk_limit = math.ceil((end_byte - current_offset) / request_chunk_size)
                 async for chunk in self.client.iter_download(
                     message.media,
-                    offset=start_byte,
+                    offset=current_offset,
                     request_size=request_chunk_size,
                     limit=chunk_limit
                 ):
@@ -606,7 +653,7 @@ class TelegramService:
                     pass
         except Exception as e:
             logger.error(f"Parallel download failed for {file_path}: {e}")
-            save_meta()
+            save_meta(force=True)
             if not resume and os.path.exists(file_path):
                 try:
                     os.remove(file_path)

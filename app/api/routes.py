@@ -6,7 +6,7 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Optional, Dict, Any
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends, Request, Query
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 
 from app.models.schemas import (
     LoginRequest,
@@ -58,7 +58,7 @@ async def get_ui(request: Request):
 
 
 @router.post("/auth/login", response_model=Token)
-async def login(login_request: LoginRequest, request: Request):
+async def login(login_request: LoginRequest, request: Request, response: Response):
     """Login endpoint - returns JWT token (rate-limited per client IP)."""
     client_ip = get_client_ip(request)
 
@@ -85,6 +85,15 @@ async def login(login_request: LoginRequest, request: Request):
     access_token_expires = timedelta(minutes=Config.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = auth_service.create_access_token(
         data={"sub": login_request.username}, expires_delta=access_token_expires
+    )
+
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        max_age=int(access_token_expires.total_seconds()),
+        httponly=True,
+        samesite="lax",
+        path="/"
     )
 
     return {"access_token": access_token, "token_type": "bearer"}
@@ -157,7 +166,7 @@ async def check_status(current_user: str = Depends(get_current_user)):
                 "first_name": me.first_name
             }
         }
-    except:
+    except Exception:
         return {"status": "not_authenticated"}
 
 
@@ -526,9 +535,15 @@ async def healthcheck() -> Dict[str, Any]:
     return {"status": "healthy", "version": Config.VERSION}
 
 
+def _check_debug_allowed():
+    if not getattr(Config, "ENABLE_DEBUG_ROUTES", False) and getattr(Config, "LOG_LEVEL", "INFO") != "DEBUG":
+        raise HTTPException(status_code=403, detail="Debug endpoints are disabled in production")
+
+
 @router.get("/debug/state")
 async def debug_state(current_user: str = Depends(get_current_user)):
     """Debug endpoint to see full state information"""
+    _check_debug_allowed()
     status = state_manager.get_status()
 
     state_file_exists = os.path.exists(Config.STATE_FILE)
@@ -539,7 +554,7 @@ async def debug_state(current_user: str = Depends(get_current_user)):
         try:
             with open(Config.STATE_FILE, 'r') as f:
                 raw_state = f.read()
-        except:
+        except Exception:
             raw_state = "Error reading file"
 
     return {
@@ -575,6 +590,7 @@ async def debug_state(current_user: str = Depends(get_current_user)):
 @router.post("/debug/cleanup-state")
 async def cleanup_state(current_user: str = Depends(get_current_user)):
     """Clean up corrupted or incomplete state"""
+    _check_debug_allowed()
     cleaned_items = state_manager.cleanup_state()
     status = state_manager.get_status()
 
@@ -594,6 +610,7 @@ async def cleanup_state(current_user: str = Depends(get_current_user)):
 @router.post("/debug/reset-state")
 async def reset_state(current_user: str = Depends(get_current_user)):
     """Completely reset the download state"""
+    _check_debug_allowed()
     import shutil
     from datetime import datetime
 
@@ -614,8 +631,9 @@ async def reset_state(current_user: str = Depends(get_current_user)):
     }
 
 @router.post("/logout-session")
-async def logout_session(current_user: str = Depends(get_current_user)):
+async def logout_session(response: Response, current_user: str = Depends(get_current_user)):
     """Logout and delete Telegram session"""
+    response.delete_cookie(key="access_token", path="/")
     try:
         # Disconnect the Telegram client
         await telegram_service.disconnect()
