@@ -515,13 +515,13 @@
             </div>
 
             <!-- SEARCH / CONTROLS (Main Container) -->
-            <div id="searchTabContent">
-                <!-- Responsive 2-Column Split Workspace (Desktop: 7/5 split, Mobile: single column stack) -->
-                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                    <!-- Left Column: Source Controls, Scan Filters & File Results -->
-                    <div class="lg:col-span-7 space-y-6 min-w-0">
+            <div id="searchTabContent" class="space-y-6">
+                <!-- Top Row: Channel Controls & Downloads Card side-by-side with equal height -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+                    <!-- Left Column: Source Controls & Scan Filters Card (7 cols) -->
+                    <div class="lg:col-span-7 flex flex-col min-w-0">
                         <!-- Main Controls -->
-                        <div class="glass-card p-4 sm:p-6 md:p-8">
+                        <div class="glass-card p-4 sm:p-6 md:p-8 flex-1 flex flex-col justify-between">
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6">
                         <div class="sm:col-span-2 relative" id="channelPickerWrapper">
                             <label class="block text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">
@@ -746,43 +746,12 @@
                         </button>
                     </div>
                 </div>
+            </div>
 
-                <!-- Dedicated Scanning Indicator Container -->
-                <div id="scanningContainer" class="hidden mb-6 animate-pulse">
-                    <div
-                        class="p-6 bg-indigo-900 bg-opacity-20 rounded-2xl border-2 border-indigo-500/50 shadow-lg relative overflow-hidden">
-                        <div
-                            class="absolute inset-0 bg-gradient-to-r from-transparent via-indigo-500/10 to-transparent animate-shimmer">
-                        </div>
-                        <div class="relative z-10 flex flex-col items-center justify-center">
-                            <i
-                                class="fa-solid fa-magnifying-glass fa-spin text-indigo-400 text-3xl mb-3 filter drop-shadow-md"></i>
-                            <p class="text-indigo-200 text-xs font-bold uppercase tracking-[0.2em] mb-3">Scanning
-                                Channel...</p>
-                            <div
-                                class="w-64 max-w-full bg-gray-800/50 rounded-full h-2 border border-black/30 overflow-hidden shadow-inner">
-                                <div id="scanningProgressBar"
-                                    class="bg-gradient-to-r from-indigo-600 to-indigo-400 h-full transition-all duration-300 w-0 relative">
-                                    <div class="absolute inset-0 bg-white/20 animate-[shimmer_2s_infinite]"></div>
-                                </div>
-                            </div>
-                            <p id="scanningProgressText"
-                                class="text-indigo-300 text-[10px] mt-2 font-mono tracking-wider">0%</p>
-                        </div>
-                    </div>
-                </div>
-
-                        <!-- File List (Scan Results) -->
-                        <div id="filesList" class="hidden glass-card p-4 sm:p-6 animate-fade-in">
-                            <!-- Content handled by JS -->
-                        </div>
-                    </div>
-
-                    <!-- Right Column: Sticky Live Transfers, Queue & History -->
-                    <div class="lg:col-span-5 space-y-6 min-w-0 lg:sticky lg:top-20">
-                        <!-- UNIFIED ACTIVITY & HISTORY SECTION (Single Screen) -->
-                        <div id="downloadProgress" class="w-full">
-                    <div id="activityCard" class="glass-card p-4 sm:p-6 space-y-4">
+            <!-- Right Column: Live Downloads Panel (Same height as Channel Selection card, scrollable) -->
+            <div class="lg:col-span-5 flex flex-col min-w-0">
+                <div id="downloadProgress" class="w-full h-full flex flex-col">
+                    <div id="activityCard" class="glass-card p-4 sm:p-6 flex-1 flex flex-col justify-between space-y-4 min-h-[380px]">
                         <!-- Activity Toolbar & Summary -->
                         <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-4 border-b border-gray-700/60 pb-4">
                             <div class="flex items-center gap-3">
@@ -791,7 +760,7 @@
                                 </div>
                                 <div>
                                     <div class="flex items-center gap-2">
-                                        <h2 class="text-lg sm:text-xl font-bold text-white tracking-wide">Downloads & History</h2>
+                                        <h2 class="text-lg sm:text-xl font-bold text-white tracking-wide">Downloads</h2>
                                         <span id="activityLiveIndicator" class="hidden px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-green-500/20 text-green-400 border border-green-500/30">
                                             <i class="fa-solid fa-circle text-[6px] mr-1"></i>Active
                                         </span>
@@ -852,8 +821,8 @@
                             </div>
                         </div>
 
-                        <!-- Unified Activity List Container -->
-                        <div id="activityContainer" class="space-y-3 min-h-[140px] max-h-[620px] overflow-y-auto pr-1.5 custom-scrollbar">
+                        <!-- Unified Activity List Container (Scrollable) -->
+                        <div id="activityContainer" class="flex-1 space-y-3 min-h-[140px] max-h-[460px] overflow-y-auto pr-1.5 custom-scrollbar">
                             <!-- Items rendered here by JS -->
                             <div id="activityEmptyState" class="text-center text-gray-500 py-12">
                                 <i class="fa-solid fa-inbox text-4xl mb-3 opacity-30"></i>
@@ -863,11 +832,41 @@
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Dedicated Scanning Indicator Container -->
+        <div id="scanningContainer" class="hidden mb-6 animate-pulse">
+            <div
+                class="p-6 bg-indigo-900 bg-opacity-20 rounded-2xl border-2 border-indigo-500/50 shadow-lg relative overflow-hidden">
+                <div
+                    class="absolute inset-0 bg-gradient-to-r from-transparent via-indigo-500/10 to-transparent animate-shimmer">
+                </div>
+                <div class="relative z-10 flex flex-col items-center justify-center">
+                    <i
+                        class="fa-solid fa-magnifying-glass fa-spin text-indigo-400 text-3xl mb-3 filter drop-shadow-md"></i>
+                    <p class="text-indigo-200 text-xs font-bold uppercase tracking-[0.2em] mb-3">Scanning
+                        Channel...</p>
+                    <div
+                        class="w-64 max-w-full bg-gray-800/50 rounded-full h-2 border border-black/30 overflow-hidden shadow-inner">
+                        <div id="scanningProgressBar"
+                            class="bg-gradient-to-r from-indigo-600 to-indigo-400 h-full transition-all duration-300 w-0 relative">
+                            <div class="absolute inset-0 bg-white/20 animate-[shimmer_2s_infinite]"></div>
+                        </div>
                     </div>
+                    <p id="scanningProgressText"
+                        class="text-indigo-300 text-[10px] mt-2 font-mono tracking-wider">0%</p>
                 </div>
             </div>
+        </div>
 
-            <!-- AUTO DOWNLOAD VIEW (Dedicated Screen) -->
+        <!-- Full Width Scanned Files List Container (Below, Scrollable) -->
+        <div id="filesList" class="hidden glass-card p-4 sm:p-6 animate-fade-in w-full">
+            <!-- Content handled by JS -->
+        </div>
+    </div>
+
+    <!-- AUTO DOWNLOAD VIEW (Dedicated Screen) -->
             <div id="watchRulesView" class="hidden space-y-6 animate-fade-in">
                 <!-- Auto Download Header & Metrics Card -->
                 <div class="glass-card p-4 sm:p-6 md:p-8 space-y-6">
@@ -961,7 +960,7 @@
         </div>
     </main>
 
-    <script src="/static/js/script.js?v=49"></script>
+    <script src="/static/js/script.js?v=50"></script>
     <!-- Toast Container -->
     <div id="toastContainer"
         class="fixed bottom-8 left-4 right-4 sm:bottom-auto sm:top-6 sm:right-6 sm:left-auto flex flex-col items-center sm:items-end gap-3 pointer-events-none transition-all duration-300"

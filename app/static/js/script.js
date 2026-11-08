@@ -1099,7 +1099,7 @@ function displayFiles(files) {
                 </div>
             </div>
         </div>
-        <div class="grid grid-cols-1 gap-3">`;
+        <div class="grid grid-cols-1 gap-3 max-h-[520px] overflow-y-auto pr-1.5 custom-scrollbar">`;
 
     files.forEach((file) => {
         const size =

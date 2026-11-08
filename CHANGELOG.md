@@ -2,6 +2,12 @@
 
 All epic victories and mysterious bugs that somehow became features are here.
 
+## [4.2.1] - 2026-11-08
+### Changed
+- Dashboard Layout: Placed Channel Selection ## [4.2.0] Scan Card side-by-side with Downloads Card at equal height.
+- Downloads Header: Simplified title to "Downloads".
+- Container Scrolling: Made Downloads list and full-width Scanned Files list internally scrollable to eliminate page overflow and maintain a fixed compact viewport.
+
 ## [4.2.0] - 2026-11-08
 ### Added
 - Responsive 2-Column Split Workspace: Desktop views feature a dedicated 7-column Explorer & Search pane alongside a sticky 5-column live Transfers & Queue pane (`lg:sticky lg:top-20`), eliminating scroll-hunting during active scans and downloads. Seamlessly folds into a single-column layout on mobile devices with touch targets and full responsiveness.
