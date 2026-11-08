@@ -2148,7 +2148,7 @@ function renderActivityRow(item) {
                         </div>
                         <div class="flex flex-wrap items-center gap-2 text-xs text-gray-400">
                             ${channelName ? `<span class="bg-gray-900 px-1.5 py-0.5 rounded text-[10px] font-mono text-gray-400 border border-black/40 truncate max-w-[120px]">${escapeHtml(channelName)}</span>` : ''}
-                            ${item.source === 'auto_watch' ? `<span class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-500/20 text-blue-300 border border-blue-500/30 flex items-center gap-1" title="Automated background download triggered by Watch Rule"><i class="fa-solid fa-tower-broadcast text-[8px]"></i> Auto-Watch</span>` : ''}
+                            ${item.source === 'auto_watch' ? `<span class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-500/20 text-blue-300 border border-blue-500/30 flex items-center gap-1" title="Automated background download triggered by Auto Download rule"><i class="fa-solid fa-tower-broadcast text-[8px]"></i> Auto Download</span>` : ''}
                             ${item.source === 'quick_fetch' ? `<span class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1" title="Direct link queued via Quick Fetch"><i class="fa-solid fa-bolt text-[8px]"></i> Quick Fetch</span>` : ''}
                             ${item.subfolder ? `<span class="px-1.5 py-0.5 rounded text-[10px] font-mono text-yellow-300 bg-yellow-500/10 border border-yellow-500/20 flex items-center gap-1" title="Saved to subfolder"><i class="fa-solid fa-folder text-[8px]"></i> ${escapeHtml(item.subfolder)}</span>` : ''}
                             <span class="row-badge">${badgeHtml}</span>
@@ -2457,7 +2457,7 @@ function switchMainView(viewName) {
         searchContent?.classList.remove("hidden");
 
         if (navBtnSearch) {
-            navBtnSearch.className = "px-3.5 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 border border-black bg-amber-400 text-black shadow-[2px_2px_0px_#000]";
+            navBtnSearch.className = "px-3.5 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 border border-black bg-blue-500 text-white shadow-[2px_2px_0px_#000]";
         }
         if (navBtnWatch) {
             navBtnWatch.className = "px-3.5 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 border border-transparent text-gray-400 hover:text-white hover:bg-gray-800";
@@ -2690,8 +2690,8 @@ function openWatchRuleModal(ruleId = null) {
     if (ruleId && currentRulesCache.length > 0) {
         const rule = currentRulesCache.find(r => r.id === ruleId);
         if (rule) {
-            if (titleEl) titleEl.textContent = "Edit Channel Watch Rule";
-            if (btnTextEl) btnTextEl.textContent = "Update Watch Rule";
+            if (titleEl) titleEl.textContent = "Edit Auto Download Rule";
+            if (btnTextEl) btnTextEl.textContent = "Update Auto Download";
 
             const channelSelect = document.getElementById("watchRuleChannel");
             const customChannelInput = document.getElementById("watchRuleCustomChannel");
@@ -2754,8 +2754,8 @@ function openWatchRuleModal(ruleId = null) {
             }
         }
     } else {
-        if (titleEl) titleEl.textContent = "Add Channel Watch Rule";
-        if (btnTextEl) btnTextEl.textContent = "Save Watch Rule";
+        if (titleEl) titleEl.textContent = "Add Auto Download Rule";
+        if (btnTextEl) btnTextEl.textContent = "Save Auto Download";
 
         const channelSelect = document.getElementById("watchRuleChannel");
         if (channelSelect) channelSelect.value = "";
@@ -2800,7 +2800,7 @@ async function loadWatchRules() {
     const container = document.getElementById("watchRulesContainer");
     if (!container) return;
 
-    container.innerHTML = '<div class="text-center py-8 text-gray-500 text-xs"><i class="fa-solid fa-spinner fa-spin text-lg text-amber-400 mb-2 block"></i>Loading watch rules...</div>';
+    container.innerHTML = '<div class="text-center py-8 text-gray-500 text-xs"><i class="fa-solid fa-spinner fa-spin text-lg text-amber-400 mb-2 block"></i>Loading auto download rules...</div>';
 
     try {
         const response = await authFetch("/api/watch-rules");
@@ -2836,11 +2836,11 @@ async function loadWatchRules() {
                         <i class="fa-solid fa-tower-broadcast"></i>
                     </div>
                     <div class="max-w-md mx-auto">
-                        <p class="text-sm font-bold text-white">No active channel watchers yet</p>
+                        <p class="text-sm font-bold text-white">No active auto download rules yet</p>
                         <p class="text-xs text-gray-400 mt-1">Add a Telegram channel rule to automatically monitor and download incoming media in real-time as soon as it is posted.</p>
                     </div>
                     <button type="button" onclick="openWatchRuleModal()" class="px-4 py-2 rounded-xl btn-yellow-hover text-xs font-bold inline-flex items-center gap-2 mt-2">
-                        <i class="fa-solid fa-plus-circle"></i> Create Your First Rule
+                        <i class="fa-solid fa-plus-circle"></i> Create Auto Download Rule
                     </button>
                 </div>
             `;
@@ -2865,7 +2865,7 @@ async function loadWatchRules() {
                                     ${rule.enabled ? 'Active' : 'Paused'}
                                 </span>
                             </div>
-                            <p class="text-[11px] text-gray-400 truncate mt-0.5">Automated 24/7 Channel Watcher</p>
+                            <p class="text-[11px] text-gray-400 truncate mt-0.5">Automated 24/7 Channel Auto Download</p>
                         </div>
                     </div>
 
@@ -2918,7 +2918,7 @@ async function loadWatchRules() {
         }).join("");
     } catch (e) {
         console.error("Error loading watch rules:", e);
-        container.innerHTML = '<div class="text-center py-8 text-red-400 text-xs">Failed to load watch rules.</div>';
+        container.innerHTML = '<div class="text-center py-8 text-red-400 text-xs">Failed to load auto download rules.</div>';
     }
 }
 
@@ -2982,11 +2982,11 @@ async function createWatchRule() {
         if (!response) return;
         const data = await response.json();
         if (response.ok && data.status === "success") {
-            showAlert("downloadAlert", currentEditingRuleId ? "Watch rule updated successfully!" : "Watch rule added successfully!", "success");
+            showAlert("downloadAlert", currentEditingRuleId ? "Auto download rule updated successfully!" : "Auto download rule added successfully!", "success");
             closeWatchRuleModal();
             loadWatchRules();
         } else {
-            showAlert("downloadAlert", data.detail || data.message || "Failed to save watch rule", "error");
+            showAlert("downloadAlert", data.detail || data.message || "Failed to save auto download rule", "error");
         }
     } catch (e) {
         showAlert("downloadAlert", "Error: " + e.message, "error");
@@ -3011,15 +3011,15 @@ async function toggleWatchRule(ruleId, enabled) {
 
 async function deleteWatchRule(ruleId) {
     showConfirmModal(
-        "Delete Watch Rule",
-        "Are you sure you want to delete this channel watch rule? Background monitoring for this channel will stop immediately.",
+        "Delete Auto Download Rule",
+        "Are you sure you want to delete this auto download rule? Automatic background downloading for this channel will stop immediately.",
         async () => {
             try {
                 const response = await authFetch(`/api/watch-rules/${encodeURIComponent(ruleId)}`, {
                     method: "DELETE"
                 });
                 if (!response) return;
-                showAlert("downloadAlert", "Watch rule deleted.", "info");
+                showAlert("downloadAlert", "Auto download rule deleted.", "info");
                 loadWatchRules();
             } catch (e) {
                 showAlert("downloadAlert", "Error: " + e.message, "error");

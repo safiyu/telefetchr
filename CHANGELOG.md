@@ -2,6 +2,13 @@
 
 All epic victories and mysterious bugs that somehow became features are here.
 
+## [4.1.4] - 2026-11-08
+### Changed
+- Renamed "Watch Rules" to "Auto Download": Updated all UI terminology, navigation buttons, view headers, metrics, modal dialogs, and activity feed chips to "Auto Download" for clearer, intuitive workflow understanding.
+
+### Fixed
+- Tab Selection Highlight: Unified tab active and inactive highlighting behavior so "Search & Download" and "Auto Download" tabs have identical, prominent selection styling. Added Tailwind 2.2.19 CSS fallbacks for amber palette utilities.
+
 ## [4.1.3] - 2026-11-08
 ### Added
 - Dedicated Watch Rules Screen: Replaced crammed modal with a first-class screen featuring live listener status, metrics (active rules, auto-ingested files), and rich rule cards with channel avatars, status toggles, criteria tags, and direct actions.
