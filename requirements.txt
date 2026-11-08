@@ -1,6 +1,7 @@
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 telethon==1.45.0
+cryptg
 pydantic
 PyYAML==6.0.1
 python-multipart==0.0.6

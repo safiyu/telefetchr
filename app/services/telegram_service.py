@@ -39,6 +39,17 @@ class TelegramService:
             )
             await self.client.connect()
 
+            try:
+                from telethon.crypto import aes as _tl_aes
+                if _tl_aes.cryptg:
+                    logger.info("Fast AES decryption enabled (cryptg)")
+                else:
+                    logger.warning(
+                        "cryptg not installed: downloads use slow Python AES and will be CPU-bound"
+                    )
+            except Exception:
+                pass
+
             if await self.client.is_user_authorized():
                 me = await self.client.get_me()
                 logger.info(f"Already logged in as: {me.first_name} (@{me.username})")
@@ -303,12 +314,15 @@ class TelegramService:
         if file_size == 0:
             return await self.download_media(message, file_path, progress_callback)
 
-        # Dynamic worker scaling based on file size thresholds
-        if file_size < 20 * 1024 * 1024:
+        # Dynamic worker scaling based on file size thresholds.
+        # Each worker keeps one 512KB request in flight, so more workers means
+        # more pipelined requests and hides per-request round-trip latency.
+        mb = 1024 * 1024
+        if file_size < 4 * mb:
             effective_workers = 1
-        elif file_size < 100 * 1024 * 1024:
+        elif file_size < 32 * mb:
             effective_workers = min(2, workers)
-        elif file_size < 500 * 1024 * 1024:
+        elif file_size < 128 * mb:
             effective_workers = min(4, workers)
         else:
             effective_workers = min(workers, Config.DOWNLOAD_WORKERS)
