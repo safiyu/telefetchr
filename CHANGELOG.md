@@ -2,6 +2,12 @@
 
 All epic victories and mysterious bugs that somehow became features are here.
 
+## [4.2.4] - 2026-11-09
+### Fixed
+- Downloads Card Scrollbar & Height Lock: Locked the desktop Downloads panel (`lg-abs-fill`) to strictly match the intrinsic height of the Channel Selection card so download items never stretch the top row or push the Scanned Files list off-screen.
+- Compact Download Rows & Tags: Added explicit CSS classes (`.dl-item`, `.dl-tag`, `.dl-meta`) and Tailwind 2.2.19 polyfills for arbitrary font sizes (`text-[9px]`, `text-[10px]`) and opacity borders, eliminating huge unstyled tags and white borders.
+- Scanned Files Visibility: Compacted top controls and single-row Files Found toolbar so the full-width Scanned Files container occupies over half the fixed desktop viewport with its own high-contrast scrollbar.
+
 ## [4.2.3] - 2026-11-08
 ### Changed
 - Compact Download Activity Items: Shortened "Auto Download" badge tag to "Auto" and reduced font size across all tags (channel, source, subfolder, status) to `text-[9px]`.

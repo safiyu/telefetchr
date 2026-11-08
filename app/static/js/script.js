@@ -882,10 +882,10 @@ function toggleFilters() {
 
     if (filtersPanel.classList.contains("hidden")) {
         filtersPanel.classList.remove("hidden");
-        toggleBtn.innerHTML = '<i class="fa-solid fa-chevron-up"></i> Hide';
+        toggleBtn.innerHTML = '<i class="fa-solid fa-chevron-up text-[9px]"></i> <span>Hide Filters</span>';
     } else {
         filtersPanel.classList.add("hidden");
-        toggleBtn.innerHTML = '<i class="fa-solid fa-chevron-down"></i> Show';
+        toggleBtn.innerHTML = '<i class="fa-solid fa-sliders text-[9px]"></i> <span>Advanced Filters</span>';
     }
 }
 
@@ -1040,66 +1040,48 @@ function displayFiles(files) {
     }
 
     let html = `
-        <div class="mb-3 pb-3 border-b border-gray-700/60 flex-shrink-0">
-            <!-- Row 1: Files Found header + Mobile Sort dropdown -->
-            <div class="flex items-center justify-between gap-3 mb-2.5">
-                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2 italic uppercase">
-                    <i class="fa-solid fa-folder-open text-yellow-400"></i> Files Found
+        <div class="mb-2 pb-2 border-b border-gray-700/60 flex-shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <!-- Left: Files Found header + Selection buttons -->
+            <div class="flex items-center justify-between sm:justify-start gap-2.5 flex-wrap">
+                <h3 class="text-sm sm:text-base font-bold text-white flex items-center gap-1.5 italic uppercase">
+                    <i class="fa-solid fa-folder-open text-yellow-400 text-xs"></i> Files Found
                     <span class="text-xs font-normal font-mono text-gray-400 normal-case">(${files.length})</span>
                 </h3>
-                <!-- Sort Dropdown on mobile sits in the top header row -->
-                <div class="relative sm:hidden">
-                    <select id="sortOptionMobile" onchange="handleSortChange(this.value)" class="appearance-none bg-gray-900 border border-gray-700 text-xs text-gray-300 py-1.5 pl-2.5 pr-7 rounded-xl focus:outline-none focus:border-yellow-400 cursor-pointer shadow-[1px_1px_0px_#000]">
-                        <option value="newest">Newest</option>
-                        <option value="oldest">Oldest</option>
-                        <option value="largest">Largest</option>
-                        <option value="smallest">Smallest</option>
+                <div class="flex items-center gap-1.5">
+                    <button onclick="selectAllFiles()" type="button" 
+                        class="py-1 px-2.5 rounded-lg btn-orange-hover text-[10px] font-semibold flex items-center gap-1 focus:outline-none whitespace-nowrap shadow-[1.5px_1.5px_0px_#000]">
+                        <i class="fa-solid fa-check-double text-[9px]"></i> <span>Select All</span>
+                    </button>
+                    <button onclick="deselectAllFiles()" type="button" 
+                        class="py-1 px-2.5 rounded-lg btn-orange-hover text-[10px] font-semibold flex items-center gap-1 focus:outline-none whitespace-nowrap shadow-[1.5px_1.5px_0px_#000]">
+                        <i class="fa-solid fa-xmark text-[9px]"></i> <span>Deselect</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right: Sort Dropdown + Download Selected -->
+            <div class="flex items-center justify-between sm:justify-end gap-2">
+                <div class="relative">
+                    <select id="sortOption" onchange="handleSortChange(this.value)" class="appearance-none bg-gray-900 border border-gray-700 text-[11px] text-gray-300 py-1 pl-2.5 pr-7 rounded-lg focus:outline-none focus:border-yellow-400 cursor-pointer shadow-[1px_1px_0px_#000]">
+                        <option value="newest">Newest First</option>
+                        <option value="oldest">Oldest First</option>
+                        <option value="largest">Largest First</option>
+                        <option value="smallest">Smallest First</option>
                         <option value="alpha">A-Z</option>
                         <option value="alpha_rev">Z-A</option>
                     </select>
-                    <i class="fa-solid fa-sort absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-500 pointer-events-none"></i>
-                </div>
-            </div>
-
-            <!-- Row 2: Clean action toolbar (Grouped selection buttons + Download Selected) -->
-            <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
-                <!-- Grouped Selection Controls (Side-by-side 50/50 on mobile) -->
-                <div class="flex items-center gap-2 flex-1 sm:flex-initial">
-                    <button onclick="selectAllFiles()" type="button" 
-                        class="flex-1 sm:flex-initial py-1.5 px-3 rounded-xl btn-orange-hover text-xs font-semibold flex items-center justify-center gap-1.5 focus:outline-none whitespace-nowrap shadow-[1.5px_1.5px_0px_#000]">
-                        <i class="fa-solid fa-check-double text-[10px]"></i> <span>Select All</span>
-                    </button>
-                    <button onclick="deselectAllFiles()" type="button" 
-                        class="flex-1 sm:flex-initial py-1.5 px-3 rounded-xl btn-orange-hover text-xs font-semibold flex items-center justify-center gap-1.5 focus:outline-none whitespace-nowrap shadow-[1.5px_1.5px_0px_#000]">
-                        <i class="fa-solid fa-xmark text-[10px]"></i> <span>Deselect</span>
-                    </button>
+                    <i class="fa-solid fa-sort absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-gray-500 pointer-events-none"></i>
                 </div>
 
-                <div class="flex items-center gap-2 w-full sm:w-auto">
-                    <!-- Sort Dropdown on desktop -->
-                    <div class="relative hidden sm:block">
-                        <select id="sortOption" onchange="handleSortChange(this.value)" class="appearance-none bg-gray-900 border border-gray-700 text-xs text-gray-300 py-1.5 pl-3 pr-8 rounded-xl focus:outline-none focus:border-yellow-400 cursor-pointer shadow-[1px_1px_0px_#000]">
-                            <option value="newest">Newest First</option>
-                            <option value="oldest">Oldest First</option>
-                            <option value="largest">Largest First</option>
-                            <option value="smallest">Smallest First</option>
-                            <option value="alpha">A-Z</option>
-                            <option value="alpha_rev">Z-A</option>
-                        </select>
-                        <i class="fa-solid fa-sort absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-500 pointer-events-none"></i>
-                    </div>
-
-                    <!-- Download Selected Button: Never wraps, clean badge -->
-                    <button onclick="downloadSelected(${jsStr(currentChannel)})" id="downloadSelectedBtn" type="button" 
-                        class="w-full sm:w-auto py-2 sm:py-1.5 px-3.5 rounded-xl btn-yellow-hover text-xs font-bold flex items-center justify-center gap-2 focus:outline-none whitespace-nowrap shadow-[2px_2px_0px_#000]">
-                        <i class="fa-solid fa-download text-xs"></i>
-                        <span>Download Selected</span>
-                        <span class="px-1.5 py-0.2 rounded bg-black bg-opacity-30 text-black font-mono font-bold text-[10px] ml-0.5"><span id="selectedCount">0</span></span>
-                    </button>
-                </div>
+                <button onclick="downloadSelected(${jsStr(currentChannel)})" id="downloadSelectedBtn" type="button" 
+                    class="py-1 px-3 rounded-lg btn-yellow-hover text-[11px] font-bold flex items-center justify-center gap-1.5 focus:outline-none whitespace-nowrap shadow-[2px_2px_0px_#000]">
+                    <i class="fa-solid fa-download text-[10px]"></i>
+                    <span>Download Selected</span>
+                    <span class="px-1.5 py-0.2 rounded bg-black bg-opacity-30 text-black font-mono font-bold text-[10px]"><span id="selectedCount">0</span></span>
+                </button>
             </div>
         </div>
-        <div class="grid grid-cols-1 gap-2.5 flex-1 min-h-0 overflow-y-auto pr-1.5 custom-scrollbar">`;
+        <div class="space-y-1.5 flex-1 min-h-0 overflow-y-auto pr-1.5 custom-scrollbar">`;
 
     files.forEach((file) => {
         const size =
@@ -1114,31 +1096,31 @@ function displayFiles(files) {
 
         const isChecked = selectedFiles.has(file.file_id) ? "checked" : "";
 
-        // Comic style file item: ink borders + hard shadow
+        // Compact comic style file item
         html += `
-            <div class="bg-gray-900 bg-opacity-80 rounded-xl border-2 border-black flex items-center p-3 gap-2 sm:gap-4 hover:bg-yellow-500 hover:bg-opacity-10 hover:border-yellow-400 hover:shadow-[3px_3px_0px_#000] hover:-translate-y-0.5 shadow-[2px_2px_0px_#000] transition-all group file-item" data-file-id="${file.file_id}">
+            <div class="bg-gray-900 bg-opacity-80 rounded-lg border-2 border-black flex items-center p-2 gap-2.5 hover:bg-yellow-500 hover:bg-opacity-10 hover:border-yellow-400 hover:shadow-[3px_3px_0px_#000] shadow-[2px_2px_0px_#000] transition-all group file-item" data-file-id="${file.file_id}">
                 <div class="flex items-center">
                     <input type="checkbox"
                            id="file_${file.file_id}"
-                           class="file-checkbox w-4 h-4 sm:w-5 sm:h-5 rounded border-2 border-black text-yellow-500 focus:ring-yellow-500 focus:ring-offset-gray-900 bg-gray-950 cursor-pointer"
+                           class="file-checkbox w-4 h-4 rounded border-2 border-black text-yellow-500 focus:ring-yellow-500 focus:ring-offset-gray-900 bg-gray-950 cursor-pointer"
                            onchange="toggleFileSelection(${file.file_id})"
                            ${isChecked}>
                 </div>
-                <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-yellow-400 bg-opacity-10 flex items-center justify-center flex-shrink-0 border border-black shadow-[1.5px_1.5px_0px_#000]">
-                    <i class="fa-solid ${icon} text-sm sm:text-base text-yellow-400"></i>
+                <div class="w-7 h-7 rounded-md bg-yellow-400 bg-opacity-10 flex items-center justify-center flex-shrink-0 border border-black shadow-[1px_1px_0px_#000]">
+                    <i class="fa-solid ${icon} text-xs text-yellow-400"></i>
                 </div>
-                <div class="flex-1 min-w-0 overflow-hidden">
-                    <div class="font-semibold text-gray-200 line-clamp-2 text-xs sm:text-sm" title="${escapeHtml(file.file_name)}">${escapeHtml(file.file_name)}</div>
-                    <div class="text-[10px] sm:text-xs text-gray-400 mt-0.5 flex items-center flex-wrap gap-x-2 gap-y-1 font-mono">
-                        <span class="bg-gray-800 border border-black/50 px-1 sm:px-1.5 rounded uppercase tracking-wide text-gray-300 font-semibold">${escapeHtml(file.file_type)}</span>
-                        <span>${size}</span>
+                <div class="flex-1 min-w-0 overflow-hidden flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3">
+                    <div class="font-semibold text-gray-200 truncate text-xs" title="${escapeHtml(file.file_name)}">${escapeHtml(file.file_name)}</div>
+                    <div class="text-[10px] text-gray-400 flex items-center gap-2 font-mono flex-shrink-0">
+                        <span class="dl-tag dl-tag-channel uppercase">${escapeHtml(file.file_type)}</span>
+                        <span class="text-amber-300">${size}</span>
                         <span class="hidden sm:inline text-gray-600">•</span>
-                        <span>${new Date(file.date).toLocaleDateString()}</span>
+                        <span class="hidden sm:inline">${new Date(file.date).toLocaleDateString()}</span>
                     </div>
                 </div>
                 <button onclick="downloadSingle(${file.file_id}, ${jsStr(currentChannel)})" 
-                    class="flex-shrink-0 p-2 sm:py-1.5 sm:px-3 rounded-lg btn-yellow-hover text-xs font-bold flex items-center gap-1.5 focus:outline-none" title="Download this file">
-                    <i class="fa-solid fa-download text-[10px]"></i> <span class="hidden sm:inline">Download</span>
+                    class="flex-shrink-0 py-1 px-2.5 rounded-md btn-yellow-hover text-[11px] font-bold flex items-center gap-1 focus:outline-none" title="Download this file">
+                    <i class="fa-solid fa-download text-[9px]"></i> <span class="hidden sm:inline">Download</span>
                 </button>
             </div>
         `;
@@ -1707,9 +1689,9 @@ function setActivityFilter(filter) {
     filterBtns.forEach(btn => {
         const isCurrent = btn.id === `filterBtn-${filter}`;
         if (isCurrent) {
-            btn.className = "activity-chip px-3 py-1.5 rounded-xl text-xs font-bold transition-all border border-black bg-amber-400 text-black shadow-[2px_2px_0px_#000]";
+            btn.className = "activity-chip px-2 py-0.5 rounded-md text-[10px] font-bold transition-all border border-black bg-amber-400 text-black shadow-[1px_1px_0px_#000] whitespace-nowrap";
         } else {
-            btn.className = "activity-chip px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all border border-transparent text-gray-400 hover:text-white hover:bg-gray-800";
+            btn.className = "activity-chip px-2 py-0.5 rounded-md text-[10px] font-bold transition-all border border-transparent text-gray-400 hover:text-white hover:bg-gray-800 whitespace-nowrap";
         }
     });
 
@@ -1988,23 +1970,23 @@ function updateActivityRowInPlace(row, item) {
         // Badge update
         const badge = row.querySelector('.row-badge');
         if (badge) {
-            badge.innerHTML = `<span class="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-wide bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 flex items-center gap-0.5 leading-normal"><i class="fa-solid fa-spinner fa-spin text-[7px]"></i> ${pct}%</span>`;
+            badge.innerHTML = `<span class="dl-tag dl-tag-active"><i class="fa-solid fa-spinner fa-spin text-[7px]"></i> ${pct}%</span>`;
         }
 
         // Details update (current/total bytes, speed, ETA)
         const details = row.querySelector('.row-details');
         if (details) {
             details.innerHTML = `
-                <span class="text-yellow-400 font-mono font-medium text-[10px]">${formatBytes(cur)} / ${formatBytes(tot)}</span>
-                ${speedText ? `<span class="text-gray-400 font-mono text-[10px]">· ${speedText}</span>` : ''}
-                ${etaText ? `<span class="text-gray-400 font-mono text-[10px]">· ${etaText}</span>` : ''}
+                <span class="text-yellow-400 dl-meta font-medium">${formatBytes(cur)}/${formatBytes(tot)}</span>
+                ${speedText ? `<span class="text-gray-400 dl-meta">· ${speedText}</span>` : ''}
+                ${etaText ? `<span class="text-gray-400 dl-meta">· ${etaText}</span>` : ''}
             `;
         }
     } else if (item.type === 'queued') {
         const qIdx = (item.queueIndex !== undefined) ? item.queueIndex + 1 : 1;
         const badge = row.querySelector('.row-badge');
         if (badge) {
-            badge.innerHTML = `<span class="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-wide bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 leading-normal">Queue #${qIdx}</span>`;
+            badge.innerHTML = `<span class="dl-tag dl-tag-queued">Queue #${qIdx}</span>`;
         }
     }
 }
@@ -2028,35 +2010,35 @@ function renderActivityRow(item) {
         const speedText = item.speed > 0 ? `${formatBytes(item.speed)}/s` : '';
         const etaText = item.eta > 0 ? `ETA: ${formatTime(item.eta)}` : '';
 
-        badgeHtml = `<span class="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-wide bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 flex items-center gap-0.5 leading-normal"><i class="fa-solid fa-spinner fa-spin text-[7px]"></i> ${pct}%</span>`;
+        badgeHtml = `<span class="dl-tag dl-tag-active"><i class="fa-solid fa-spinner fa-spin text-[7px]"></i> ${pct}%</span>`;
 
         detailsHtml = `
-            <span class="text-yellow-400 font-mono font-medium text-[10px]">${formatBytes(cur)} / ${formatBytes(tot)}</span>
-            ${speedText ? `<span class="text-gray-400 font-mono text-[10px]">· ${speedText}</span>` : ''}
-            ${etaText ? `<span class="text-gray-400 font-mono text-[10px]">· ${etaText}</span>` : ''}
+            <span class="text-yellow-400 dl-meta font-medium">${formatBytes(cur)}/${formatBytes(tot)}</span>
+            ${speedText ? `<span class="text-gray-400 dl-meta">· ${speedText}</span>` : ''}
+            ${etaText ? `<span class="text-gray-400 dl-meta">· ${etaText}</span>` : ''}
         `;
 
         actionsHtml = `
             <button onclick="cancelIndividualDownload(${jsStr(fileId)})" 
-                class="w-6 h-6 rounded-md btn-red flex items-center justify-center text-[10px] focus:outline-none" 
+                class="w-5 h-5 rounded btn-red flex items-center justify-center text-[9px] focus:outline-none" 
                 title="Cancel Download">
                 <i class="fa-solid fa-stop"></i>
             </button>
         `;
 
         trackHtml = `
-            <div class="mt-1.5 h-1.5 w-full bg-gray-950 border border-black/80 rounded-full overflow-hidden relative shadow-inner">
+            <div class="mt-1 h-1 w-full bg-gray-950 border border-black/80 rounded-full overflow-hidden relative shadow-inner">
                 <div class="progress-bar-inner h-full rounded-full transition-all duration-300 ease-out" 
-                     style="width: ${pct}%; background-color: #fbbf24; background-image: linear-gradient(90deg, #f59e0b, #fbbf24); box-shadow: 0 0 8px rgba(251, 191, 36, 0.45);"></div>
+                     style="width: ${pct}%; background-color: #fbbf24; background-image: linear-gradient(90deg, #f59e0b, #fbbf24);"></div>
             </div>
         `;
     } else if (item.type === 'queued') {
         const qIdx = (item.queueIndex !== undefined) ? item.queueIndex + 1 : 1;
-        badgeHtml = `<span class="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-wide bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 leading-normal">Queue #${qIdx}</span>`;
-        detailsHtml = `<span class="text-gray-400 italic text-[10px]">Waiting in line...</span>`;
+        badgeHtml = `<span class="dl-tag dl-tag-queued">Queue #${qIdx}</span>`;
+        detailsHtml = `<span class="text-gray-400 italic dl-meta">Waiting...</span>`;
         actionsHtml = `
             <button onclick="removeFromQueue(${jsStr(fileId)})" 
-                class="w-6 h-6 rounded-md btn-red flex items-center justify-center text-[10px] focus:outline-none" 
+                class="w-5 h-5 rounded btn-red flex items-center justify-center text-[9px] focus:outline-none" 
                 title="Remove from Queue">
                 <i class="fa-solid fa-trash-can"></i>
             </button>
@@ -2066,42 +2048,41 @@ function renderActivityRow(item) {
         const cur = item.progress || 0;
         const tot = item.total || 0;
 
-        badgeHtml = `<span class="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-wide bg-red-500/20 text-red-300 border border-red-500/30 flex items-center gap-0.5 leading-normal"><i class="fa-solid fa-pause text-[7px]"></i> Partial ${pct}%</span>`;
+        badgeHtml = `<span class="dl-tag dl-tag-partial"><i class="fa-solid fa-pause text-[7px]"></i> ${pct}%</span>`;
 
         detailsHtml = `
-            <span class="text-red-400 font-mono text-[10px]">${formatBytes(cur)} / ${formatBytes(tot)}</span>
-            <span class="text-gray-500 text-[9px]">· Interrupted</span>
+            <span class="text-red-400 dl-meta">${formatBytes(cur)}/${formatBytes(tot)}</span>
         `;
 
         actionsHtml = `
             <button onclick="retryIndividualDownload(${jsStr(fileId)})" 
-                class="px-2 py-0.5 rounded-md btn-yellow-hover text-[11px] font-bold flex items-center gap-1 focus:outline-none" 
+                class="px-1.5 py-0.5 rounded btn-yellow-hover text-[9px] font-bold flex items-center gap-1 focus:outline-none" 
                 title="Resume download from where it stopped">
-                <i class="fa-solid fa-rotate text-[9px]"></i> <span>Resume</span>
+                <i class="fa-solid fa-rotate text-[8px]"></i> <span>Resume</span>
             </button>
             <button onclick="clearIndividualProgress(${jsStr(fileId)})" 
-                class="w-6 h-6 rounded-md btn-red flex items-center justify-center text-[10px] focus:outline-none" 
+                class="w-5 h-5 rounded btn-red flex items-center justify-center text-[9px] focus:outline-none" 
                 title="Dismiss from history">
                 <i class="fa-solid fa-xmark"></i>
             </button>
         `;
 
         trackHtml = `
-            <div class="mt-1.5 h-1.5 w-full bg-gray-950 border border-black/80 rounded-full overflow-hidden relative shadow-inner">
+            <div class="mt-1 h-1 w-full bg-gray-950 border border-black/80 rounded-full overflow-hidden relative shadow-inner">
                 <div class="h-full rounded-full" style="width: ${pct}%; background-color: #f43f5e;"></div>
             </div>
         `;
     } else if (item.type === 'failed') {
-        badgeHtml = `<span class="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-wide bg-red-500/20 text-red-300 border border-red-500/30 flex items-center gap-0.5 leading-normal"><i class="fa-solid fa-triangle-exclamation text-[7px]"></i> Failed</span>`;
-        detailsHtml = `<span class="text-red-400 font-mono text-[10px]">Error occurred</span>`;
+        badgeHtml = `<span class="dl-tag dl-tag-partial"><i class="fa-solid fa-triangle-exclamation text-[7px]"></i> Failed</span>`;
+        detailsHtml = `<span class="text-red-400 dl-meta">Error</span>`;
         actionsHtml = `
             <button onclick="retryIndividualDownload(${jsStr(fileId)})" 
-                class="px-2 py-0.5 rounded-md btn-yellow-hover text-[11px] font-bold flex items-center gap-1 focus:outline-none" 
+                class="px-1.5 py-0.5 rounded btn-yellow-hover text-[9px] font-bold flex items-center gap-1 focus:outline-none" 
                 title="Retry download">
-                <i class="fa-solid fa-rotate text-[9px]"></i> <span>Retry</span>
+                <i class="fa-solid fa-rotate text-[8px]"></i> <span>Retry</span>
             </button>
             <button onclick="clearIndividualProgress(${jsStr(fileId)})" 
-                class="w-6 h-6 rounded-md btn-red flex items-center justify-center text-[10px] focus:outline-none" 
+                class="w-5 h-5 rounded btn-red flex items-center justify-center text-[9px] focus:outline-none" 
                 title="Dismiss from history">
                 <i class="fa-solid fa-xmark"></i>
             </button>
@@ -2110,23 +2091,23 @@ function renderActivityRow(item) {
         const sizeStr = item.size ? formatBytes(item.size) : '';
         const timeStr = item.completed_at ? new Date(item.completed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
 
-        badgeHtml = `<span class="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-wide bg-green-500/20 text-green-300 border border-green-500/30 flex items-center gap-0.5 leading-normal"><i class="fa-solid fa-check text-[7px]"></i> Done</span>`;
+        badgeHtml = `<span class="dl-tag dl-tag-done"><i class="fa-solid fa-check text-[7px]"></i> Done</span>`;
 
         detailsHtml = `
-            ${sizeStr ? `<span class="text-green-400 font-mono font-medium text-[10px]">${sizeStr}</span>` : ''}
-            ${timeStr ? `<span class="text-gray-500 text-[9px]">· ${timeStr}</span>` : ''}
+            ${sizeStr ? `<span class="text-green-400 dl-meta font-medium">${sizeStr}</span>` : ''}
+            ${timeStr ? `<span class="text-gray-500 dl-meta">· ${timeStr}</span>` : ''}
         `;
 
         const servePath = item.relative_path || fileName;
         const serveUrl = getFileServeUrl(servePath);
         actionsHtml = `
             <a href="${serveUrl}" onclick="this.href=getFileServeUrl(${jsStr(servePath)})" target="_blank" download="${escapeHtml(fileName)}"
-                class="w-6 h-6 rounded-md bg-gray-700/50 hover:bg-yellow-400 hover:text-black text-gray-300 flex items-center justify-center text-[10px] transition-all border border-black/50" 
+                class="w-5 h-5 rounded bg-gray-700/50 hover:bg-yellow-400 hover:text-black text-gray-300 flex items-center justify-center text-[9px] transition-all border border-black/50" 
                 title="Download to Device">
-                <i class="fa-solid fa-download text-[9px]"></i>
+                <i class="fa-solid fa-download text-[8px]"></i>
             </a>
             <button onclick="clearIndividualProgress(${jsStr(fileId)})" 
-                class="w-6 h-6 rounded-md btn-red flex items-center justify-center text-[10px] focus:outline-none" 
+                class="w-5 h-5 rounded btn-red flex items-center justify-center text-[9px] focus:outline-none" 
                 title="Clear from history">
                 <i class="fa-solid fa-xmark"></i>
             </button>
@@ -2134,31 +2115,30 @@ function renderActivityRow(item) {
     }
 
     return `
-        <div id="${progressId}" class="activity-row border-2 border-black rounded-lg p-2 sm:p-2.5 bg-gray-800/80 hover:bg-gray-800 transition-colors shadow-[2px_2px_0px_rgba(0,0,0,0.3)]" data-type="${item.type}">
-            <div class="flex items-start justify-between gap-2">
-                <div class="flex items-start gap-2 min-w-0 flex-1">
-                    <div class="w-7 h-7 rounded-md bg-gray-900 border border-black flex items-center justify-center flex-shrink-0 text-xs shadow-[1px_1px_0px_#000]">
+        <div id="${progressId}" class="activity-row dl-item" data-type="${item.type}">
+            <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2 min-w-0 flex-1">
+                    <div class="w-6 h-6 rounded bg-gray-900 border border-black flex items-center justify-center flex-shrink-0 text-[11px] shadow-[1px_1px_0px_#000]">
                         ${fileIcon}
                     </div>
                     <div class="min-w-0 flex-1">
-                        <div class="flex items-center gap-1.5 mb-0.5">
-                            <span class="text-xs font-semibold text-white truncate max-w-full" title="${escapeHtml(fileName)}">
+                        <div class="flex items-center justify-between gap-2 mb-0.5">
+                            <span class="text-xs font-semibold text-white truncate" title="${escapeHtml(fileName)}">
                                 ${escapeHtml(fileName)}
                             </span>
+                            <div class="row-actions flex items-center gap-1 flex-shrink-0">
+                                ${actionsHtml}
+                            </div>
                         </div>
-                        <div class="flex flex-wrap items-center gap-1 text-[10px] text-gray-400 leading-none">
-                            ${channelName ? `<span class="bg-gray-900/90 px-1 py-0.5 rounded text-[9px] font-mono text-gray-400 border border-black/40 truncate max-w-[110px] leading-tight" title="${escapeHtml(channelName)}">${escapeHtml(channelName)}</span>` : ''}
-                            ${item.source === 'auto_watch' ? `<span class="px-1 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-blue-500/20 text-blue-300 border border-blue-500/30 flex items-center gap-0.5 leading-tight" title="Auto Download"><i class="fa-solid fa-tower-broadcast text-[7px]"></i> Auto</span>` : ''}
-                            ${item.source === 'quick_fetch' ? `<span class="px-1 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-0.5 leading-tight" title="Quick Fetch"><i class="fa-solid fa-bolt text-[7px]"></i> Quick</span>` : ''}
-                            ${item.subfolder ? `<span class="px-1 py-0.5 rounded text-[9px] font-mono text-yellow-300 bg-yellow-500/10 border border-yellow-500/20 flex items-center gap-0.5 leading-tight" title="Folder: ${escapeHtml(item.subfolder)}"><i class="fa-solid fa-folder text-[7px]"></i> ${escapeHtml(item.subfolder)}</span>` : ''}
-                            <span class="row-badge leading-tight">${badgeHtml}</span>
-                            <span class="row-details flex items-center gap-1 text-[10px] leading-tight">${detailsHtml}</span>
+                        <div class="flex flex-wrap items-center gap-1">
+                            ${channelName ? `<span class="dl-tag dl-tag-channel" title="${escapeHtml(channelName)}">${escapeHtml(channelName)}</span>` : ''}
+                            ${item.source === 'auto_watch' ? `<span class="dl-tag dl-tag-auto" title="Auto Download"><i class="fa-solid fa-bolt text-[7px]"></i> Auto</span>` : ''}
+                            ${item.source === 'quick_fetch' ? `<span class="dl-tag dl-tag-quick" title="Quick Fetch"><i class="fa-solid fa-bolt text-[7px]"></i> Quick</span>` : ''}
+                            ${item.subfolder ? `<span class="dl-tag dl-tag-folder" title="Folder: ${escapeHtml(item.subfolder)}"><i class="fa-solid fa-folder text-[7px]"></i> ${escapeHtml(item.subfolder)}</span>` : ''}
+                            <span class="row-badge inline-flex">${badgeHtml}</span>
+                            <span class="row-details inline-flex items-center gap-1">${detailsHtml}</span>
                         </div>
                     </div>
-                </div>
-
-                <div class="row-actions flex items-center gap-1 flex-shrink-0">
-                    ${actionsHtml}
                 </div>
             </div>
 

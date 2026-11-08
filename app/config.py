@@ -66,7 +66,7 @@ def _load_or_create_secret_key() -> str:
 
 class Config:
     """Application configuration"""
-    VERSION = "4.2.3"
+    VERSION = "4.2.4"
     # Telegram API Configuration
     API_ID = os.getenv("API_ID")
     API_HASH = os.getenv("API_HASH")

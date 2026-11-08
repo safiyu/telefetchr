@@ -193,24 +193,210 @@
             border-right: 1.5px solid #000;
         }
 
-        /* Custom Scrollbar - Inky Comic Edition */
+        /* Custom Scrollbar - High-Contrast Inky Comic Edition */
         ::-webkit-scrollbar {
-            width: 10px;
+            width: 8px;
+            height: 8px;
         }
 
         ::-webkit-scrollbar-track {
-            background: #131e32;
+            background: #0b1120;
+            border-radius: 4px;
         }
 
         ::-webkit-scrollbar-thumb {
-            background: #1e293b;
-            border: 2px solid #000;
-            border-radius: 0px;
+            background: #475569;
+            border: 1.5px solid #000;
+            border-radius: 4px;
         }
 
         ::-webkit-scrollbar-thumb:hover {
             background: #fcd34d;
         }
+
+        .custom-scrollbar {
+            scrollbar-width: thin;
+            scrollbar-color: #475569 #0b1120;
+        }
+
+        /* Desktop Height Lock for Downloads Panel to match Left Card height */
+        @media (min-width: 1024px) {
+            .lg-abs-fill {
+                position: absolute !important;
+                top: 0;
+                right: 0;
+                bottom: 0;
+                left: 0;
+                height: 100% !important;
+                max-height: 100% !important;
+            }
+        }
+        @media (max-width: 1023px) {
+            #activityContainer {
+                max-height: 300px;
+            }
+        }
+
+        /* Compact Download Activity Rows & Tags */
+        .dl-item {
+            background: rgba(15, 23, 42, 0.9);
+            border: 1.5px solid #000;
+            border-radius: 8px;
+            padding: 6px 8px;
+            box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.45);
+            transition: background-color 0.15s ease;
+        }
+        .dl-item:hover {
+            background: rgba(30, 41, 59, 0.95);
+        }
+        .dl-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            font-size: 9px !important;
+            line-height: 1.15 !important;
+            padding: 1px 5px;
+            border-radius: 4px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            white-space: nowrap;
+        }
+        .dl-tag-channel {
+            font-family: 'JetBrains Mono', monospace !important;
+            text-transform: none;
+            font-weight: 500;
+            color: #94a3b8;
+            background: #090d16;
+            border: 1px solid #334155;
+            max-width: 100px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .dl-tag-auto {
+            color: #93c5fd;
+            background: rgba(59, 130, 246, 0.16);
+            border: 1px solid rgba(59, 130, 246, 0.4);
+        }
+        .dl-tag-quick {
+            color: #fcd34d;
+            background: rgba(245, 158, 11, 0.16);
+            border: 1px solid rgba(245, 158, 11, 0.4);
+        }
+        .dl-tag-folder {
+            font-family: 'JetBrains Mono', monospace !important;
+            text-transform: none;
+            color: #fde047;
+            background: rgba(234, 179, 8, 0.12);
+            border: 1px solid rgba(234, 179, 8, 0.35);
+            max-width: 90px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .dl-tag-active {
+            color: #fde047;
+            background: rgba(234, 179, 8, 0.18);
+            border: 1px solid rgba(234, 179, 8, 0.45);
+        }
+        .dl-tag-queued {
+            color: #fcd34d;
+            background: rgba(245, 158, 11, 0.16);
+            border: 1px solid rgba(245, 158, 11, 0.35);
+        }
+        .dl-tag-partial {
+            color: #fca5a5;
+            background: rgba(239, 68, 68, 0.18);
+            border: 1px solid rgba(239, 68, 68, 0.4);
+        }
+        .dl-tag-done {
+            color: #86efac;
+            background: rgba(34, 197, 94, 0.18);
+            border: 1px solid rgba(34, 197, 94, 0.4);
+        }
+        .dl-meta {
+            font-family: 'JetBrains Mono', monospace !important;
+            font-size: 9.5px !important;
+            line-height: 1.2 !important;
+            white-space: nowrap;
+        }
+
+        /* Tailwind 2.2.19 Polyfills for Arbitrary & Slash Opacity Classes */
+        .-translate-y-1\/2 { transform: translateY(-50%) !important; }
+        .text-\[6px\] { font-size: 6px !important; line-height: 1 !important; }
+        .text-\[7px\] { font-size: 7px !important; line-height: 1 !important; }
+        .text-\[8px\] { font-size: 8px !important; line-height: 1.1 !important; }
+        .text-\[9px\] { font-size: 9px !important; line-height: 1.2 !important; }
+        .text-\[10px\] { font-size: 10px !important; line-height: 1.25 !important; }
+        .text-\[11px\] { font-size: 11px !important; line-height: 1.3 !important; }
+        @media (min-width: 640px) { .sm\:text-\[10px\] { font-size: 10px !important; line-height: 1.25 !important; } }
+        .tracking-\[0\.2em\] { letter-spacing: 0.2em !important; }
+        .tracking-\[0\.5em\] { letter-spacing: 0.5em !important; }
+        .bg-gray-950 { background-color: #090d16 !important; }
+        .bg-gray-950\/60 { background-color: rgba(9, 13, 22, 0.6) !important; }
+        .bg-gray-950\/70 { background-color: rgba(9, 13, 22, 0.7) !important; }
+        .bg-gray-950\/80 { background-color: rgba(9, 13, 22, 0.8) !important; }
+        .bg-gray-900\/40 { background-color: rgba(17, 24, 39, 0.4) !important; }
+        .bg-gray-900\/50 { background-color: rgba(17, 24, 39, 0.5) !important; }
+        .bg-gray-900\/60 { background-color: rgba(17, 24, 39, 0.6) !important; }
+        .bg-gray-900\/70 { background-color: rgba(17, 24, 39, 0.7) !important; }
+        .bg-gray-900\/80 { background-color: rgba(17, 24, 39, 0.8) !important; }
+        .bg-gray-900\/90 { background-color: rgba(17, 24, 39, 0.9) !important; }
+        .bg-gray-800\/50 { background-color: rgba(31, 41, 55, 0.5) !important; }
+        .bg-gray-800\/80 { background-color: rgba(31, 41, 55, 0.8) !important; }
+        .bg-gray-700\/50 { background-color: rgba(55, 65, 81, 0.5) !important; }
+        .bg-gray-500\/20 { background-color: rgba(107, 114, 128, 0.2) !important; }
+        .bg-black\/20 { background-color: rgba(0, 0, 0, 0.2) !important; }
+        .bg-white\/5 { background-color: rgba(255, 255, 255, 0.05) !important; }
+        .bg-white\/20 { background-color: rgba(255, 255, 255, 0.2) !important; }
+        .hover\:bg-white\/10:hover { background-color: rgba(255, 255, 255, 0.1) !important; }
+        .bg-amber-500\/10, .bg-yellow-500\/10 { background-color: rgba(245, 158, 11, 0.12) !important; }
+        .bg-amber-500\/15 { background-color: rgba(245, 158, 11, 0.16) !important; }
+        .bg-amber-500\/20, .bg-yellow-500\/20, .hover\:bg-amber-500\/20:hover { background-color: rgba(245, 158, 11, 0.2) !important; }
+        .bg-amber-900\/20, .bg-yellow-900\/20 { background-color: rgba(120, 53, 15, 0.25) !important; }
+        .bg-blue-500\/10 { background-color: rgba(59, 130, 246, 0.12) !important; }
+        .bg-blue-500\/15 { background-color: rgba(59, 130, 246, 0.16) !important; }
+        .bg-blue-500\/20 { background-color: rgba(59, 130, 246, 0.2) !important; }
+        .hover\:bg-blue-500\/25:hover { background-color: rgba(59, 130, 246, 0.25) !important; }
+        .bg-green-500\/10 { background-color: rgba(34, 197, 94, 0.12) !important; }
+        .bg-green-500\/20 { background-color: rgba(34, 197, 94, 0.2) !important; }
+        .bg-red-500\/10 { background-color: rgba(239, 68, 68, 0.12) !important; }
+        .bg-red-500\/20, .hover\:bg-red-500\/20:hover { background-color: rgba(239, 68, 68, 0.2) !important; }
+        .bg-purple-500\/10 { background-color: rgba(168, 85, 247, 0.12) !important; }
+        .bg-purple-500\/20 { background-color: rgba(168, 85, 247, 0.2) !important; }
+        .border-gray-700\/50 { border-color: rgba(55, 65, 81, 0.5) !important; }
+        .border-gray-700\/60 { border-color: rgba(55, 65, 81, 0.6) !important; }
+        .border-gray-800\/60 { border-color: rgba(31, 41, 55, 0.6) !important; }
+        .border-gray-800\/80 { border-color: rgba(31, 41, 55, 0.8) !important; }
+        .border-black\/30 { border-color: rgba(0, 0, 0, 0.3) !important; }
+        .border-black\/40 { border-color: rgba(0, 0, 0, 0.4) !important; }
+        .border-black\/50 { border-color: rgba(0, 0, 0, 0.5) !important; }
+        .border-black\/60 { border-color: rgba(0, 0, 0, 0.6) !important; }
+        .border-black\/80 { border-color: rgba(0, 0, 0, 0.8) !important; }
+        .border-blue-500\/20 { border-color: rgba(59, 130, 246, 0.25) !important; }
+        .border-blue-500\/30 { border-color: rgba(59, 130, 246, 0.35) !important; }
+        .border-amber-500\/20, .border-yellow-500\/20 { border-color: rgba(245, 158, 11, 0.25) !important; }
+        .border-amber-500\/30, .border-yellow-500\/30 { border-color: rgba(245, 158, 11, 0.35) !important; }
+        .border-amber-500\/50, .border-yellow-500\/40, .border-yellow-700\/50 { border-color: rgba(245, 158, 11, 0.45) !important; }
+        .border-green-500\/20 { border-color: rgba(34, 197, 94, 0.25) !important; }
+        .border-green-500\/30 { border-color: rgba(34, 197, 94, 0.35) !important; }
+        .border-green-500\/40 { border-color: rgba(34, 197, 94, 0.45) !important; }
+        .border-red-500\/30 { border-color: rgba(239, 68, 68, 0.35) !important; }
+        .border-red-500\/40 { border-color: rgba(239, 68, 68, 0.45) !important; }
+        .border-purple-500\/20 { border-color: rgba(168, 85, 247, 0.25) !important; }
+        .border-indigo-500\/50 { border-color: rgba(99, 102, 241, 0.5) !important; }
+        .max-w-\[110px\] { max-width: 110px !important; }
+        .max-w-\[120px\] { max-width: 120px !important; }
+        .max-w-\[200px\] { max-width: 200px !important; }
+        .max-w-\[220px\] { max-width: 220px !important; }
+        .max-h-\[85vh\] { max-height: 85vh !important; }
+        .max-h-\[92vh\] { max-height: 92vh !important; }
+        .shadow-\[1px_1px_0px_\#000\] { box-shadow: 1px 1px 0px #000 !important; }
+        .shadow-\[1\.5px_1\.5px_0px_\#000\] { box-shadow: 1.5px 1.5px 0px #000 !important; }
+        .shadow-\[2px_2px_0px_\#000\] { box-shadow: 2px 2px 0px #000 !important; }
+        .shadow-\[3px_3px_0px_\#000\], .hover\:shadow-\[3px_3px_0px_\#000\]:hover { box-shadow: 3px 3px 0px #000 !important; }
+        .z-\[99999\] { z-index: 99999 !important; }
+        .z-\[999999\] { z-index: 999999 !important; }
+        .z-\[1000000\] { z-index: 1000000 !important; }
 
         /* Comic Toast Bubbles */
         .comic-toast {
@@ -515,18 +701,24 @@
             </div>
 
             <!-- SEARCH / CONTROLS (Main Container) -->
-            <div id="searchTabContent" class="w-full flex-1 flex flex-col min-h-0 space-y-3 lg:overflow-hidden">
+            <div id="searchTabContent" class="w-full flex-1 flex flex-col min-h-0 space-y-2.5 lg:overflow-hidden">
                 <!-- Top Row: Channel Controls & Downloads Card side-by-side with equal height -->
-                <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4 items-stretch flex-shrink-0">
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch flex-shrink-0">
                     <!-- Left Column: Source Controls & Scan Filters Card (7 cols) -->
                     <div class="lg:col-span-7 flex flex-col min-w-0">
                         <!-- Main Controls -->
-                        <div class="glass-card p-3 sm:p-4 md:p-5 flex-1 flex flex-col justify-between">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5 mb-3">
+                        <div class="glass-card p-3 sm:p-3.5 flex-1 flex flex-col justify-between">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-2.5 mb-2">
                         <div class="sm:col-span-2 relative" id="channelPickerWrapper">
-                            <label class="block text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">
-                                Source Channel
-                            </label>
+                            <div class="flex items-center justify-between mb-1">
+                                <label class="block text-gray-400 text-[10px] font-semibold uppercase tracking-wider">
+                                    Source Channel
+                                </label>
+                                <button id="toggleFiltersBtn" onclick="toggleFilters()" type="button"
+                                    class="px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 text-[10px] font-semibold hover:bg-amber-500/20 hover:text-amber-300 flex items-center gap-1 transition-all focus:outline-none">
+                                    <i class="fa-solid fa-sliders text-[9px]"></i> <span>Advanced Filters</span>
+                                </button>
+                            </div>
 
                             <!-- Hidden select for full backward compatibility -->
                             <select id="channelUsername" class="hidden">
@@ -536,37 +728,37 @@
                             <!-- Custom Searchable Combobox Trigger -->
                             <div class="relative">
                                 <button type="button" id="channelDropdownBtn" onclick="toggleChannelDropdown(event)"
-                                    class="w-full pl-10 pr-10 py-3 rounded-lg bg-gray-900 border border-gray-700 text-left text-white flex items-center justify-between focus:ring-2 focus:ring-amber-500 transition-all cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,0.2)]">
+                                    class="w-full pl-9 pr-8 py-2 rounded-lg bg-gray-900 border border-gray-700 text-left text-white flex items-center justify-between focus:ring-2 focus:ring-amber-500 transition-all cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,0.2)]">
                                     <div class="flex items-center gap-2 min-w-0">
-                                        <i class="fa-brands fa-telegram absolute left-3.5 top-1/2 -translate-y-1/2 text-amber-400 text-base flex-shrink-0"></i>
-                                        <span id="channelSelectedLabel" class="truncate text-sm font-medium text-gray-300">Select a channel...</span>
+                                        <i class="fa-brands fa-telegram absolute left-3 top-1/2 -translate-y-1/2 text-amber-400 text-sm flex-shrink-0"></i>
+                                        <span id="channelSelectedLabel" class="truncate text-xs font-medium text-gray-300">Select a channel...</span>
                                     </div>
-                                    <i id="channelDropdownChevron" class="fa-solid fa-chevron-down text-gray-400 text-xs transition-transform duration-200"></i>
+                                    <i id="channelDropdownChevron" class="fa-solid fa-chevron-down text-gray-400 text-[10px] transition-transform duration-200"></i>
                                 </button>
 
                                 <!-- Dropdown Menu Panel -->
                                 <div id="channelDropdownPanel"
-                                    class="hidden absolute z-50 left-0 right-0 top-full mt-2 bg-gray-900 border-2 border-black rounded-xl shadow-2xl overflow-hidden animate-fade-in">
-                                    <div class="p-2.5 border-b border-gray-800 bg-gray-950/70">
+                                    class="hidden absolute z-50 left-0 right-0 top-full mt-1.5 bg-gray-900 border-2 border-black rounded-xl shadow-2xl overflow-hidden animate-fade-in">
+                                    <div class="p-2 border-b border-gray-800 bg-gray-950/70">
                                         <div class="relative">
                                             <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs"></i>
                                             <input type="text" id="channelSearchInput" oninput="filterChannels(this.value)"
                                                 placeholder="Type to filter channels..."
-                                                class="w-full pl-8 pr-7 py-2 text-xs rounded-lg bg-gray-900 border border-gray-700 text-white placeholder-gray-500 focus:outline-none focus:border-amber-500"
+                                                class="w-full pl-8 pr-7 py-1.5 text-xs rounded-lg bg-gray-900 border border-gray-700 text-white placeholder-gray-500 focus:outline-none focus:border-amber-500"
                                                 autocomplete="off">
                                             <button type="button" onclick="clearChannelSearch()" id="channelSearchClearBtn"
                                                 class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white text-xs">
                                                 <i class="fa-solid fa-xmark"></i>
                                             </button>
                                         </div>
-                                        <div class="flex items-center justify-between text-[10px] text-gray-400 mt-1.5 px-1 font-mono">
+                                        <div class="flex items-center justify-between text-[10px] text-gray-400 mt-1 px-1 font-mono">
                                             <span id="channelMatchCount">Loading channels...</span>
                                             <span class="text-gray-500 hidden sm:inline">Esc to close</span>
                                         </div>
                                     </div>
 
                                     <div id="channelOptionsList"
-                                        class="max-h-60 sm:max-h-72 overflow-y-auto overscroll-contain p-1.5 space-y-1 custom-scrollbar">
+                                        class="max-h-56 sm:max-h-64 overflow-y-auto overscroll-contain p-1.5 space-y-1 custom-scrollbar">
                                         <!-- Options injected via JS -->
                                     </div>
                                 </div>
@@ -574,61 +766,53 @@
                         </div>
 
                         <div>
-                            <label class="block text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">Limit</label>
+                            <label class="block text-gray-400 text-[10px] font-semibold uppercase tracking-wider mb-1">Limit</label>
                             <div class="relative">
-                                <i class="fa-solid fa-list-ol absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
+                                <i class="fa-solid fa-list-ol absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs"></i>
                                 <input type="number" id="fileLimit" value="10" min="1" max="1000"
-                                    class="w-full pl-11 pr-4 py-3 rounded-lg border border-gray-700 bg-gray-900 focus:ring-2 focus:ring-amber-500 outline-none transition-all">
+                                    class="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-gray-700 bg-gray-900 focus:ring-2 focus:ring-amber-500 outline-none transition-all">
                             </div>
                         </div>
 
                         <div>
-                            <label class="block text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">Type</label>
+                            <label class="block text-gray-400 text-[10px] font-semibold uppercase tracking-wider mb-1">Type</label>
                             <div class="relative">
-                                <i class="fa-solid fa-filter absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
+                                <i class="fa-solid fa-filter absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs"></i>
                                 <select id="fileType"
-                                    class="w-full pl-11 pr-4 py-3 rounded-lg border border-gray-700 bg-gray-900 appearance-none cursor-pointer focus:ring-2 focus:ring-amber-500 outline-none transition-all">
+                                    class="w-full pl-9 pr-7 py-2 text-xs rounded-lg border border-gray-700 bg-gray-900 appearance-none cursor-pointer focus:ring-2 focus:ring-amber-500 outline-none transition-all">
                                     <option value="">All Files</option>
                                     <option value="video">Videos</option>
                                     <option value="audio">Audio</option>
                                     <option value="document">Documents</option>
                                     <option value="photo">Photos</option>
                                 </select>
-                                <i class="fa-solid fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 text-xs pointer-events-none"></i>
+                                <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-[10px] pointer-events-none"></i>
                             </div>
                         </div>
-                    </div>
-
-                    <!-- Advanced Filters Toggle -->
-                    <div class="mb-4">
-                        <button id="toggleFiltersBtn" onclick="toggleFilters()" type="button"
-                            class="px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-400 text-xs font-medium hover:bg-amber-500/20 hover:text-amber-300 flex items-center gap-2 transition-all focus:outline-none">
-                            <i class="fa-solid fa-sliders"></i> Show Advanced Filters
-                        </button>
                     </div>
 
                     <!-- Advanced Filters Panel -->
                     <div id="filtersPanel"
-                        class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 p-4 bg-gray-800/50 rounded-xl border border-gray-700/50">
+                        class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2.5 mb-2.5 p-2.5 bg-gray-800/50 rounded-xl border border-gray-700/50">
                         <div>
                             <label
-                                class="block text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">Search
+                                class="block text-gray-400 text-[10px] font-semibold uppercase tracking-wider mb-1">Search
                                 Query</label>
                             <div class="relative">
                                 <i
-                                    class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
+                                    class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs"></i>
                                 <input type="text" id="searchQuery" placeholder="Filename contains..."
-                                    class="w-full pl-11 pr-4 py-3 rounded-lg border border-gray-700 bg-gray-900 focus:ring-2 focus:ring-amber-500 outline-none transition-all">
+                                    class="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-gray-700 bg-gray-900 focus:ring-2 focus:ring-amber-500 outline-none transition-all">
                             </div>
                         </div>
 
                         <div>
                             <label
-                                class="block text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">File Type / Extension</label>
+                                class="block text-gray-400 text-[10px] font-semibold uppercase tracking-wider mb-1">File Type / Extension</label>
                             <div class="relative">
-                                <i class="fa-solid fa-file absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
+                                <i class="fa-solid fa-file absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs"></i>
                                 <select id="fileTypeSelect" onchange="onDashboardFileTypeChange(this.value)"
-                                    class="w-full pl-11 pr-8 py-3 rounded-lg border border-gray-700 bg-gray-900 text-white focus:ring-2 focus:ring-amber-500 outline-none transition-all appearance-none cursor-pointer">
+                                    class="w-full pl-9 pr-7 py-1.5 text-xs rounded-lg border border-gray-700 bg-gray-900 text-white focus:ring-2 focus:ring-amber-500 outline-none transition-all appearance-none cursor-pointer">
                                     <option value="">All File Types</option>
                                     <option value="video">Videos (mp4, mkv, avi, mov, webm)</option>
                                     <option value="audio">Audio (mp3, flac, wav, m4a, aac)</option>
@@ -637,82 +821,64 @@
                                     <option value="photo">Photos (jpg, png, webp, gif)</option>
                                     <option value="custom">Custom Extension...</option>
                                 </select>
-                                <i class="fa-solid fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none text-xs"></i>
+                                <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none text-[10px]"></i>
                             </div>
                             <input type="text" id="fileExtension" placeholder="e.g. mp4 or mkv, avi"
-                                class="hidden mt-2 w-full px-4 py-2 text-xs rounded-lg border border-amber-500/50 bg-gray-900 text-white focus:ring-2 focus:ring-amber-500 outline-none">
+                                class="hidden mt-1.5 w-full px-3 py-1.5 text-xs rounded-lg border border-amber-500/50 bg-gray-900 text-white focus:ring-2 focus:ring-amber-500 outline-none">
                         </div>
 
                         <div>
-                            <label class="block text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">Min
-                                Size
-                                (MB)</label>
+                            <label class="block text-gray-400 text-[10px] font-semibold uppercase tracking-wider mb-1">Min
+                                Size (MB)</label>
                             <div class="relative">
                                 <i
-                                    class="fa-solid fa-weight-hanging absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
+                                    class="fa-solid fa-weight-hanging absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs"></i>
                                 <input type="number" id="minSize" min="0" placeholder="0"
-                                    class="w-full pl-11 pr-4 py-3 rounded-lg border border-gray-700 bg-gray-900 focus:ring-2 focus:ring-amber-500 outline-none transition-all">
+                                    class="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-gray-700 bg-gray-900 focus:ring-2 focus:ring-amber-500 outline-none transition-all">
                             </div>
                         </div>
 
                         <div>
-                            <label class="block text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">Max
-                                Size
-                                (MB)</label>
+                            <label class="block text-gray-400 text-[10px] font-semibold uppercase tracking-wider mb-1">Max
+                                Size (MB)</label>
                             <div class="relative">
                                 <i
-                                    class="fa-solid fa-weight-hanging absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
+                                    class="fa-solid fa-weight-hanging absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs"></i>
                                 <input type="number" id="maxSize" min="0" placeholder="0"
-                                    class="w-full pl-11 pr-4 py-3 rounded-lg border border-gray-700 bg-gray-900 focus:ring-2 focus:ring-amber-500 outline-none transition-all">
+                                    class="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-gray-700 bg-gray-900 focus:ring-2 focus:ring-amber-500 outline-none transition-all">
                             </div>
                         </div>
                     </div>
 
-                    <!-- Destination & Storage Info Bar -->
-                    <div class="mb-5 p-3 sm:p-4 bg-gray-900/60 rounded-xl border border-gray-800 text-xs flex flex-col gap-3">
-                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                            <div class="flex items-center gap-2 text-gray-300 min-w-0">
-                                <i class="fa-solid fa-folder-open text-yellow-400 flex-shrink-0"></i>
-                                <span class="text-gray-400 flex-shrink-0">Root:</span>
-                                <span id="diskPathText" class="font-mono text-white bg-gray-950 px-2 py-0.5 rounded border border-gray-800 text-[11px] font-semibold truncate max-w-[200px] sm:max-w-xs" title="/downloads">/downloads</span>
-                            </div>
-                            <div class="flex items-center justify-between sm:justify-end gap-3 min-w-0">
-                                <div class="flex items-center gap-1.5 text-gray-400 text-[11px] sm:text-xs">
-                                    <i class="fa-solid fa-hard-drive text-gray-500 text-[11px]"></i>
-                                    <span id="diskMetricText" class="text-yellow-300 font-semibold font-mono whitespace-nowrap">-- GB free</span>
-                                </div>
-                                <div class="w-24 sm:w-36 bg-gray-950 h-2 rounded-full overflow-hidden border border-black/60 flex-shrink-0 relative" title="Disk Usage">
-                                    <div id="diskProgressBar" class="h-full transition-all duration-500 rounded-full" style="width: 0%; background-color: #fbbf24; background-image: linear-gradient(90deg, #f59e0b, #fbbf24);"></div>
-                                </div>
-                            </div>
-                        </div>
+                    <!-- Destination & Storage Info Bar (Compact) -->
+                    <div class="mb-2.5 p-2.5 bg-gray-900/60 rounded-xl border border-gray-800 text-xs flex flex-col gap-2">
                         <!-- Subfolder Routing & Organization -->
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2.5 border-t border-gray-800/80">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                             <div>
-                                <label class="block text-gray-400 text-[11px] font-semibold uppercase tracking-wider mb-1">
+                                <label class="block text-gray-400 text-[10px] font-semibold uppercase tracking-wider mb-1">
                                     <i class="fa-solid fa-folder-tree mr-1 text-amber-400"></i> Target Subfolder
                                 </label>
                                 <div class="flex items-center gap-1.5">
                                     <div class="relative flex-1">
                                         <select id="targetSubfolder" onchange="updatePathPreview('targetSubfolder', 'organizeBy', 'dashboardPathPreview')"
-                                            class="w-full px-3 py-1.5 text-xs rounded-lg border border-gray-700 bg-gray-900 text-white focus:ring-1 focus:ring-amber-500 outline-none">
+                                            class="w-full px-2.5 py-1.5 text-xs rounded-lg border border-gray-700 bg-gray-900 text-white focus:ring-1 focus:ring-amber-500 outline-none">
                                             <option value="">📁 Root (/)</option>
                                         </select>
                                     </div>
                                     <button type="button" onclick="promptCreateSubfolder('targetSubfolder')"
-                                        class="px-2.5 py-1.5 bg-amber-500/15 border border-black text-amber-400 hover:bg-amber-500 hover:text-black rounded-lg text-xs font-bold transition-all flex items-center gap-1 flex-shrink-0"
+                                        class="px-2 py-1.5 bg-amber-500/15 border border-black text-amber-400 hover:bg-amber-500 hover:text-black rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 flex-shrink-0"
                                         title="Create New Folder">
-                                        <i class="fa-solid fa-folder-plus text-[11px]"></i>
+                                        <i class="fa-solid fa-folder-plus text-[10px]"></i>
                                         <span class="hidden sm:inline">New</span>
                                     </button>
                                 </div>
                             </div>
                             <div>
-                                <label class="block text-gray-400 text-[11px] font-semibold uppercase tracking-wider mb-1">
+                                <label class="block text-gray-400 text-[10px] font-semibold uppercase tracking-wider mb-1">
                                     <i class="fa-solid fa-sitemap mr-1 text-amber-400"></i> Auto-Organize By
                                 </label>
                                 <select id="organizeBy" onchange="updatePathPreview('targetSubfolder', 'organizeBy', 'dashboardPathPreview')"
-                                    class="w-full px-3 py-1.5 text-xs rounded-lg border border-gray-700 bg-gray-900 focus:ring-1 focus:ring-amber-500 outline-none">
+                                    class="w-full px-2.5 py-1.5 text-xs rounded-lg border border-gray-700 bg-gray-900 focus:ring-1 focus:ring-amber-500 outline-none">
                                     <option value="">No Auto-Organization (Direct to destination)</option>
                                     <option value="channel">Channel Name / ID (e.g. @channel/...)</option>
                                     <option value="media_type">Media Type (videos/, audio/, documents/, photos/)</option>
@@ -720,114 +886,126 @@
                             </div>
                         </div>
 
-                        <!-- Live Destination Path Preview -->
-                        <div class="pt-2 border-t border-gray-800/80 flex items-center gap-2 text-[11px] font-mono text-gray-400">
-                            <span class="text-gray-500 flex items-center gap-1 flex-shrink-0">
-                                <i class="fa-solid fa-arrow-turn-down text-[10px] text-amber-400"></i> Save Path:
-                            </span>
-                            <span id="dashboardPathPreview" class="text-amber-300 font-semibold truncate bg-gray-950 px-2 py-0.5 rounded border border-gray-800">/downloads/</span>
+                        <!-- Unified Save Path & Disk Metric Bar -->
+                        <div class="pt-1.5 border-t border-gray-800/80 flex flex-wrap items-center justify-between gap-2 text-[10px] font-mono text-gray-400">
+                            <div class="flex items-center gap-1.5 min-w-0">
+                                <span id="diskPathText" class="hidden">/downloads</span>
+                                <span class="text-gray-500 flex items-center gap-1 flex-shrink-0">
+                                    <i class="fa-solid fa-folder-open text-amber-400"></i> Save Path:
+                                </span>
+                                <span id="dashboardPathPreview" class="text-amber-300 font-semibold truncate bg-gray-950 px-1.5 py-0.5 rounded border border-gray-800">/downloads/</span>
+                            </div>
+                            <div class="flex items-center gap-2 flex-shrink-0">
+                                <div class="flex items-center gap-1 text-gray-400">
+                                    <i class="fa-solid fa-hard-drive text-gray-500 text-[10px]"></i>
+                                    <span id="diskMetricText" class="text-yellow-300 font-semibold font-mono whitespace-nowrap">-- GB free</span>
+                                </div>
+                                <div class="w-20 sm:w-24 bg-gray-950 h-1.5 rounded-full overflow-hidden border border-black/60 flex-shrink-0 relative" title="Disk Usage">
+                                    <div id="diskProgressBar" class="h-full transition-all duration-500 rounded-full" style="width: 0%; background-color: #fbbf24; background-image: linear-gradient(90deg, #f59e0b, #fbbf24);"></div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
                     <!-- Action Buttons -->
-                    <div class="flex flex-col sm:flex-row gap-3 border-t border-gray-700/60 pt-5">
+                    <div class="flex flex-col sm:flex-row gap-2.5 pt-1">
                         <button onclick="listFiles()" id="scanBtn"
-                            class="flex-1 py-3 px-6 rounded-xl btn-yellow-hover flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none">
+                            class="flex-1 py-2 px-4 rounded-xl btn-yellow-hover text-xs flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none">
                             <i class="fa-solid fa-magnifying-glass"></i> <span>Scan Files</span>
                         </button>
                         <button onclick="downloadAll()" id="addAllBtn"
-                            class="flex-1 py-3 px-6 rounded-xl btn-yellow-hover flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none">
+                            class="flex-1 py-2 px-4 rounded-xl btn-yellow-hover text-xs flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none">
                             <i class="fa-solid fa-cloud-arrow-down"></i> <span>Download All</span>
                         </button>
 
                         <button onclick="cancelDownload()" id="stopAllBtn"
-                            class="hidden flex-1 py-3 px-6 rounded-xl btn-red flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none">
+                            class="hidden flex-1 py-2 px-4 rounded-xl btn-red text-xs flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none">
                             <i class="fa-solid fa-stop"></i> <span>Stop All</span>
                         </button>
                     </div>
                 </div>
             </div>
 
-            <!-- Right Column: Live Downloads Panel (Same height as Channel Selection card, scrollable) -->
-            <div class="lg:col-span-5 flex flex-col min-w-0">
-                <div id="downloadProgress" class="w-full h-full flex flex-col">
-                    <div id="activityCard" class="glass-card p-3 sm:p-4 md:p-5 flex-1 flex flex-col justify-between space-y-3 min-h-[300px]">
-                        <!-- Activity Toolbar & Summary -->
-                        <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-3 border-b border-gray-700/60 pb-3 flex-shrink-0">
-                            <div class="flex items-center gap-2.5">
-                                <div id="activityStatusIcon" class="w-8 h-8 rounded-lg bg-amber-500/15 border border-black flex items-center justify-center text-amber-400 shadow-[1.5px_1.5px_0px_#000] flex-shrink-0">
-                                    <i class="fa-solid fa-list-check text-sm"></i>
-                                </div>
-                                <div>
-                                    <div class="flex items-center gap-2">
-                                        <h2 class="text-base sm:text-lg font-bold text-white tracking-wide">Downloads</h2>
-                                        <span id="activityLiveIndicator" class="hidden px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-green-500/20 text-green-400 border border-green-500/30">
-                                            <i class="fa-solid fa-circle text-[6px] mr-1"></i>Active
-                                        </span>
+            <!-- Right Column: Live Downloads Panel (Locked to Left Card height on desktop, internally scrollable) -->
+            <div class="lg:col-span-5 flex flex-col min-w-0 relative">
+                <div id="downloadProgress" class="w-full h-full flex flex-col lg-abs-fill">
+                    <div id="activityCard" class="glass-card p-3 sm:p-3.5 flex-1 flex flex-col min-h-0 overflow-hidden">
+                        <!-- Activity Toolbar & Summary (Compact 2-Row Header so nothing overflows) -->
+                        <div class="flex flex-col gap-2 border-b border-gray-700/60 pb-2 mb-2 flex-shrink-0">
+                            <!-- Header Row 1: Title + Status + Action Buttons -->
+                            <div class="flex items-center justify-between gap-2 min-w-0">
+                                <div class="flex items-center gap-2 min-w-0">
+                                    <div id="activityStatusIcon" class="w-7 h-7 rounded-lg bg-amber-500/15 border border-black flex items-center justify-center text-amber-400 shadow-[1.5px_1.5px_0px_#000] flex-shrink-0">
+                                        <i class="fa-solid fa-list-check text-xs"></i>
                                     </div>
-                                    <div class="flex items-center gap-2.5 text-xs text-gray-400 mt-0.5 font-mono">
-                                        <span id="sessionTimerWrapper" class="hidden items-center gap-1 text-amber-300">
-                                            <i class="fa-solid fa-clock text-[10px]"></i> <span id="sessionTimer">00:00</span>
-                                        </span>
-                                        <span id="activityTotalSummary">0 items</span>
+                                    <div class="min-w-0">
+                                        <div class="flex items-center gap-1.5">
+                                            <h2 class="text-sm sm:text-base font-bold text-white tracking-wide leading-tight">Downloads</h2>
+                                            <span id="activityLiveIndicator" class="hidden dl-tag dl-tag-done">
+                                                <i class="fa-solid fa-circle text-[6px]"></i> Active
+                                            </span>
+                                        </div>
+                                        <div class="flex items-center gap-2 text-[10px] text-gray-400 font-mono leading-tight mt-0.5">
+                                            <span id="sessionTimerWrapper" class="hidden items-center gap-1 text-amber-300">
+                                                <i class="fa-solid fa-clock text-[9px]"></i> <span id="sessionTimer">00:00</span>
+                                            </span>
+                                            <span id="activityTotalSummary" class="truncate">0 items</span>
+                                        </div>
                                     </div>
-                                </div>
-                            </div>
-
-                            <!-- Filter Chips & Actions -->
-                            <div class="flex flex-wrap items-center justify-between xl:justify-end gap-1.5">
-                                <!-- Filter Chips -->
-                                <div class="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 no-scrollbar" id="activityFilterGroup">
-                                    <button type="button" onclick="setActivityFilter('all')" id="filterBtn-all"
-                                        class="activity-chip px-2.5 py-1 rounded-lg text-xs font-bold transition-all border border-black bg-amber-400 text-black shadow-[1.5px_1.5px_0px_#000]">
-                                        All <span id="count-all" class="ml-1 opacity-75 font-mono">0</span>
-                                    </button>
-                                    <button type="button" onclick="setActivityFilter('active')" id="filterBtn-active"
-                                        class="activity-chip px-2 py-1 rounded-lg text-xs font-bold transition-all border border-transparent text-gray-400 hover:text-white hover:bg-gray-800">
-                                        Active <span id="count-active" class="ml-1 px-1.5 py-0.2 rounded-full bg-blue-500/20 text-blue-300 font-mono">0</span>
-                                    </button>
-                                    <button type="button" onclick="setActivityFilter('queued')" id="filterBtn-queued"
-                                        class="activity-chip px-2 py-1 rounded-lg text-xs font-bold transition-all border border-transparent text-gray-400 hover:text-white hover:bg-gray-800">
-                                        Queued <span id="count-queued" class="ml-1 px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-300 font-mono">0</span>
-                                    </button>
-                                    <button type="button" onclick="setActivityFilter('partial')" id="filterBtn-partial"
-                                        class="activity-chip px-2 py-1 rounded-lg text-xs font-bold transition-all border border-transparent text-gray-400 hover:text-white hover:bg-gray-800">
-                                        Partial <span id="count-partial" class="ml-1 px-1.5 py-0.2 rounded-full bg-red-500/20 text-red-300 font-mono">0</span>
-                                    </button>
-                                    <button type="button" onclick="setActivityFilter('completed')" id="filterBtn-completed"
-                                        class="activity-chip px-2 py-1 rounded-lg text-xs font-bold transition-all border border-transparent text-gray-400 hover:text-white hover:bg-gray-800">
-                                        Done <span id="count-completed" class="ml-1 px-1.5 py-0.2 rounded-full bg-green-500/20 text-green-300 font-mono">0</span>
-                                    </button>
                                 </div>
 
                                 <!-- Activity Actions -->
-                                <div class="flex items-center gap-1.5">
+                                <div class="flex items-center gap-1 flex-shrink-0">
                                     <button type="button" onclick="resumeAllUnfinished()" id="resumeAllBtn"
-                                        class="hidden px-2.5 py-1 rounded-lg btn-yellow-hover text-xs font-bold flex items-center gap-1"
+                                        class="hidden px-2 py-1 rounded-md btn-yellow-hover text-[10px] font-bold flex items-center gap-1"
                                         title="Resume all unfinished downloads">
-                                        <i class="fa-solid fa-play text-[9px]"></i> <span>Resume</span>
+                                        <i class="fa-solid fa-play text-[8px]"></i> <span>Resume</span>
                                     </button>
                                     <button type="button" onclick="clearCompletedHistory()" id="clearHistoryBtn"
-                                        class="hidden px-2.5 py-1 rounded-lg btn-red text-xs font-bold flex items-center gap-1"
+                                        class="hidden px-2 py-1 rounded-md btn-red text-[10px] font-bold flex items-center gap-1"
                                         title="Clear completed and partial downloads history">
-                                        <i class="fa-solid fa-broom text-[9px]"></i> <span>Clear</span>
+                                        <i class="fa-solid fa-broom text-[8px]"></i> <span>Clear</span>
                                     </button>
                                     <button type="button" onclick="clearQueue()" id="clearQueueBtn"
-                                        class="hidden px-2.5 py-1 rounded-lg btn-red text-xs font-bold flex items-center gap-1"
+                                        class="hidden px-2 py-1 rounded-md btn-red text-[10px] font-bold flex items-center gap-1"
                                         title="Clear pending queue">
-                                        <i class="fa-solid fa-trash-can text-[9px]"></i> <span>Queue</span>
+                                        <i class="fa-solid fa-trash-can text-[8px]"></i> <span>Queue</span>
                                     </button>
                                 </div>
+                            </div>
+
+                            <!-- Header Row 2: Compact Filter Chips -->
+                            <div class="flex items-center gap-1 overflow-x-auto no-scrollbar" id="activityFilterGroup">
+                                <button type="button" onclick="setActivityFilter('all')" id="filterBtn-all"
+                                    class="activity-chip px-2 py-0.5 rounded-md text-[10px] font-bold transition-all border border-black bg-amber-400 text-black shadow-[1px_1px_0px_#000] whitespace-nowrap">
+                                    All <span id="count-all" class="ml-0.5 opacity-80 font-mono">0</span>
+                                </button>
+                                <button type="button" onclick="setActivityFilter('active')" id="filterBtn-active"
+                                    class="activity-chip px-2 py-0.5 rounded-md text-[10px] font-bold transition-all border border-transparent text-gray-400 hover:text-white hover:bg-gray-800 whitespace-nowrap">
+                                    Active <span id="count-active" class="ml-0.5 px-1 rounded bg-blue-500/20 text-blue-300 font-mono text-[9px]">0</span>
+                                </button>
+                                <button type="button" onclick="setActivityFilter('queued')" id="filterBtn-queued"
+                                    class="activity-chip px-2 py-0.5 rounded-md text-[10px] font-bold transition-all border border-transparent text-gray-400 hover:text-white hover:bg-gray-800 whitespace-nowrap">
+                                    Queued <span id="count-queued" class="ml-0.5 px-1 rounded bg-amber-500/20 text-amber-300 font-mono text-[9px]">0</span>
+                                </button>
+                                <button type="button" onclick="setActivityFilter('partial')" id="filterBtn-partial"
+                                    class="activity-chip px-2 py-0.5 rounded-md text-[10px] font-bold transition-all border border-transparent text-gray-400 hover:text-white hover:bg-gray-800 whitespace-nowrap">
+                                    Partial <span id="count-partial" class="ml-0.5 px-1 rounded bg-red-500/20 text-red-300 font-mono text-[9px]">0</span>
+                                </button>
+                                <button type="button" onclick="setActivityFilter('completed')" id="filterBtn-completed"
+                                    class="activity-chip px-2 py-0.5 rounded-md text-[10px] font-bold transition-all border border-transparent text-gray-400 hover:text-white hover:bg-gray-800 whitespace-nowrap">
+                                    Done <span id="count-completed" class="ml-0.5 px-1 rounded bg-green-500/20 text-green-300 font-mono text-[9px]">0</span>
+                                </button>
                             </div>
                         </div>
 
                         <!-- Unified Activity List Container (Scrollable) -->
-                        <div id="activityContainer" class="flex-1 min-h-0 space-y-2.5 overflow-y-auto pr-1.5 custom-scrollbar">
+                        <div id="activityContainer" class="flex-1 min-h-0 space-y-1.5 overflow-y-auto pr-1.5 custom-scrollbar">
                             <!-- Items rendered here by JS -->
-                            <div id="activityEmptyState" class="text-center text-gray-500 py-8">
-                                <i class="fa-solid fa-inbox text-3xl mb-2 opacity-30"></i>
+                            <div id="activityEmptyState" class="text-center text-gray-500 py-6">
+                                <i class="fa-solid fa-inbox text-2xl mb-1.5 opacity-30"></i>
                                 <p class="text-xs font-semibold text-gray-400">No download activity yet</p>
-                                <p class="text-[11px] text-gray-500 mt-0.5">Select a channel and scan files to begin downloading</p>
+                                <p class="text-[10px] text-gray-500 mt-0.5">Select a channel and scan files to begin downloading</p>
                             </div>
                         </div>
                     </div>
@@ -838,30 +1016,29 @@
         <!-- Dedicated Scanning Indicator Container -->
         <div id="scanningContainer" class="hidden animate-pulse flex-shrink-0">
             <div
-                class="p-4 bg-indigo-900 bg-opacity-20 rounded-2xl border-2 border-indigo-500/50 shadow-lg relative overflow-hidden">
+                class="p-3 bg-indigo-900 bg-opacity-20 rounded-xl border-2 border-indigo-500/50 shadow-lg relative overflow-hidden">
                 <div
                     class="absolute inset-0 bg-gradient-to-r from-transparent via-indigo-500/10 to-transparent animate-shimmer">
                 </div>
-                <div class="relative z-10 flex flex-col items-center justify-center">
+                <div class="relative z-10 flex items-center justify-center gap-4">
                     <i
-                        class="fa-solid fa-magnifying-glass fa-spin text-indigo-400 text-2xl mb-2 filter drop-shadow-md"></i>
-                    <p class="text-indigo-200 text-xs font-bold uppercase tracking-[0.2em] mb-2">Scanning
-                        Channel...</p>
+                        class="fa-solid fa-magnifying-glass fa-spin text-indigo-400 text-lg filter drop-shadow-md"></i>
+                    <p class="text-indigo-200 text-xs font-bold uppercase tracking-[0.2em]">Scanning Channel...</p>
                     <div
-                        class="w-64 max-w-full bg-gray-800/50 rounded-full h-2 border border-black/30 overflow-hidden shadow-inner">
+                        class="w-48 max-w-full bg-gray-800/50 rounded-full h-2 border border-black/30 overflow-hidden shadow-inner">
                         <div id="scanningProgressBar"
                             class="bg-gradient-to-r from-indigo-600 to-indigo-400 h-full transition-all duration-300 w-0 relative">
                             <div class="absolute inset-0 bg-white/20 animate-[shimmer_2s_infinite]"></div>
                         </div>
                     </div>
                     <p id="scanningProgressText"
-                        class="text-indigo-300 text-[10px] mt-1.5 font-mono tracking-wider">0%</p>
+                        class="text-indigo-300 text-[10px] font-mono tracking-wider">0%</p>
                 </div>
             </div>
         </div>
 
         <!-- Full Width Scanned Files List Container (Below, Scrollable, Viewport-Fitting) -->
-        <div id="filesList" class="hidden glass-card p-3 sm:p-4 animate-fade-in w-full flex-1 min-h-0 flex flex-col overflow-hidden">
+        <div id="filesList" class="hidden glass-card p-3 animate-fade-in w-full flex-1 min-h-0 flex flex-col overflow-hidden">
             <!-- Content handled by JS -->
         </div>
     </div>
@@ -960,7 +1137,7 @@
         </div>
     </main>
 
-    <script src="/static/js/script.js?v=51"></script>
+    <script src="/static/js/script.js?v=52"></script>
     <!-- Toast Container -->
     <div id="toastContainer"
         class="fixed bottom-8 left-4 right-4 sm:bottom-auto sm:top-6 sm:right-6 sm:left-auto flex flex-col items-center sm:items-end gap-3 pointer-events-none transition-all duration-300"
