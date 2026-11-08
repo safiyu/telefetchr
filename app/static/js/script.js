@@ -415,6 +415,7 @@ window.addEventListener('DOMContentLoaded', () => {
     checkStatus();
     fetchVersion();
     loadFolders();
+    startProgressMonitoring();
 });
 
 async function fetchVersion() {
@@ -712,17 +713,7 @@ async function resumeDownload() {
 }
 
 async function refreshProgress() {
-    try {
-        const response = await authFetch('/download-progress');
-        if (!response) return;
-        const data = await safeJsonParse(response, 'Refresh progress');
-        updateProgressUI(data);
-        if (data.active || data.scanning) {
-            startProgressMonitoring();
-        }
-    } catch (err) {
-        console.error("Error refreshing progress:", err);
-    }
+    await pollProgress();
 }
 
 async function checkStatus() {
@@ -1483,140 +1474,123 @@ async function cancelDownload() {
     }
 }
 
-function startProgressMonitoring() {
+let isProgressActive = false;
+let wasPreviouslyActive = false;
+let isPollingInProgress = false;
+let lastKnownActiveFiles = new Set();
+
+function scheduleNextProgressPoll(delayMs = null) {
     if (progressMonitoringInterval) {
-        clearInterval(progressMonitoringInterval);
+        clearTimeout(progressMonitoringInterval);
         progressMonitoringInterval = null;
     }
 
-    // Clear existing watchdog
-    if (progressWatchdog) {
-        clearInterval(progressWatchdog);
-        progressWatchdog = null;
+    let delay = delayMs;
+    if (delay === null) {
+        if (isProgressActive) {
+            delay = 1000; // Active downloading: 1s fast refresh
+        } else if (document.hidden) {
+            delay = 5000; // Background tab: 5s heartbeat
+        } else {
+            delay = 2500; // Idle visible tab: 2.5s heartbeat
+        }
     }
 
-    let hasStarted = false;
-    let errorCount = 0;
-    const maxErrors = 5;
+    progressMonitoringInterval = setTimeout(pollProgress, delay);
+}
 
-    lastProgressUpdate = Date.now();
+async function pollProgress() {
+    if (isPollingInProgress) return;
+    isPollingInProgress = true;
 
-    // Start watchdog to detect stalled monitoring (check every 5 seconds)
-    progressWatchdog = setInterval(() => {
-        const timeSinceUpdate = Date.now() - lastProgressUpdate;
-        if (timeSinceUpdate > 10000) { // 10 seconds without update
-
-            // Check if download is still active
-            authFetch('/download-progress').then(response => {
-                if (!response) return;
-                return response.json();
-            }).then(data => {
-                if (data && data.active && !progressMonitoringInterval) {
-                    startProgressMonitoring();
-                }
-            }).catch(err => {
-                console.error('Watchdog check failed:', err);
-            });
+    try {
+        const response = await authFetch('/download-progress');
+        if (!response) {
+            scheduleNextProgressPoll(5000);
+            return;
         }
-    }, 5000);
 
-    progressMonitoringInterval = setInterval(async () => {
+        let data;
         try {
-            const response = await authFetch('/download-progress');
+            data = await safeJsonParse(response, 'Progress monitoring');
+        } catch (jsonErr) {
+            scheduleNextProgressPoll(5000);
+            return;
+        }
 
-            if (!response) {
-                console.error('No response from download-progress endpoint');
-                errorCount++;
-                if (errorCount >= maxErrors) {
-                    console.error(`Too many errors (${errorCount}), stopping progress monitoring`);
-                    clearInterval(progressMonitoringInterval);
-                    progressMonitoringInterval = null;
+        if (!data) {
+            scheduleNextProgressPoll(5000);
+            return;
+        }
 
-                    // Clear watchdog
-                    if (progressWatchdog) {
-                        clearInterval(progressWatchdog);
-                        progressWatchdog = null;
-                    }
+        const isScanning = Boolean(data.scanning);
+        const hasQueued = Boolean(data.queue && data.queue.length > 0);
+        const concurrent = data.concurrent_downloads || {};
+        const concurrentCount = Object.keys(concurrent).length;
+        const isCurrentlyActive = Boolean(data.active || isScanning || hasQueued || concurrentCount > 0);
 
-                    // Don't show error if it's likely a token issue (user will see session expired message)
-                    // Only show if it seems like a genuine connection issue
-                    const token = getAuthToken();
-                    if (token) {
-                        showAlert("downloadAlert", "Lost connection to server. Please refresh the page.", "error");
-                    }
-                }
-                return;
-            }
+        isProgressActive = isCurrentlyActive;
 
-            let data;
-            try {
-                data = await safeJsonParse(response, 'Progress monitoring');
-            } catch (jsonError) {
-                console.error('Failed to parse progress response:', jsonError.message);
-                errorCount++;
-                if (errorCount >= maxErrors) {
-                    console.error(`Too many JSON parsing errors (${errorCount}), stopping progress monitoring`);
-                    clearInterval(progressMonitoringInterval);
-                    progressMonitoringInterval = null;
-                    if (progressWatchdog) {
-                        clearInterval(progressWatchdog);
-                        progressWatchdog = null;
-                    }
-                }
-                return;
-            }
-
-            errorCount = 0; // Reset error count on success
-            lastProgressUpdate = Date.now(); // Update last progress timestamp
-
-            if (data.active) {
-                hasStarted = true;
+        // Transition: Idle -> Active (e.g. background watch rule matched incoming message)
+        if (isCurrentlyActive && !wasPreviouslyActive) {
+            wasPreviouslyActive = true;
+            document.getElementById('downloadProgress')?.classList.remove('hidden');
+            document.getElementById('stopAllBtn')?.classList.remove('hidden');
+            if (data.started_at) {
                 updateSessionTimer(data.started_at);
             }
-
-            // Centralized UI update
-            updateProgressUI(data);
-
-            // Resilient Stoppage: Only stop monitoring if:
-            // 1. Backend says active is false
-            // 2. We don't have pending queued items (safety)
-            // 3. We aren't currently scanning
-            // 4. We actually had a session going (hasStarted)
-            const isScanning = data.scanning || false;
-            const hasQueued = data.queue && data.queue.length > 0;
-            const concurrentCount = data.concurrent_downloads ? Object.keys(data.concurrent_downloads).length : 0;
-
-            if (!data.active && hasStarted && !isScanning && !hasQueued && concurrentCount === 0) {
-                clearInterval(progressMonitoringInterval);
-                progressMonitoringInterval = null;
-                if (progressWatchdog) {
-                    clearInterval(progressWatchdog);
-                    progressWatchdog = null;
-                }
-                document.getElementById('stopAllBtn')?.classList.add('hidden');
-
-                const completedCount = Object.keys(data.completed_downloads || {}).length;
-                if (completedCount > 0) {
-                    showAlert("downloadAlert", `Download session complete! ${completedCount} files downloaded.`, "success");
-                    loadDiskInfo();
-                }
-                return;
-            }
-
-            // The rendering logic is now fully handled in updateProgressUI(data) above.
-            // This prevents redundant DOM manipulation and ensures section-based organization.
-        } catch (error) {
-            console.error('Progress check error:', error);
-            errorCount++;
-            if (errorCount >= maxErrors) {
-                console.error(`Too many errors (${errorCount}), stopping progress monitoring`);
-                clearInterval(progressMonitoringInterval);
-                progressMonitoringInterval = null;
-                showAlert("downloadAlert", "Error monitoring download progress. Please refresh the page.", "error");
+        }
+        // Transition: Active -> Idle (Session finished)
+        else if (!isCurrentlyActive && wasPreviouslyActive) {
+            wasPreviouslyActive = false;
+            document.getElementById('stopAllBtn')?.classList.add('hidden');
+            const completedCount = Object.keys(data.completed_downloads || {}).length;
+            if (completedCount > 0) {
+                showAlert("downloadAlert", `Download session complete! ${completedCount} file(s) downloaded.`, "success");
+                loadDiskInfo();
             }
         }
-    }, 1000);
+
+        // Track new background downloads starting to notify user
+        if (concurrentCount > 0) {
+            const currentActiveIds = Object.keys(concurrent);
+            const newActiveIds = currentActiveIds.filter(id => !lastKnownActiveFiles.has(id));
+            if (newActiveIds.length > 0 && lastKnownActiveFiles.size > 0) {
+                const newName = concurrent[newActiveIds[0]]?.name || "new file";
+                showAlert("downloadAlert", `Active download started: ${escapeHtml(newName)}`, "info");
+            }
+            lastKnownActiveFiles = new Set(currentActiveIds);
+        } else {
+            lastKnownActiveFiles.clear();
+        }
+
+        // Always update the unified activity UI with live status
+        updateProgressUI(data);
+
+        // Schedule next check
+        scheduleNextProgressPoll();
+    } catch (error) {
+        console.error('Progress check error:', error);
+        scheduleNextProgressPoll(5000);
+    } finally {
+        isPollingInProgress = false;
+    }
 }
+
+function startProgressMonitoring() {
+    isProgressActive = true;
+    if (progressMonitoringInterval) {
+        clearTimeout(progressMonitoringInterval);
+        progressMonitoringInterval = null;
+    }
+    pollProgress();
+}
+
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+        pollProgress();
+    }
+});
 
 function showAlert(_elementId, message, type) {
     const toastContainer = document.getElementById("toastContainer");

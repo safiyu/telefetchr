@@ -2,6 +2,10 @@
 
 All epic victories and mysterious bugs that somehow became features are here.
 
+## [4.1.2] - 2026-11-08
+### Fixed
+- Real-Time Watch Rule Download Updates: Added continuous adaptive background polling (`pollProgress`) that checks `/download-progress` every 2.5 seconds when idle (5 seconds in background tab) and 1 second during active downloads, so incoming automated downloads triggered by Telegram watch rules appear on the UI in real time without requiring manual page refreshes.
+
 ## [4.1.1] - 2026-11-08
 ### Added
 - Dynamic Folder Picker & Management: Replaced subfolder free-text inputs with dynamic dropdown pickers populated from `SAVE_PATH`, plus an interactive dialog to create new subfolders on the fly across Dashboard, Quick Fetch, and Watch Rules.
