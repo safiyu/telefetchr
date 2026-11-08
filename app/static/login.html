@@ -5,90 +5,148 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com data:; img-src 'self' data: blob: https://www.transparenttextures.com; connect-src 'self'; base-uri 'self'; form-action 'self'">
-    <title>Login - TeleFetchr</title>
+    <title>Login — TeleFetchr</title>
     <link rel="icon" type="image/png" href="/static/images/favicon.png" />
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
-        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg-canvas: #0f172a;
+            --bg-card: #1e293b;
+            --bg-subcard: #0b1120;
+            --accent-gold: #fcd34d;
+            --accent-gold-hover: #fbbf24;
+            --accent-cyan: #38bdf8;
+            --ink: #000000;
+        }
+
         * {
             font-family: 'Outfit', sans-serif;
         }
 
+        .font-mono {
+            font-family: 'JetBrains Mono', monospace !important;
+        }
+
         body {
-            background-color: #131e32;
-            color: #f1f5f9;
-            background-image: url("/static/images/stardust.png");
-            /* Subtle paper grain */
+            background-color: var(--bg-canvas);
+            color: #f8fafc;
+            background-image:
+                radial-gradient(rgba(56, 189, 248, 0.10) 1px, transparent 1px),
+                url("/static/images/stardust.png");
+            background-size: 18px 18px, auto;
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
+            padding: 1.25rem;
         }
 
-        /* Comic Panel Design */
+        /* Cyber-Comic 2.0 Neo-Brutalist Shell */
         .login-card {
-            background: #1e293b;
-            border: 2px solid #000;
+            background: var(--bg-card);
+            border: 2.5px solid var(--ink);
             border-radius: 16px;
-            box-shadow: 6px 6px 0px rgba(0, 0, 0, 0.5);
-            padding: 3rem;
+            box-shadow: 7px 7px 0px var(--ink);
             width: 100%;
-            max-width: 420px;
-            animation: kapow 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            max-width: 430px;
+            overflow: hidden;
+            animation: kapow 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             position: relative;
+        }
+
+        .login-topbar {
+            background: #0b1120;
+            border-bottom: 2.5px solid var(--ink);
+            padding: 0.75rem 1.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .window-dots {
+            display: flex;
+            gap: 6px;
+        }
+
+        .window-dot {
+            width: 11px;
+            height: 11px;
+            border-radius: 50%;
+            border: 1.5px solid var(--ink);
+        }
+
+        .login-body {
+            padding: 2.25rem 2rem 2rem;
         }
 
         @keyframes kapow {
             0% {
-                transform: scale(0.8) rotate(-2deg);
+                transform: scale(0.92) translateY(8px);
                 opacity: 0;
             }
-
-            50% {
-                transform: scale(1.05) rotate(1deg);
-            }
-
             100% {
-                transform: scale(1) rotate(0deg);
+                transform: scale(1) translateY(0);
                 opacity: 1;
             }
         }
 
         .input-group {
             position: relative;
-            margin-bottom: 1.5rem;
+            margin-bottom: 1.25rem;
         }
 
         .input-group label {
             display: block;
             font-size: 0.75rem;
-            font-weight: 700;
-            color: #9ca3af;
+            font-weight: 800;
+            color: #cbd5e1;
             margin-bottom: 0.5rem;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.08em;
+        }
+
+        .input-wrapper {
+            position: relative;
+        }
+
+        .input-wrapper i {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #64748b;
+            font-size: 0.9rem;
+            pointer-events: none;
+            transition: color 0.15s ease;
         }
 
         .input-group input {
             width: 100%;
-            padding: 12px 16px;
-            background: #0f172a !important;
-            border: 1.5px solid #000 !important;
+            padding: 12px 16px 12px 40px;
+            background: var(--bg-subcard) !important;
+            border: 2px solid var(--ink) !important;
             border-radius: 10px !important;
             font-size: 0.95rem;
-            color: #f1f5f9 !important;
-            transition: all 0.2s ease;
+            font-weight: 500;
+            color: #f8fafc !important;
+            transition: all 0.15s ease;
             outline: none;
-            box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.3) !important;
+            box-shadow: 3px 3px 0px var(--ink) !important;
         }
 
         .input-group input:focus {
-            border-color: #fcd34d !important;
-            box-shadow: 3px 3px 0px #000 !important;
+            border-color: var(--accent-gold) !important;
+            box-shadow: 4px 4px 0px var(--ink) !important;
+            transform: translate(-1px, -1px);
+        }
+
+        .input-group input:focus + i,
+        .input-wrapper:focus-within i {
+            color: var(--accent-gold);
         }
 
         .input-group input::placeholder {
@@ -97,123 +155,136 @@
 
         .btn-login {
             width: 100%;
-            padding: 14px;
-            background: #fcd34d;
-            border: 2px solid #000;
-            color: #000;
+            padding: 13px 16px;
+            background: var(--accent-gold);
+            border: 2.5px solid var(--ink);
+            color: var(--ink);
             font-weight: 800;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
-            border-radius: 12px;
-            font-size: 1rem;
+            letter-spacing: 0.06em;
+            border-radius: 10px;
+            font-size: 0.95rem;
             cursor: pointer;
-            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            box-shadow: 3px 3px 0px #000;
-            text-shadow: none;
+            transition: all 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 4px 4px 0px var(--ink);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 0.5rem;
         }
 
         .btn-login:hover {
             transform: translate(-2px, -2px);
-            box-shadow: 5px 5px 0px #000;
-            background: #fbbf24;
+            box-shadow: 6px 6px 0px var(--ink);
+            background: var(--accent-gold-hover);
         }
 
         .btn-login:active {
-            transform: translate(0, 0);
-            box-shadow: 2px 2px 0px #000;
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0px var(--ink);
         }
 
         .btn-login:disabled {
-            opacity: 0.6;
+            opacity: 0.65;
             cursor: not-allowed;
             transform: none;
-            background: #9ca3af;
+            background: #94a3b8;
         }
 
-        .logo {
-            text-align: center;
-            margin-bottom: 2.5rem;
+        .logo-box {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.75rem;
+            padding: 1rem;
+            background: var(--bg-subcard);
+            border: 2px solid var(--ink);
+            border-radius: 12px;
+            box-shadow: 3px 3px 0px var(--ink);
         }
 
-        .logo img {
-            width: 80px;
-            height: 80px;
-            margin-bottom: 1rem;
-            border: 2px solid #000;
-            border-radius: 50%;
-            box-shadow: 3px 3px 0px rgba(0, 0, 0, 0.4);
+        .logo-box img {
+            width: 58px;
+            height: 58px;
+            border: 2px solid var(--ink);
+            border-radius: 12px;
+            box-shadow: 2px 2px 0px var(--ink);
+            flex-shrink: 0;
+            object-fit: cover;
         }
 
-        .logo h1 {
-            font-size: 2.5rem;
+        .logo-title {
+            font-size: 1.75rem;
             font-weight: 800;
-            color: #fcd34d;
+            color: var(--accent-gold);
             text-transform: uppercase;
-            letter-spacing: 0.05em;
-            text-shadow: 3px 3px 0px #000;
-            margin-bottom: 0.5rem;
+            letter-spacing: 0.04em;
+            text-shadow: 2px 2px 0px var(--ink);
+            line-height: 1.1;
         }
 
-        .logo p {
+        .logo-sub {
             color: #94a3b8;
-            font-size: 0.9rem;
-            font-weight: 600;
+            font-size: 0.75rem;
+            font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.1em;
+            letter-spacing: 0.08em;
+            margin-top: 0.25rem;
         }
 
         .footer-note {
-            margin-top: 2rem;
-            padding-top: 1.5rem;
-            border-top: 2px solid #000;
-            text-align: center;
+            margin-top: 1.75rem;
+            padding-top: 1.25rem;
+            border-top: 2px dashed rgba(0, 0, 0, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
         }
 
-        .footer-note .badge {
+        .badge-brutal {
             display: inline-flex;
             align-items: center;
-            gap: 8px;
-            background: rgba(34, 197, 94, 0.15);
-            padding: 8px 16px;
-            border-radius: 9999px;
-            font-weight: 700;
-            font-size: 0.75rem;
-            color: #4ade80;
-            border: 1.5px solid #000;
+            gap: 6px;
+            background: rgba(52, 211, 153, 0.15);
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-weight: 800;
+            font-size: 0.7rem;
+            color: #34d399;
+            border: 2px solid var(--ink);
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.3);
+            box-shadow: 2px 2px 0px var(--ink);
         }
 
         .alert {
-            padding: 12px 16px;
+            padding: 12px 14px;
             border-radius: 10px;
-            margin-bottom: 1.5rem;
-            font-weight: 600;
-            font-size: 0.9rem;
-            border: 2px solid #000;
-            box-shadow: 3px 3px 0px rgba(0, 0, 0, 0.3);
+            margin-bottom: 1.25rem;
+            font-weight: 700;
+            font-size: 0.85rem;
+            border: 2px solid var(--ink);
+            box-shadow: 3px 3px 0px var(--ink);
             display: none;
         }
 
         .alert-error {
-            background-color: rgba(239, 68, 68, 0.2);
-            color: #fca5a5;
-            border-color: #000;
+            background-color: #7f1d1d;
+            color: #fecaca;
         }
 
         .alert-success {
-            background-color: rgba(34, 197, 94, 0.2);
-            color: #86efac;
-            border-color: #000;
+            background-color: #064e3b;
+            color: #a7f3d0;
         }
 
-        /* Spinner update */
         .spinner {
             display: inline-block;
             width: 16px;
             height: 16px;
-            border: 2px solid rgba(0, 0, 0, 0.3);
+            border: 2.5px solid rgba(0, 0, 0, 0.25);
             border-top-color: #000;
             border-radius: 50%;
             animation: spin 0.6s linear infinite;
@@ -229,34 +300,55 @@
 
 <body>
     <div class="login-card">
-        <div class="logo">
-            <img src="/static/images/logo.png" alt="TeleFetchr Logo">
-            <h1>TeleFetchr</h1>
-            <p>Secure File Access</p>
+        <!-- Neo-Brutalist Window Header Strip -->
+        <div class="login-topbar">
+            <div class="window-dots">
+                <span class="window-dot" style="background: #fb7185;"></span>
+                <span class="window-dot" style="background: #fcd34d;"></span>
+                <span class="window-dot" style="background: #34d399;"></span>
+            </div>
+            <span class="font-mono text-xs font-bold uppercase tracking-widest text-gray-400">AUTH // GATEWAY</span>
         </div>
 
-        <div id="alert" class="alert"></div>
-
-        <form id="loginForm">
-            <div class="input-group">
-                <label for="username">Username</label>
-                <input type="text" id="username" placeholder="Enter username" required autocomplete="username">
+        <div class="login-body">
+            <div class="logo-box">
+                <img src="/static/images/logo.png" alt="TeleFetchr Logo">
+                <div>
+                    <h1 class="logo-title">TeleFetchr</h1>
+                    <p class="logo-sub">Telegram Media Ingest</p>
+                </div>
             </div>
 
-            <div class="input-group">
-                <label for="password">Password</label>
-                <input type="password" id="password" placeholder="Enter password" required
-                    autocomplete="current-password">
-            </div>
+            <div id="alert" class="alert"></div>
 
-            <button type="submit" class="btn-login" id="loginBtn">
-                Sign In
-            </button>
-        </form>
+            <form id="loginForm">
+                <div class="input-group">
+                    <label for="username">Operator Username</label>
+                    <div class="input-wrapper">
+                        <input type="text" id="username" placeholder="Enter username" required autocomplete="username">
+                        <i class="fa-solid fa-user-astronaut"></i>
+                    </div>
+                </div>
 
-        <div class="footer-note">
-            <div class="badge">
-                <i class="fa-solid fa-lock text-xs"></i> Secure Environment
+                <div class="input-group">
+                    <label for="password">Access Password</label>
+                    <div class="input-wrapper">
+                        <input type="password" id="password" placeholder="Enter password" required autocomplete="current-password">
+                        <i class="fa-solid fa-key"></i>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-login" id="loginBtn">
+                    <span>Unlock Workspace</span>
+                    <i class="fa-solid fa-arrow-right"></i>
+                </button>
+            </form>
+
+            <div class="footer-note">
+                <div class="badge-brutal">
+                    <i class="fa-solid fa-shield-halved text-xs"></i> JWT Protected
+                </div>
+                <span class="font-mono text-xs text-gray-500">MTProto v2</span>
             </div>
         </div>
     </div>
@@ -284,9 +376,8 @@
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
 
-            // Disable button and show loading
             loginBtn.disabled = true;
-            loginBtn.innerHTML = '<span class="spinner"></span> Signing in...';
+            loginBtn.innerHTML = '<span class="spinner"></span> <span>Authenticating...</span>';
 
             try {
                 const response = await fetch('/auth/login', {
@@ -302,16 +393,12 @@
 
                 if (response.ok) {
                     const data = await response.json();
-
-                    // Store the token
                     localStorage.setItem('access_token', data.access_token);
-
                     showAlert('Login successful! Redirecting...', 'success');
 
-                    // Redirect to app
                     setTimeout(() => {
                         window.location.href = '/app';
-                    }, 1000);
+                    }, 800);
                 } else {
                     let errorMessage = 'Login failed. Please check your credentials.';
                     try {
@@ -319,28 +406,25 @@
                         const error = await responseClone.json();
                         errorMessage = error.detail || errorMessage;
                     } catch (parseError) {
-                        // Response is not JSON (e.g., HTML error page or plain text)
                         console.error('Non-JSON error response');
-                        errorMessage = `Server error(${response.status}). Please try again later.`;
+                        errorMessage = `Server error (${response.status}). Please try again later.`;
                     }
                     showAlert(errorMessage, 'error');
                     loginBtn.disabled = false;
-                    loginBtn.innerHTML = 'Sign In';
+                    loginBtn.innerHTML = '<span>Unlock Workspace</span> <i class="fa-solid fa-arrow-right"></i>';
                 }
             } catch (error) {
                 console.error('Login error:', error);
                 showAlert('An error occurred. Please try again.', 'error');
                 loginBtn.disabled = false;
-                loginBtn.innerHTML = 'Sign In';
+                loginBtn.innerHTML = '<span>Unlock Workspace</span> <i class="fa-solid fa-arrow-right"></i>';
             }
         });
 
-        // Check if already logged in
         window.addEventListener('DOMContentLoaded', async () => {
             const token = localStorage.getItem('access_token');
             if (token) {
                 try {
-                    // Try to access a protected endpoint to verify token
                     const response = await fetch('/status', {
                         headers: {
                             'Authorization': `Bearer ${token}`
@@ -348,14 +432,11 @@
                     });
 
                     if (response.ok) {
-                        // Token is valid, redirect to app
                         window.location.href = '/app';
                     } else {
-                        // Token is invalid, remove it
                         localStorage.removeItem('access_token');
                     }
                 } catch (error) {
-                    // Token check failed
                     localStorage.removeItem('access_token');
                 }
             }

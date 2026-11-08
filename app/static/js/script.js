@@ -1116,28 +1116,28 @@ function displayFiles(files) {
 
         // Comic style file item: ink borders + hard shadow
         html += `
-            <div class="bg-gray-800 bg-opacity-60 rounded-xl border-1.5 border-black flex items-center p-3 gap-2 sm:gap-4 hover:bg-yellow-500 hover:bg-opacity-10 hover:border-yellow-400 hover:shadow-[3px_3px_0px_rgba(0,0,0,1)] hover:-translate-y-0.5 shadow-[2px_2px_0px_rgba(0,0,0,0.5)] transition-all group file-item" data-file-id="${file.file_id}">
+            <div class="bg-gray-900 bg-opacity-80 rounded-xl border-2 border-black flex items-center p-3 gap-2 sm:gap-4 hover:bg-yellow-500 hover:bg-opacity-10 hover:border-yellow-400 hover:shadow-[3px_3px_0px_#000] hover:-translate-y-0.5 shadow-[2px_2px_0px_#000] transition-all group file-item" data-file-id="${file.file_id}">
                 <div class="flex items-center">
                     <input type="checkbox"
                            id="file_${file.file_id}"
-                           class="file-checkbox w-5 h-5 rounded border-black text-yellow-500 focus:ring-yellow-500 focus:ring-offset-gray-900 bg-gray-900 cursor-pointer"
+                           class="file-checkbox w-4 h-4 sm:w-5 sm:h-5 rounded border-2 border-black text-yellow-500 focus:ring-yellow-500 focus:ring-offset-gray-900 bg-gray-950 cursor-pointer"
                            onchange="toggleFileSelection(${file.file_id})"
                            ${isChecked}>
                 </div>
-                <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-yellow-400 bg-opacity-10 flex items-center justify-center flex-shrink-0 border border-black shadow-[2px_2px_0px_rgba(0,0,0,0.2)]">
-                    <i class="fa-solid ${icon} text-sm sm:text-lg text-yellow-400"></i>
+                <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-yellow-400 bg-opacity-10 flex items-center justify-center flex-shrink-0 border border-black shadow-[1.5px_1.5px_0px_#000]">
+                    <i class="fa-solid ${icon} text-sm sm:text-base text-yellow-400"></i>
                 </div>
                 <div class="flex-1 min-w-0 overflow-hidden">
-                    <div class="font-medium text-gray-200 line-clamp-2 text-sm sm:text-base" title="${escapeHtml(file.file_name)}">${escapeHtml(file.file_name)}</div>
-                    <div class="text-[10px] sm:text-xs text-gray-500 mt-0.5 flex items-center flex-wrap gap-x-2 gap-y-1">
-                        <span class="bg-gray-700 bg-opacity-80 px-1 sm:px-1.5 rounded uppercase tracking-wide">${escapeHtml(file.file_type)}</span>
+                    <div class="font-semibold text-gray-200 line-clamp-2 text-xs sm:text-sm" title="${escapeHtml(file.file_name)}">${escapeHtml(file.file_name)}</div>
+                    <div class="text-[10px] sm:text-xs text-gray-400 mt-0.5 flex items-center flex-wrap gap-x-2 gap-y-1 font-mono">
+                        <span class="bg-gray-800 border border-black/50 px-1 sm:px-1.5 rounded uppercase tracking-wide text-gray-300 font-semibold">${escapeHtml(file.file_type)}</span>
                         <span>${size}</span>
-                        <span class="hidden sm:inline">•</span>
+                        <span class="hidden sm:inline text-gray-600">•</span>
                         <span>${new Date(file.date).toLocaleDateString()}</span>
                     </div>
                 </div>
                 <button onclick="downloadSingle(${file.file_id}, ${jsStr(currentChannel)})" 
-                    class="flex-shrink-0 p-2 sm:py-1.5 sm:px-4 rounded-xl btn-yellow-hover text-xs flex items-center gap-1.5 md:opacity-0 md:group-hover:opacity-100 md:translate-x-2 md:group-hover:translate-x-0 focus:outline-none">
+                    class="flex-shrink-0 p-2 sm:py-1.5 sm:px-3 rounded-lg btn-yellow-hover text-xs font-bold flex items-center gap-1.5 focus:outline-none" title="Download this file">
                     <i class="fa-solid fa-download text-[10px]"></i> <span class="hidden sm:inline">Download</span>
                 </button>
             </div>

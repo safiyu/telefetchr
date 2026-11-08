@@ -2,6 +2,12 @@
 
 All epic victories and mysterious bugs that somehow became features are here.
 
+## [4.2.0] - 2026-11-08
+### Added
+- Responsive 2-Column Split Workspace: Desktop views feature a dedicated 7-column Explorer & Search pane alongside a sticky 5-column live Transfers & Queue pane (`lg:sticky lg:top-20`), eliminating scroll-hunting during active scans and downloads. Seamlessly folds into a single-column layout on mobile devices with touch targets and full responsiveness.
+- Cyber-Comic 2.0 Aesthetic: Refined Neo-Brutalist design tokens (`--bg-canvas`, `--bg-card`, `--bg-subcard`, `--accent-gold`, `--accent-cyan`, `--ink`) with tactile 2px ink borders, 4px hard offset shadows, JetBrains Mono font integration, and custom checkbox and badge elements.
+- Login Gateway Redesign: Styled login page to match the Cyber-Comic 2.0 terminal window theme with operator inputs and security badges.
+
 ## [4.1.4] - 2026-11-08
 ### Changed
 - Renamed "Watch Rules" to "Auto Download": Updated all UI terminology, navigation buttons, view headers, metrics, modal dialogs, and activity feed chips to "Auto Download" for clearer, intuitive workflow understanding.

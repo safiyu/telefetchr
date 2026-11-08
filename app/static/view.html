@@ -12,25 +12,41 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg-canvas: #0f172a;
+            --bg-card: #1e293b;
+            --bg-subcard: #0b1120;
+            --accent-gold: #fcd34d;
+            --accent-gold-hover: #fbbf24;
+            --accent-cyan: #38bdf8;
+            --ink: #000000;
+        }
+
         * {
             font-family: 'Outfit', sans-serif;
         }
 
-        body {
-            background-color: #131e32;
-            color: #f1f5f9;
-            background-image: url("/static/images/stardust.png");
-            /* Subtle paper grain */
+        .font-mono {
+            font-family: 'JetBrains Mono', monospace !important;
         }
 
-        /* Comic Panel Design */
+        body {
+            background-color: var(--bg-canvas);
+            color: #f8fafc;
+            background-image:
+                radial-gradient(rgba(56, 189, 248, 0.08) 1px, transparent 1px),
+                url("/static/images/stardust.png");
+            background-size: 18px 18px, auto;
+        }
+
+        /* Refined Cyber-Comic 2.0 Neo-Brutalist Panel */
         .glass-card {
-            background: #1e293b;
-            border: 1.5px solid #000;
-            border-radius: 12px;
-            box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.4);
+            background: var(--bg-card);
+            border: 2px solid var(--ink);
+            border-radius: 14px;
+            box-shadow: 4px 4px 0px var(--ink);
             position: relative;
         }
 
@@ -67,12 +83,12 @@
         /* Comic Grey Button - Turns Yellow on Hover */
         .btn-yellow-hover {
             background: rgba(107, 114, 128, 0.15);
-            border: 1.5px solid #000;
-            color: #9ca3af;
+            border: 2px solid var(--ink);
+            color: #cbd5e1;
             font-weight: 700;
             text-transform: uppercase;
-            box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.3);
-            transition: all 0.2s ease;
+            box-shadow: 2.5px 2.5px 0px var(--ink);
+            transition: all 0.15s ease;
         }
 
         .btn-yellow-hover:hover {
@@ -80,18 +96,18 @@
             color: #000;
             border-color: #000;
             transform: translate(-1.5px, -1.5px);
-            box-shadow: 3.5px 3.5px 0px #000;
+            box-shadow: 4px 4px 0px var(--ink);
         }
 
         /* Comic Grey Button - Turns Orange on Hover */
         .btn-orange-hover {
             background: rgba(107, 114, 128, 0.15);
-            border: 1.5px solid #000;
-            color: #9ca3af;
+            border: 2px solid var(--ink);
+            color: #cbd5e1;
             font-weight: 700;
             text-transform: uppercase;
-            box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.3);
-            transition: all 0.2s ease;
+            box-shadow: 2.5px 2.5px 0px var(--ink);
+            transition: all 0.15s ease;
         }
 
         /* Amber fallbacks for Tailwind 2.2.19 */
@@ -109,30 +125,30 @@
             color: #fff;
             border-color: #000;
             transform: translate(-1.5px, -1.5px);
-            box-shadow: 3.5px 3.5px 0px #000;
+            box-shadow: 4px 4px 0px var(--ink);
         }
 
         .btn-red {
             background: rgba(239, 68, 68, 0.15);
-            border: 2px solid #000;
+            border: 2px solid var(--ink);
             color: #ef4444;
             font-weight: 800;
             text-transform: uppercase;
-            box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.5);
-            transition: all 0.2s ease;
+            box-shadow: 2.5px 2.5px 0px var(--ink);
+            transition: all 0.15s ease;
         }
 
         .btn-red:hover {
             background: #ef4444;
             color: #fff;
             transform: translate(-2px, -2px);
-            box-shadow: 4px 4px 0px #000;
+            box-shadow: 4px 4px 0px var(--ink);
         }
 
         /* Comic Badge Styles */
         .comic-badge {
-            border: 2px solid #000;
-            box-shadow: 3px 3px 0px rgba(0, 0, 0, 0.4);
+            border: 2px solid var(--ink);
+            box-shadow: 3px 3px 0px var(--ink);
             font-weight: 800;
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -158,17 +174,17 @@
 
         input,
         select {
-            background: #0f172a !important;
-            border: 1.5px solid #000 !important;
+            background: var(--bg-subcard) !important;
+            border: 2px solid var(--ink) !important;
             color: #f1f5f9 !important;
-            border-radius: 8px !important;
-            box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.2) !important;
+            border-radius: 10px !important;
+            box-shadow: 3px 3px 0px var(--ink) !important;
         }
 
         input:focus,
         select:focus {
-            border-color: #fcd34d !important;
-            box-shadow: 3px 3px 0px #000 !important;
+            border-color: var(--accent-gold) !important;
+            box-shadow: 4px 4px 0px var(--ink) !important;
             outline: none !important;
         }
 
@@ -499,9 +515,13 @@
             </div>
 
             <!-- SEARCH / CONTROLS (Main Container) -->
-            <div id="searchTabContent" class="space-y-6">
-                <!-- Main Controls -->
-                <div class="glass-card p-4 sm:p-6 md:p-8">
+            <div id="searchTabContent">
+                <!-- Responsive 2-Column Split Workspace (Desktop: 7/5 split, Mobile: single column stack) -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                    <!-- Left Column: Source Controls, Scan Filters & File Results -->
+                    <div class="lg:col-span-7 space-y-6 min-w-0">
+                        <!-- Main Controls -->
+                        <div class="glass-card p-4 sm:p-6 md:p-8">
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6">
                         <div class="sm:col-span-2 relative" id="channelPickerWrapper">
                             <label class="block text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">
@@ -752,13 +772,16 @@
                     </div>
                 </div>
 
-                <!-- File List (Scan Results) -->
-                <div id="filesList" class="hidden glass-card p-4 sm:p-6 animate-fade-in">
-                    <!-- Content handled by JS -->
-                </div>
+                        <!-- File List (Scan Results) -->
+                        <div id="filesList" class="hidden glass-card p-4 sm:p-6 animate-fade-in">
+                            <!-- Content handled by JS -->
+                        </div>
+                    </div>
 
-                <!-- UNIFIED ACTIVITY & HISTORY SECTION (Single Screen) -->
-                <div id="downloadProgress" class="w-full">
+                    <!-- Right Column: Sticky Live Transfers, Queue & History -->
+                    <div class="lg:col-span-5 space-y-6 min-w-0 lg:sticky lg:top-20">
+                        <!-- UNIFIED ACTIVITY & HISTORY SECTION (Single Screen) -->
+                        <div id="downloadProgress" class="w-full">
                     <div id="activityCard" class="glass-card p-4 sm:p-6 space-y-4">
                         <!-- Activity Toolbar & Summary -->
                         <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-4 border-b border-gray-700/60 pb-4">
@@ -838,6 +861,8 @@
                                 <p class="text-xs text-gray-500 mt-1">Select a channel and scan files to begin downloading</p>
                             </div>
                         </div>
+                    </div>
+                </div>
                     </div>
                 </div>
             </div>
@@ -936,7 +961,7 @@
         </div>
     </main>
 
-    <script src="/static/js/script.js?v=48"></script>
+    <script src="/static/js/script.js?v=49"></script>
     <!-- Toast Container -->
     <div id="toastContainer"
         class="fixed bottom-8 left-4 right-4 sm:bottom-auto sm:top-6 sm:right-6 sm:left-auto flex flex-col items-center sm:items-end gap-3 pointer-events-none transition-all duration-300"
