@@ -2,6 +2,18 @@
 
 All epic victories and mysterious bugs that somehow became features are here.
 
+## [4.0.1] - 2026-11-08
+### Fixed
+- Media Filter in Download All: Fixed document/photo condition in `download_all_files` so that video and audio media files are correctly queued and downloaded when filtering.
+- Parallel Connection Pool: Resolved socket leakage in `_create_parallel_senders` on partial connection failure and preserved `_init_request.query` state.
+- Worker Fallback: Added graceful fallback to single-connection `iter_download` if a parallel sender worker hits a CDN redirect or transient connection error mid-stream.
+- Resumption Disk Throttling: Throttled metadata file writes to at most once per 2 seconds during active streaming, avoiding excessive disk writes on every chunk.
+- Auth & Security: Added `HttpOnly` cookie authentication for seamless browser downloads on `/files/serve/`, and scoped `?token=` acceptance exclusively to file serving.
+- Debug Endpoint Gating: Gated `/debug/*` endpoints behind `ENABLE_DEBUG_ROUTES` or debug log level in production.
+- Phone Number Formatting: Fixed string formatting logic so leading `+` is never duplicated when provided in environment variables.
+- Private Channel Support: Enabled private channels and supergroups without `@username` in the channel picker by capturing and resolving numeric peer IDs.
+- Mobile UI Layout: Fixed toast width to fit cleanly on narrow mobile viewports (`min(400px, calc(100vw - 2rem))`).
+
 ## [4.0.0] - 2026-11-07
 ### Added
 - Unified Activity Screen: Replaced fragmented tabs (Search/Queue) and active/history split with a single-screen feed showing Downloading, Queued, Partial, and Completed items with instant filter chips.
