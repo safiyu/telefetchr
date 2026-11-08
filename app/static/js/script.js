@@ -1040,7 +1040,7 @@ function displayFiles(files) {
     }
 
     let html = `
-        <div class="mb-4 pb-3 border-b border-gray-700/60">
+        <div class="mb-3 pb-3 border-b border-gray-700/60 flex-shrink-0">
             <!-- Row 1: Files Found header + Mobile Sort dropdown -->
             <div class="flex items-center justify-between gap-3 mb-2.5">
                 <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2 italic uppercase">
@@ -1099,7 +1099,7 @@ function displayFiles(files) {
                 </div>
             </div>
         </div>
-        <div class="grid grid-cols-1 gap-3 max-h-[520px] overflow-y-auto pr-1.5 custom-scrollbar">`;
+        <div class="grid grid-cols-1 gap-2.5 flex-1 min-h-0 overflow-y-auto pr-1.5 custom-scrollbar">`;
 
     files.forEach((file) => {
         const size =

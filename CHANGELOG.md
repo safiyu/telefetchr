@@ -2,11 +2,16 @@
 
 All epic victories and mysterious bugs that somehow became features are here.
 
+## [4.2.2] - 2026-11-08
+### Fixed
+- Fixed Viewport Height: Locked desktop view to exact viewport height (`lg:h-screen lg:overflow-hidden`) with zero window scrolling.
+- Independent Custom Scrollbars: Configured dedicated internal scrollbars for both the Downloads panel (`#activityContainer`) and the full-width Scanned Files container, keeping layout intact.
+
 ## [4.2.1] - 2026-11-08
 ### Changed
-- Dashboard Layout: Placed Channel Selection ## [4.2.0] Scan Card side-by-side with Downloads Card at equal height.
+- Dashboard Layout: Placed Channel Selection & Scan Card side-by-side with Downloads Card at equal height.
 - Downloads Header: Simplified title to "Downloads".
-- Container Scrolling: Made Downloads list and full-width Scanned Files list internally scrollable to eliminate page overflow and maintain a fixed compact viewport.
+- Container Scrolling: Made Downloads list and full-width Scanned Files list internally scrollable.
 
 ## [4.2.0] - 2026-11-08
 ### Added
